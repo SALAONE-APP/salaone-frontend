@@ -1,0 +1,2 @@
+# salaone-frontend
+Frontend Salaone
