@@ -1,0 +1,339 @@
+import api from "./api";
+
+/* ─── tipos ─── */
+
+export interface SuperAdminDashboard {
+  totalBarbershops: number;
+  activeBarbershops: number;
+  inactiveBarbershops: number;
+  blockedBarbershops: number;
+  pendingBarbershops: number;
+  activeSubscriptions: number;
+  newBarbershopsThisMonth: number;
+}
+
+export type BarbershopStatus = "active" | "inactive" | "blocked" | "pending";
+export type SubscriptionStatus = "active" | "paused" | "cancelled" | "expired" | "pending" | "none";
+
+export interface SuperAdminPlatformSubscription {
+  id: string;
+  status: string;
+  selected_plan: string;
+  payment_method?: string | null;
+  amount?: number | null;
+  start_date?: string | null;
+  next_billing_date?: string | null;
+  canceled_at?: string | null;
+  created_at: string;
+  platform_plans?: {
+    id: string;
+    name: string;
+    price: number;
+    interval: string;
+    interval_count: number;
+  } | null;
+}
+
+export interface SuperAdminBarbershop {
+  id: string;
+  name: string;
+  slug: string;
+  cnpj?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  status: BarbershopStatus;
+  createdAt: string;
+  blockedReason?: string | null;
+  blockedAt?: string | null;
+  deactivatedAt?: string | null;
+  admin?: {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string | null;
+    created_at: string;
+  } | null;
+  subscription?: {
+    id: string;
+    status: string;
+    created_at: string;
+    next_billing_at?: string | null;
+    last_billing_at?: string | null;
+    subscription_plans?: {
+      id: string;
+      name: string;
+      price: number;
+    } | null;
+  } | null;
+  platformSubscription?: SuperAdminPlatformSubscription | null;
+  metrics: {
+    appointmentsCount: number;
+    servicesCount: number;
+    productsCount: number;
+    clientsCount: number;
+    employeesCount: number;
+  };
+}
+
+export interface SuperAdminBarbershopDetail extends SuperAdminBarbershop {
+  updated_at?: string;
+  stripe_connect_account_id?: string | null;
+  stripe_connect_charges_enabled?: boolean;
+  stripe_connect_payouts_enabled?: boolean;
+  subscriptions?: Array<{
+    id: string;
+    status: string;
+    started_at?: string | null;
+    next_billing_at?: string | null;
+    ended_at?: string | null;
+    created_at: string;
+    users?: { id: string; name: string; email: string } | null;
+    subscription_plans?: {
+      id: string;
+      name: string;
+      price: number;
+      cuts_per_month: number;
+    } | null;
+  }>;
+}
+
+export interface SuperAdminBarbershopUser {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  role: string;
+  is_admin: boolean;
+  current_barbershop_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SuperAdminUser {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  role: string;
+  isAdmin: boolean;
+  createdAt: string;
+  updatedAt: string;
+  barbershopId?: string | null;
+  barbershop?: {
+    id: string;
+    name: string;
+    slug: string;
+    status: string;
+  } | null;
+}
+
+export interface ListBarbershopsParams {
+  q?: string;
+  status?: BarbershopStatus;
+  plan?: string;
+  subscriptionStatus?: SubscriptionStatus;
+  createdFrom?: string;
+  createdTo?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: "name" | "createdAt" | "updatedAt" | "status";
+  sortOrder?: "asc" | "desc";
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+/* ─── dashboard ─── */
+
+export async function getSuperAdminDashboard(): Promise<SuperAdminDashboard> {
+  const response = await api.get<SuperAdminDashboard>("/super-admin/dashboard");
+  return response.data;
+}
+
+/* ─── barbearias ─── */
+
+export async function listSuperAdminBarbershops(
+  params: ListBarbershopsParams = {}
+): Promise<PaginatedResponse<SuperAdminBarbershop>> {
+  const response = await api.get<PaginatedResponse<SuperAdminBarbershop>>(
+    "/super-admin/barbershops",
+    { params }
+  );
+  return response.data;
+}
+
+export async function getSuperAdminBarbershopById(
+  id: string
+): Promise<SuperAdminBarbershopDetail> {
+  const response = await api.get<SuperAdminBarbershopDetail>(
+    `/super-admin/barbershops/${id}`
+  );
+  return response.data;
+}
+
+export async function listSuperAdminBarbershopUsers(
+  barbershopId: string
+): Promise<{ items: SuperAdminBarbershopUser[]; total: number }> {
+  const response = await api.get<{ items: SuperAdminBarbershopUser[]; total: number }>(
+    `/super-admin/barbershops/${barbershopId}/users`
+  );
+  return response.data;
+}
+
+export async function updateSuperAdminBarbershopStatus(
+  id: string,
+  status: BarbershopStatus,
+  reason?: string | null
+): Promise<{ id: string; name: string; status: string; blocked_reason?: string | null }> {
+  const response = await api.patch(`/super-admin/barbershops/${id}/status`, {
+    status,
+    reason: reason || undefined,
+  });
+  return response.data;
+}
+
+export async function activatePixPlatformSubscription(
+  barbershopId: string,
+  payload: {
+    platformPlanId: string;
+    paidAt?: string;
+    nextBillingDate?: string;
+    amount?: number;
+  }
+): Promise<SuperAdminPlatformSubscription> {
+  const response = await api.post<SuperAdminPlatformSubscription>(
+    `/super-admin/barbershops/${barbershopId}/platform-subscription/pix/activate`,
+    payload
+  );
+  return response.data;
+}
+
+/* ─── usuários globais ─── */
+
+export async function listSuperAdminUsers(params: {
+  q?: string;
+  role?: string;
+  page?: number;
+  limit?: number;
+}): Promise<PaginatedResponse<SuperAdminUser>> {
+  const response = await api.get<PaginatedResponse<SuperAdminUser>>(
+    "/super-admin/users",
+    { params }
+  );
+  return response.data;
+}
+
+export async function updateSuperAdminUser(
+  id: string,
+  data: { email?: string; phone?: string | null; newPassword?: string }
+): Promise<SuperAdminUser> {
+  const response = await api.patch<SuperAdminUser>(`/super-admin/users/${id}`, data);
+  return response.data;
+}
+
+export async function resetSuperAdminUserPassword(
+  id: string,
+  newPassword?: string
+): Promise<{ id: string; password: string }> {
+  const response = await api.patch<{ id: string; password: string }>(
+    `/super-admin/users/${id}/password`,
+    newPassword ? { newPassword } : {}
+  );
+  return response.data;
+}
+
+/* ─── planos da plataforma ─── */
+
+export interface PlatformPlan {
+  id: string;
+  name: string;
+  description?: string | null;
+  price: number;
+  interval: string;
+  intervalCount?: number | null;
+  interval_count?: number | null;
+  trialPeriodDays?: number | null;
+  trial_period_days?: number | null;
+  statementDescriptor?: string | null;
+  paymentMethods?: string[];
+  payment_methods?: string[];
+  features?: string[];
+  maxBarbers?: number | null;
+  max_barbers?: number | null;
+  maxAdmins?: number | null;
+  max_admins?: number | null;
+  maxReceptionists?: number | null;
+  max_receptionists?: number | null;
+  isPublic?: boolean;
+  is_public?: boolean;
+  isRecommended?: boolean;
+  is_recommended?: boolean;
+  sortOrder?: number;
+  sort_order?: number;
+  active?: boolean;
+  pagarmePlanId?: string | null;
+  pagarme_plan_id?: string | null;
+}
+
+export async function getPlatformPlans(): Promise<PlatformPlan[]> {
+  const response = await api.get<PlatformPlan[] | { items: PlatformPlan[] }>("/platform-plans");
+  const data = response.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray((data as { items: PlatformPlan[] }).items)) {
+    return (data as { items: PlatformPlan[] }).items;
+  }
+  return [];
+}
+
+export async function createPlatformPlan(payload: {
+  name: string;
+  description?: string | null;
+  price: number;
+  interval: string;
+  intervalCount: number;
+  trialPeriodDays?: number;
+  statementDescriptor?: string;
+  paymentMethods?: string[];
+  features?: string[];
+  maxBarbers?: number | null;
+  maxAdmins?: number | null;
+  maxReceptionists?: number | null;
+  isPublic?: boolean;
+  isRecommended?: boolean;
+  sortOrder?: number;
+  syncPagarme?: boolean;
+}): Promise<PlatformPlan & { pagarmeSkipped?: boolean }> {
+  const response = await api.post<PlatformPlan & { pagarmeSkipped?: boolean }>("/platform-plans", payload);
+  return response.data;
+}
+
+export async function updatePlatformPlan(
+  id: string,
+  payload: Partial<{
+    name: string;
+    description: string | null;
+    price: number;
+    features: string[];
+    isPublic: boolean;
+    isRecommended: boolean;
+    sortOrder: number;
+    maxBarbers: number | null;
+    maxAdmins: number | null;
+    maxReceptionists: number | null;
+    statementDescriptor: string;
+    paymentMethods: string[];
+    active: boolean;
+  }>
+): Promise<PlatformPlan> {
+  const response = await api.patch<PlatformPlan>(`/platform-plans/${id}`, payload);
+  return response.data;
+}
+
+export async function deletePlatformPlan(id: string): Promise<void> {
+  await api.delete(`/platform-plans/${id}`);
+}
