@@ -95,5 +95,5 @@ function buildSections(): SidebarSection[] {
 }
 
 export function AdminSidebar() {
-  return <ProfileSidebar title="Painel da Barbearia" homeHref="/home" sections={buildSections()} />;
+  return <ProfileSidebar title="Painel da Salão" homeHref="/home" sections={buildSections()} />;
 }

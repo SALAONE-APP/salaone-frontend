@@ -146,7 +146,7 @@ export function SuperAdminFeatureUpdatesPage() {
           <div>
             <h2 className="text-xl font-semibold text-foreground">Novas funcionalidades</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Cadastre comunicados que serao exibidos para administradores das barbearias.
+              Cadastre comunicados que serao exibidos para administradores das salões.
             </p>
           </div>
         </div>

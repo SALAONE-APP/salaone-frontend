@@ -4,7 +4,7 @@ export type PlanPaymentMethod = "pix" | "debito" | "credito" | "local";
 
 export interface Plan {
   id: string;
-  barbershopId?: string;
+  salonId?: string;
   name: string;
   subtitle?: string | null;
   price: number;

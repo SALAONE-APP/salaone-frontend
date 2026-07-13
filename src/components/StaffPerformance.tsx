@@ -20,12 +20,12 @@ export function StaffPerformance({ staff }: Props) {
   return (
     <div className="h-full rounded-xl border border-border bg-card p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-base font-medium text-foreground">Barbeiros</h3>
+        <h3 className="text-base font-medium text-foreground">Profissionais</h3>
         <span className="text-xs text-muted-foreground">este mês</span>
       </div>
 
       {sorted.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nenhum barbeiro cadastrado.</p>
+        <p className="text-sm text-muted-foreground">Nenhum profissional cadastrado.</p>
       ) : (
         <div className="space-y-3">
           {sorted.map((member) => (
@@ -42,7 +42,7 @@ export function StaffPerformance({ staff }: Props) {
                 </Avatar>
                 <div>
                   <p className="text-sm font-medium text-foreground">{member.name}</p>
-                  <p className="text-xs text-muted-foreground">{member.specialty ?? "Barbeiro"}</p>
+                  <p className="text-xs text-muted-foreground">{member.specialty ?? "Profissional"}</p>
                 </div>
               </div>
               <div className="flex items-center gap-1.5 text-muted-foreground">

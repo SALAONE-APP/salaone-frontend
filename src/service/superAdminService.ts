@@ -3,16 +3,16 @@ import api from "./api";
 /* ─── tipos ─── */
 
 export interface SuperAdminDashboard {
-  totalBarbershops: number;
-  activeBarbershops: number;
-  inactiveBarbershops: number;
-  blockedBarbershops: number;
-  pendingBarbershops: number;
+  totalSalons: number;
+  activeSalons: number;
+  inactiveSalons: number;
+  blockedSalons: number;
+  pendingSalons: number;
   activeSubscriptions: number;
-  newBarbershopsThisMonth: number;
+  newSalonsThisMonth: number;
 }
 
-export type BarbershopStatus = "active" | "inactive" | "blocked" | "pending";
+export type SalonStatus = "active" | "inactive" | "blocked" | "pending";
 export type SubscriptionStatus = "active" | "paused" | "cancelled" | "expired" | "pending" | "none";
 
 export interface SuperAdminPlatformSubscription {
@@ -34,14 +34,14 @@ export interface SuperAdminPlatformSubscription {
   } | null;
 }
 
-export interface SuperAdminBarbershop {
+export interface SuperAdminSalon {
   id: string;
   name: string;
   slug: string;
   cnpj?: string | null;
   email?: string | null;
   phone?: string | null;
-  status: BarbershopStatus;
+  status: SalonStatus;
   createdAt: string;
   blockedReason?: string | null;
   blockedAt?: string | null;
@@ -75,7 +75,7 @@ export interface SuperAdminBarbershop {
   };
 }
 
-export interface SuperAdminBarbershopDetail extends SuperAdminBarbershop {
+export interface SuperAdminSalonDetail extends SuperAdminSalon {
   updated_at?: string;
   stripe_connect_account_id?: string | null;
   stripe_connect_charges_enabled?: boolean;
@@ -97,14 +97,14 @@ export interface SuperAdminBarbershopDetail extends SuperAdminBarbershop {
   }>;
 }
 
-export interface SuperAdminBarbershopUser {
+export interface SuperAdminSalonUser {
   id: string;
   name: string;
   email: string;
   phone?: string | null;
   role: string;
   is_admin: boolean;
-  current_barbershop_id?: string | null;
+  current_salon_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -118,8 +118,8 @@ export interface SuperAdminUser {
   isAdmin: boolean;
   createdAt: string;
   updatedAt: string;
-  barbershopId?: string | null;
-  barbershop?: {
+  salonId?: string | null;
+  salon?: {
     id: string;
     name: string;
     slug: string;
@@ -127,9 +127,9 @@ export interface SuperAdminUser {
   } | null;
 }
 
-export interface ListBarbershopsParams {
+export interface ListSalonsParams {
   q?: string;
-  status?: BarbershopStatus;
+  status?: SalonStatus;
   plan?: string;
   subscriptionStatus?: SubscriptionStatus;
   createdFrom?: string;
@@ -155,42 +155,42 @@ export async function getSuperAdminDashboard(): Promise<SuperAdminDashboard> {
   return response.data;
 }
 
-/* ─── barbearias ─── */
+/* ─── salões ─── */
 
-export async function listSuperAdminBarbershops(
-  params: ListBarbershopsParams = {}
-): Promise<PaginatedResponse<SuperAdminBarbershop>> {
-  const response = await api.get<PaginatedResponse<SuperAdminBarbershop>>(
-    "/super-admin/barbershops",
+export async function listSuperAdminSalons(
+  params: ListSalonsParams = {}
+): Promise<PaginatedResponse<SuperAdminSalon>> {
+  const response = await api.get<PaginatedResponse<SuperAdminSalon>>(
+    "/super-admin/salons",
     { params }
   );
   return response.data;
 }
 
-export async function getSuperAdminBarbershopById(
+export async function getSuperAdminSalonById(
   id: string
-): Promise<SuperAdminBarbershopDetail> {
-  const response = await api.get<SuperAdminBarbershopDetail>(
-    `/super-admin/barbershops/${id}`
+): Promise<SuperAdminSalonDetail> {
+  const response = await api.get<SuperAdminSalonDetail>(
+    `/super-admin/salons/${id}`
   );
   return response.data;
 }
 
-export async function listSuperAdminBarbershopUsers(
-  barbershopId: string
-): Promise<{ items: SuperAdminBarbershopUser[]; total: number }> {
-  const response = await api.get<{ items: SuperAdminBarbershopUser[]; total: number }>(
-    `/super-admin/barbershops/${barbershopId}/users`
+export async function listSuperAdminSalonUsers(
+  salonId: string
+): Promise<{ items: SuperAdminSalonUser[]; total: number }> {
+  const response = await api.get<{ items: SuperAdminSalonUser[]; total: number }>(
+    `/super-admin/salons/${salonId}/users`
   );
   return response.data;
 }
 
-export async function updateSuperAdminBarbershopStatus(
+export async function updateSuperAdminSalonStatus(
   id: string,
-  status: BarbershopStatus,
+  status: SalonStatus,
   reason?: string | null
 ): Promise<{ id: string; name: string; status: string; blocked_reason?: string | null }> {
-  const response = await api.patch(`/super-admin/barbershops/${id}/status`, {
+  const response = await api.patch(`/super-admin/salons/${id}/status`, {
     status,
     reason: reason || undefined,
   });
@@ -198,7 +198,7 @@ export async function updateSuperAdminBarbershopStatus(
 }
 
 export async function activatePixPlatformSubscription(
-  barbershopId: string,
+  salonId: string,
   payload: {
     platformPlanId: string;
     paidAt?: string;
@@ -207,7 +207,7 @@ export async function activatePixPlatformSubscription(
   }
 ): Promise<SuperAdminPlatformSubscription> {
   const response = await api.post<SuperAdminPlatformSubscription>(
-    `/super-admin/barbershops/${barbershopId}/platform-subscription/pix/activate`,
+    `/super-admin/salons/${salonId}/platform-subscription/pix/activate`,
     payload
   );
   return response.data;

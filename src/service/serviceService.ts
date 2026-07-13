@@ -16,7 +16,7 @@ export interface Service {
   active: boolean;
   createdAt?: string;
   updatedAt?: string;
-  barbershopId?: string;
+  salonId?: string;
 }
 
 export interface ListServicesParams {
@@ -24,7 +24,7 @@ export interface ListServicesParams {
   includeInactive?: boolean;
   page?: number;
   limit?: number;
-  barbershopId?: string;
+  salonId?: string;
 }
 
 export interface ListServicesResponse {

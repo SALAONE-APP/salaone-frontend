@@ -7,7 +7,7 @@ const sections: SidebarSection[] = [
   {
     items: [
       { icon: LayoutDashboard, label: "Dashboard", href: "/home" },
-      { icon: Building2, label: "Barbearias", href: "/barbershops" },
+      { icon: Building2, label: "Salões", href: "/salons" },
       { icon: Users, label: "Usuarios", href: "/users" },
       { icon: CreditCard, label: "Assinaturas", href: "/subscriptions" },
       { icon: FileText, label: "Planos Landing", href: "/platform-plans" },

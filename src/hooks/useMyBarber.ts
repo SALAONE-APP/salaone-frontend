@@ -13,7 +13,7 @@ export function useMyBarber() {
       .catch((err: unknown) => {
         const msg =
           (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          (err instanceof Error ? err.message : "Erro ao carregar perfil do barbeiro");
+          (err instanceof Error ? err.message : "Erro ao carregar perfil do profissional");
         setError(msg);
       })
       .finally(() => setLoading(false));

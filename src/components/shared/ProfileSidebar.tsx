@@ -28,20 +28,20 @@ interface ProfileSidebarProps {
   sections: SidebarSection[];
 }
 
-type StoredBarbershop = {
+type StoredSalon = {
   name?: string;
   logoUrl?: string;
 };
 
-function getStoredBarbershop() {
-  const storedBarbershop = localStorage.getItem("barbershop");
+function getStoredSalon() {
+  const storedSalon = localStorage.getItem("salon");
 
-  if (!storedBarbershop) {
+  if (!storedSalon) {
     return null;
   }
 
   try {
-    return JSON.parse(storedBarbershop) as StoredBarbershop;
+    return JSON.parse(storedSalon) as StoredSalon;
   } catch {
     return null;
   }
@@ -50,8 +50,8 @@ function getStoredBarbershop() {
 export function ProfileSidebar({ title, homeHref, sections }: ProfileSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
-  const [barbershop, setBarbershop] = useState<StoredBarbershop | null>(() =>
-    getStoredBarbershop()
+  const [salon, setSalon] = useState<StoredSalon | null>(() =>
+    getStoredSalon()
   );
   const location = useLocation();
   const navigate = useNavigate();
@@ -59,8 +59,8 @@ export function ProfileSidebar({ title, homeHref, sections }: ProfileSidebarProp
   const { open: mobileOpen, setOpen: setMobileOpen } = useSidebarMobile();
   const { can } = usePermissions();
 
-  const sidebarTitle = barbershop?.name?.trim() || title;
-  const logoUrl = barbershop?.logoUrl?.trim() || "";
+  const sidebarTitle = salon?.name?.trim() || title;
+  const logoUrl = salon?.logoUrl?.trim() || "";
   const fallbackInitial = sidebarTitle.trim()[0]?.toUpperCase() || "B";
 
   const filterItems = (items: SidebarItem[]): SidebarItem[] =>
@@ -107,16 +107,16 @@ export function ProfileSidebar({ title, homeHref, sections }: ProfileSidebarProp
   };
 
   useEffect(() => {
-    function refreshBarbershop() {
-      setBarbershop(getStoredBarbershop());
+    function refreshSalon() {
+      setSalon(getStoredSalon());
     }
 
-    window.addEventListener("storage", refreshBarbershop);
-    window.addEventListener("barbershop:updated", refreshBarbershop);
+    window.addEventListener("storage", refreshSalon);
+    window.addEventListener("salon:updated", refreshSalon);
 
     return () => {
-      window.removeEventListener("storage", refreshBarbershop);
-      window.removeEventListener("barbershop:updated", refreshBarbershop);
+      window.removeEventListener("storage", refreshSalon);
+      window.removeEventListener("salon:updated", refreshSalon);
     };
   }, []);
 

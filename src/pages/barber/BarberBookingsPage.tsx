@@ -57,7 +57,7 @@ import {
   type Appointment,
   type AppointmentStatus,
 } from "@/service/appointmentService";
-import { getBarbershopProfile, type BarbershopProfile } from "@/service/barbershopProfileService";
+import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
 import { listServices, type Service } from "@/service/serviceService";
 import { isFitAppointment } from "@/utils/fitAppointment";
 import { ClientPickerModal } from "@/components/ClientPickerModal";
@@ -174,7 +174,7 @@ export function BarberBookingsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [clientPickerOpen, setClientPickerOpen] = useState(false);
   const [selectedClientName, setSelectedClientName] = useState("");
-  const [barbershopProfile, setBarbershopProfile] = useState<BarbershopProfile | null>(null);
+  const [salonProfile, setSalonProfile] = useState<SalonProfile | null>(null);
   const [todayCount, setTodayCount] = useState<number | null>(null);
   const [form, setForm] = useState<BookingFormState>(emptyForm);
   const [services, setServices] = useState<Service[]>([]);
@@ -213,7 +213,7 @@ export function BarberBookingsPage() {
   }, [barber, loadAppointments]);
 
   useEffect(() => {
-    getBarbershopProfile().then(setBarbershopProfile).catch(() => null);
+    getSalonProfile().then(setSalonProfile).catch(() => null);
   }, []);
 
   useEffect(() => {
@@ -351,7 +351,7 @@ export function BarberBookingsPage() {
     try {
       await updateAppointment(appt.id, { status });
       if (barber?.id) void loadAppointments(barber.id);
-      if (status === "confirmed" && barbershopProfile?.phone) {
+      if (status === "confirmed" && salonProfile?.phone) {
         toast.success("Agendamento confirmado.", {
           action: {
             label: (
@@ -360,7 +360,7 @@ export function BarberBookingsPage() {
                 Enviar WhatsApp
               </span>
             ),
-            onClick: () => sendAppointmentWhatsApp(appt, barbershopProfile),
+            onClick: () => sendAppointmentWhatsApp(appt, salonProfile),
           },
         });
       } else {
@@ -393,7 +393,7 @@ export function BarberBookingsPage() {
     return (
       <div className="rounded-xl border border-border bg-card p-8 text-center">
         <p className="text-muted-foreground">
-          Perfil de barbeiro nao encontrado. Solicite ao administrador para vincular seu usuario.
+          Perfil de profissional nao encontrado. Solicite ao administrador para vincular seu usuario.
         </p>
       </div>
     );
@@ -620,7 +620,7 @@ export function BarberBookingsPage() {
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                onClick={() => sendAppointmentWhatsApp(appt, barbershopProfile)}
+                                onClick={() => sendAppointmentWhatsApp(appt, salonProfile)}
                               >
                                 <WhatsAppIcon size={14} />
                                 Enviar WhatsApp
@@ -702,7 +702,7 @@ export function BarberBookingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Barbeiro</Label>
+                <Label>Profissional</Label>
                 <div className="flex h-9 items-center rounded-md border border-border bg-secondary/50 px-3 text-sm text-foreground">
                   {barber.displayName}
                 </div>

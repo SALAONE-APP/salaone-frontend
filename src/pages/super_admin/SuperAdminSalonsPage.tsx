@@ -3,15 +3,15 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
-  listSuperAdminBarbershops,
-  getSuperAdminBarbershopById,
-  listSuperAdminBarbershopUsers,
-  updateSuperAdminBarbershopStatus,
+  listSuperAdminSalons,
+  getSuperAdminSalonById,
+  listSuperAdminSalonUsers,
+  updateSuperAdminSalonStatus,
   resetSuperAdminUserPassword,
-  type BarbershopStatus,
-  type SuperAdminBarbershop,
-  type SuperAdminBarbershopDetail,
-  type SuperAdminBarbershopUser,
+  type SalonStatus,
+  type SuperAdminSalon,
+  type SuperAdminSalonDetail,
+  type SuperAdminSalonUser,
 } from "@/service/superAdminService";
 
 function fmtDate(value?: string | null) {
@@ -67,8 +67,8 @@ const SUBSCRIPTION_OPTIONS = [
   { value: "none", label: "Sem assinatura" },
 ];
 
-export function SuperAdminBarbershopsPage() {
-  const [barbershops, setBarbershops] = useState<SuperAdminBarbershop[]>([]);
+export function SuperAdminSalonsPage() {
+  const [salons, setSalons] = useState<SuperAdminSalon[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const limit = 15;
@@ -78,25 +78,25 @@ export function SuperAdminBarbershopsPage() {
     q: "", status: "", plan: "", subscriptionStatus: "", createdFrom: "", createdTo: "",
   });
 
-  const [selectedBarbershop, setSelectedBarbershop] = useState<SuperAdminBarbershopDetail | null>(null);
-  const [selectedBarbershopUsers, setSelectedBarbershopUsers] = useState<SuperAdminBarbershopUser[]>([]);
+  const [selectedSalon, setSelectedSalon] = useState<SuperAdminSalonDetail | null>(null);
+  const [selectedSalonUsers, setSelectedSalonUsers] = useState<SuperAdminSalonUser[]>([]);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [statusReasonModal, setStatusReasonModal] = useState({
-    open: false, barbershopId: "", barbershopName: "", nextStatus: "", reason: "",
+    open: false, salonId: "", salonName: "", nextStatus: "", reason: "",
   });
   const [resetPasswordModal, setResetPasswordModal] = useState({
     open: false,
-    user: null as SuperAdminBarbershopUser | null,
+    user: null as SuperAdminSalonUser | null,
     newPassword: "",
     generatedPassword: "",
     isSubmitting: false,
   });
 
-  const loadBarbershops = useCallback(async () => {
-    const result = await listSuperAdminBarbershops({
+  const loadSalons = useCallback(async () => {
+    const result = await listSuperAdminSalons({
       page, limit,
       q: filters.q || undefined,
-      status: (filters.status || undefined) as BarbershopStatus | undefined,
+      status: (filters.status || undefined) as SalonStatus | undefined,
       plan: filters.plan || undefined,
       subscriptionStatus: (filters.subscriptionStatus || undefined) as "active" | "paused" | "cancelled" | "expired" | "pending" | "none" | undefined,
       createdFrom: filters.createdFrom || undefined,
@@ -104,7 +104,7 @@ export function SuperAdminBarbershopsPage() {
       sortBy: "createdAt",
       sortOrder: "desc",
     });
-    setBarbershops(Array.isArray(result?.items) ? result.items : []);
+    setSalons(Array.isArray(result?.items) ? result.items : []);
     setTotal(Number(result?.total || 0));
     setTotalPages(Number(result?.totalPages || 1));
   }, [filters, page]);
@@ -112,63 +112,63 @@ export function SuperAdminBarbershopsPage() {
   useEffect(() => {
     void (async () => {
       setLoading(true);
-      try { await loadBarbershops(); } catch { toast.error("Nao foi possivel carregar as barbearias."); } finally { setLoading(false); }
+      try { await loadSalons(); } catch { toast.error("Nao foi possivel carregar as salões."); } finally { setLoading(false); }
     })();
-  }, [loadBarbershops]);
+  }, [loadSalons]);
 
   const handleSearchSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setPage(1);
     setLoading(true);
-    try { await loadBarbershops(); } catch { toast.error("Erro ao aplicar filtros."); } finally { setLoading(false); }
+    try { await loadSalons(); } catch { toast.error("Erro ao aplicar filtros."); } finally { setLoading(false); }
   };
 
-  const openDetails = async (barbershopId: string) => {
+  const openDetails = async (salonId: string) => {
     setDetailsLoading(true);
     try {
       const [details, usersData] = await Promise.all([
-        getSuperAdminBarbershopById(barbershopId),
-        listSuperAdminBarbershopUsers(barbershopId),
+        getSuperAdminSalonById(salonId),
+        listSuperAdminSalonUsers(salonId),
       ]);
-      setSelectedBarbershop(details);
-      setSelectedBarbershopUsers(Array.isArray(usersData?.items) ? usersData.items : []);
+      setSelectedSalon(details);
+      setSelectedSalonUsers(Array.isArray(usersData?.items) ? usersData.items : []);
     } catch { toast.error("Nao foi possivel carregar os detalhes."); } finally { setDetailsLoading(false); }
   };
 
-  const closeDetails = () => { setSelectedBarbershop(null); setSelectedBarbershopUsers([]); };
+  const closeDetails = () => { setSelectedSalon(null); setSelectedSalonUsers([]); };
 
-  const performStatusUpdate = async (barbershopId: string, nextStatus: string, reason?: string | null) => {
+  const performStatusUpdate = async (salonId: string, nextStatus: string, reason?: string | null) => {
     try {
-      await updateSuperAdminBarbershopStatus(barbershopId, nextStatus as BarbershopStatus, reason);
+      await updateSuperAdminSalonStatus(salonId, nextStatus as SalonStatus, reason);
       toast.success("Status atualizado com sucesso.");
-      await loadBarbershops();
-      if (selectedBarbershop?.id === barbershopId) {
-        const details = await getSuperAdminBarbershopById(barbershopId);
-        setSelectedBarbershop(details);
+      await loadSalons();
+      if (selectedSalon?.id === salonId) {
+        const details = await getSuperAdminSalonById(salonId);
+        setSelectedSalon(details);
       }
     } catch { toast.error("Nao foi possivel atualizar o status."); }
   };
 
-  const handleStatusUpdate = async (barbershopId: string, nextStatus: string) => {
+  const handleStatusUpdate = async (salonId: string, nextStatus: string) => {
     if (nextStatus === "blocked" || nextStatus === "inactive") {
-      const shop = barbershops.find((s) => s.id === barbershopId);
-      setStatusReasonModal({ open: true, barbershopId, barbershopName: shop?.name ?? "Barbearia", nextStatus, reason: "" });
+      const shop = salons.find((s) => s.id === salonId);
+      setStatusReasonModal({ open: true, salonId, salonName: shop?.name ?? "Salão", nextStatus, reason: "" });
       return;
     }
-    await performStatusUpdate(barbershopId, nextStatus, null);
+    await performStatusUpdate(salonId, nextStatus, null);
   };
 
   const closeStatusReasonModal = () =>
-    setStatusReasonModal({ open: false, barbershopId: "", barbershopName: "", nextStatus: "", reason: "" });
+    setStatusReasonModal({ open: false, salonId: "", salonName: "", nextStatus: "", reason: "" });
 
   const submitStatusReasonModal = async () => {
     const reason = statusReasonModal.reason.trim() || null;
-    const { barbershopId, nextStatus } = statusReasonModal;
+    const { salonId, nextStatus } = statusReasonModal;
     closeStatusReasonModal();
-    await performStatusUpdate(barbershopId, nextStatus, reason);
+    await performStatusUpdate(salonId, nextStatus, reason);
   };
 
-  const openResetPasswordModal = (user: SuperAdminBarbershopUser) =>
+  const openResetPasswordModal = (user: SuperAdminSalonUser) =>
     setResetPasswordModal({ open: true, user, newPassword: "", generatedPassword: "", isSubmitting: false });
 
   const closeResetPasswordModal = () =>
@@ -189,7 +189,7 @@ export function SuperAdminBarbershopsPage() {
   };
 
   const subscriptionsByShop: Record<string, { planName: string | null; price: number | null }> = {};
-  for (const shop of barbershops) {
+  for (const shop of salons) {
     const platformSub = shop.platformSubscription;
     const platformPlan = platformSub?.platform_plans ?? null;
     const sub = shop.subscription;
@@ -203,8 +203,8 @@ export function SuperAdminBarbershopsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-base font-semibold text-foreground">Gestao de Barbearias</h3>
-        <p className="text-sm text-muted-foreground">Filtre, visualize detalhes e atualize o status das barbearias.</p>
+        <h3 className="text-base font-semibold text-foreground">Gestao de Salões</h3>
+        <p className="text-sm text-muted-foreground">Filtre, visualize detalhes e atualize o status das salões.</p>
       </div>
 
       <form onSubmit={handleSearchSubmit} className="flex flex-wrap gap-2">
@@ -236,7 +236,7 @@ export function SuperAdminBarbershopsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                <th className="px-5 py-3">Barbearia</th>
+                <th className="px-5 py-3">Salão</th>
                 <th className="px-5 py-3">Responsavel</th>
                 <th className="px-5 py-3">Plano</th>
                 <th className="px-5 py-3">Status</th>
@@ -250,9 +250,9 @@ export function SuperAdminBarbershopsPage() {
                 <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">
                   <Loader2 className="mx-auto mb-2 animate-spin" size={20} />Carregando...
                 </td></tr>
-              ) : barbershops.length === 0 ? (
-                <tr><td colSpan={7} className="p-8 text-center text-sm text-muted-foreground">Nenhuma barbearia encontrada.</td></tr>
-              ) : barbershops.map((shop) => (
+              ) : salons.length === 0 ? (
+                <tr><td colSpan={7} className="p-8 text-center text-sm text-muted-foreground">Nenhuma salão encontrada.</td></tr>
+              ) : salons.map((shop) => (
                 <tr key={shop.id} className="border-b border-border last:border-0 hover:bg-secondary/30">
                   <td className="px-5 py-3">
                     <strong className="block text-foreground">{shop.name}</strong>
@@ -297,7 +297,7 @@ export function SuperAdminBarbershopsPage() {
       </div>
 
       {/* Modal Detalhes */}
-      {selectedBarbershop && (
+      {selectedSalon && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={closeDetails}>
           <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             {detailsLoading ? (
@@ -305,26 +305,26 @@ export function SuperAdminBarbershopsPage() {
             ) : (
               <>
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-foreground">{selectedBarbershop.name}</h3>
+                  <h3 className="text-lg font-semibold text-foreground">{selectedSalon.name}</h3>
                   <button type="button" onClick={closeDetails} className="rounded border border-border px-3 py-1 text-sm text-muted-foreground hover:bg-secondary">Fechar</button>
                 </div>
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <div className="space-y-2 text-sm">
                     <h4 className="font-semibold text-foreground">Dados principais</h4>
-                    <p><strong className="text-muted-foreground">Slug:</strong> <span className="text-foreground">{selectedBarbershop.slug}</span></p>
-                    <p><strong className="text-muted-foreground">Email:</strong> <span className="text-foreground">{selectedBarbershop.email ?? "-"}</span></p>
-                    <p><strong className="text-muted-foreground">Telefone:</strong> <span className="text-foreground">{selectedBarbershop.phone ?? "-"}</span></p>
-                    <p><strong className="text-muted-foreground">CNPJ:</strong> <span className="text-foreground">{selectedBarbershop.cnpj ?? "-"}</span></p>
-                    <p><strong className="text-muted-foreground">Status:</strong> <StatusBadge status={selectedBarbershop.status} /></p>
-                    <p><strong className="text-muted-foreground">Criada em:</strong> <span className="text-foreground">{fmtDate(selectedBarbershop.createdAt)}</span></p>
+                    <p><strong className="text-muted-foreground">Slug:</strong> <span className="text-foreground">{selectedSalon.slug}</span></p>
+                    <p><strong className="text-muted-foreground">Email:</strong> <span className="text-foreground">{selectedSalon.email ?? "-"}</span></p>
+                    <p><strong className="text-muted-foreground">Telefone:</strong> <span className="text-foreground">{selectedSalon.phone ?? "-"}</span></p>
+                    <p><strong className="text-muted-foreground">CNPJ:</strong> <span className="text-foreground">{selectedSalon.cnpj ?? "-"}</span></p>
+                    <p><strong className="text-muted-foreground">Status:</strong> <StatusBadge status={selectedSalon.status} /></p>
+                    <p><strong className="text-muted-foreground">Criada em:</strong> <span className="text-foreground">{fmtDate(selectedSalon.createdAt)}</span></p>
                   </div>
                   <div className="space-y-2 text-sm">
                     <h4 className="font-semibold text-foreground">Assinaturas recentes</h4>
-                    {!selectedBarbershop.subscriptions?.length ? (
+                    {!selectedSalon.subscriptions?.length ? (
                       <p className="text-muted-foreground">Sem assinaturas registradas.</p>
                     ) : (
                       <ul className="space-y-2">
-                        {selectedBarbershop.subscriptions.map((sub) => (
+                        {selectedSalon.subscriptions.map((sub) => (
                           <li key={sub.id} className="rounded-lg border border-border bg-secondary/30 p-3">
                             <p className="font-medium text-foreground">{sub.subscription_plans?.name ?? "Plano desconhecido"}</p>
                             <p className="text-xs text-muted-foreground">Status: {sub.status}</p>
@@ -335,9 +335,9 @@ export function SuperAdminBarbershopsPage() {
                     )}
                   </div>
                 </div>
-                {selectedBarbershopUsers.length > 0 && (
+                {selectedSalonUsers.length > 0 && (
                   <div className="mt-5 space-y-2">
-                    <h4 className="text-sm font-semibold text-foreground">Usuarios vinculados ({selectedBarbershopUsers.length})</h4>
+                    <h4 className="text-sm font-semibold text-foreground">Usuarios vinculados ({selectedSalonUsers.length})</h4>
                     <div className="overflow-hidden rounded-lg border border-border">
                       <table className="w-full text-sm">
                         <thead>
@@ -351,7 +351,7 @@ export function SuperAdminBarbershopsPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {selectedBarbershopUsers.map((u) => (
+                          {selectedSalonUsers.map((u) => (
                             <tr key={u.id} className="border-b border-border last:border-0">
                               <td className="px-4 py-2 font-medium text-foreground">{u.name}</td>
                               <td className="px-4 py-2 text-muted-foreground">{u.email ?? "-"}</td>
@@ -383,13 +383,13 @@ export function SuperAdminBarbershopsPage() {
           <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-foreground">
-                {statusReasonModal.nextStatus === "blocked" ? "Bloquear barbearia" : "Inativar barbearia"}
+                {statusReasonModal.nextStatus === "blocked" ? "Bloquear salão" : "Inativar salão"}
               </h3>
               <button type="button" onClick={closeStatusReasonModal} className="rounded border border-border px-3 py-1 text-sm text-muted-foreground hover:bg-secondary">Fechar</button>
             </div>
             <p className="mb-4 text-sm text-muted-foreground">
               Informe um motivo (opcional) para {statusReasonModal.nextStatus === "blocked" ? "bloquear" : "inativar"}{" "}
-              <strong className="text-foreground">{statusReasonModal.barbershopName}</strong>.
+              <strong className="text-foreground">{statusReasonModal.salonName}</strong>.
             </p>
             <textarea value={statusReasonModal.reason}
               onChange={(e) => setStatusReasonModal((p) => ({ ...p, reason: e.target.value }))}

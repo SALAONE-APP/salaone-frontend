@@ -121,7 +121,7 @@ const permissionOptions: Array<{
   { key: "managePayments", label: "Gerenciar pagamentos", description: "Permite acessar e administrar pagamentos." },
   { key: "managePayroll", label: "Gerenciar pagamentos de equipe", description: "Permite controlar vales e repasses." },
   { key: "manageBenefits", label: "Gerenciar beneficios", description: "Permite administrar planos e assinaturas." },
-  { key: "manageGallery", label: "Gerenciar galeria", description: "Permite alterar imagens da barbearia." },
+  { key: "manageGallery", label: "Gerenciar galeria", description: "Permite alterar imagens da salão." },
   { key: "manageSettings", label: "Gerenciar configuracoes", description: "Permite alterar configuracoes gerais." },
 ];
 
@@ -160,7 +160,7 @@ const emptyForm: UserFormState = {
 
 const roleLabels: Record<UserRole, string> = {
   admin: "Administrador",
-  barber: "Barbeiro",
+  barber: "Profissional",
   receptionist: "Recepcionista",
   client: "Cliente",
 };
@@ -604,7 +604,7 @@ export function UsersPage() {
           <h3 className="text-2xl font-semibold text-foreground">{total}</h3>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
-          <p className="mb-1 text-sm text-muted-foreground">Barbeiros nesta pagina</p>
+          <p className="mb-1 text-sm text-muted-foreground">Profissionais nesta pagina</p>
           <h3 className="text-2xl font-semibold text-foreground">{stats.barbers}</h3>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
@@ -653,7 +653,7 @@ export function UsersPage() {
                 >
                   <DropdownMenuRadioItem value="all">Todos</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="admin">Administradores</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="barber">Barbeiros</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="barber">Profissionais</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="receptionist">
                     Recepcionistas
                   </DropdownMenuRadioItem>
@@ -867,7 +867,7 @@ export function UsersPage() {
                 <DialogDescription>
                   {editingUser
                     ? "Atualize os dados de acesso e perfil deste funcionario."
-                    : "Cadastre um funcionario vinculado a esta barbearia."}
+                    : "Cadastre um funcionario vinculado a esta salão."}
                 </DialogDescription>
               </DialogHeader>
             </div>
@@ -958,7 +958,7 @@ export function UsersPage() {
                         <UserCog size={14} />
                         Administrador
                       </SelectItem>
-                      <SelectItem value="barber">Barbeiro</SelectItem>
+                      <SelectItem value="barber">Profissional</SelectItem>
                       <SelectItem value="receptionist">Recepcionista</SelectItem>
                     </SelectContent>
                   </Select>
@@ -1024,10 +1024,10 @@ export function UsersPage() {
                 )}
               </div>
 
-              {/* Seção exclusiva para barbeiros */}
+              {/* Seção exclusiva para profissionais */}
               {form.role === "barber" && (
                 <div className="space-y-4 rounded-xl border border-border bg-secondary/30 p-4">
-                  <h4 className="text-sm font-semibold text-foreground">Configurações do barbeiro</h4>
+                  <h4 className="text-sm font-semibold text-foreground">Configurações do profissional</h4>
 
                   <div className="space-y-2">
                     <Label htmlFor="user-commission">Comissão padrão (%)</Label>
@@ -1058,9 +1058,9 @@ export function UsersPage() {
 
                   {services.length > 0 && (
                     <div className="space-y-2">
-                      <Label>Serviços que o barbeiro realiza</Label>
+                      <Label>Serviços que o profissional realiza</Label>
                       <p className="text-xs text-muted-foreground">
-                        Selecione os serviços disponíveis para este barbeiro.
+                        Selecione os serviços disponíveis para este profissional.
                       </p>
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         {services.map((service) => (
@@ -1224,7 +1224,7 @@ export function UsersPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remover funcionario?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acao remove {userToDelete?.name} do cadastro da barbearia.
+              Esta acao remove {userToDelete?.name} do cadastro da salão.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { Mail, Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
-import salaOneLogo from "../assets/image/salaone-logo.svg";
+import salaOneLogo from "../assets/image/logo-icone-salaone.jpeg";
 import { forgotPassword } from "../service/authService";
 
 export function ForgotPassword() {
@@ -44,7 +44,7 @@ export function ForgotPassword() {
           <img
             src={salaOneLogo}
             alt="SalaOne"
-            className="block h-auto w-full max-w-[180px] object-contain"
+            className="block h-24 w-24 rounded-full object-cover"
             draggable={false}
           />
         </div>

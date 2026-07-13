@@ -8,7 +8,7 @@ import {
   Clock, CreditCard, Lock, Menu, MessageCircle, Scissors,
   ShieldCheck, Star, Store, TrendingUp, Users, Wallet, X,
 } from "lucide-react";
-import salaOneLogo from "../assets/image/salaone-logo.svg";
+import salaOneLogo from "../assets/image/logo-icone-salaone.jpeg";
 import axios from "axios";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -25,7 +25,7 @@ interface Plan {
 }
 
 interface RegForm {
-  barbershopName: string;
+  salonName: string;
   slug: string;
   cnpj: string;
   phone: string;
@@ -52,7 +52,7 @@ interface CardForm {
 interface RegisterResult {
   token: string;
   refreshToken: string;
-  barbershop: { id: string; name: string; slug: string };
+  salon: { id: string; name: string; slug: string };
   user: { id: string; name: string; email: string; role: string };
 }
 
@@ -71,8 +71,8 @@ async function apiFetchPlans(): Promise<Plan[]> {
 }
 
 async function apiRegister(form: RegForm, planId: string): Promise<RegisterResult> {
-  const { data } = await api.post<RegisterResult>("/barbershops/register", {
-    barbershopName: form.barbershopName.trim(),
+  const { data } = await api.post<RegisterResult>("/salons/register", {
+    salonName: form.salonName.trim(),
     slug: form.slug.trim().toLowerCase() || undefined,
     cnpj: form.cnpj || null,
     phone: form.phone || null,
@@ -86,7 +86,7 @@ async function apiRegister(form: RegForm, planId: string): Promise<RegisterResul
   localStorage.setItem("token", data.token);
   localStorage.setItem("refreshToken", data.refreshToken);
   localStorage.setItem("user", JSON.stringify(data.user));
-  localStorage.setItem("barbershop", JSON.stringify(data.barbershop));
+  localStorage.setItem("salon", JSON.stringify(data.salon));
   return data;
 }
 
@@ -135,10 +135,10 @@ async function apiSubscribe(
   customer: { name: string; email: string; document: string; phone: string },
 ) {
   const token = localStorage.getItem("token");
-  const barbershop = JSON.parse(localStorage.getItem("barbershop") || "{}");
+  const salon = JSON.parse(localStorage.getItem("salon") || "{}");
   await api.post(
-    "/pagarme/subscriptions/barbershop-platform-subscriptions",
-    { platformPlanId: planId, cardToken, amount, barbershopId: barbershop?.id, customer },
+    "/pagarme/subscriptions/salon-platform-subscriptions",
+    { platformPlanId: planId, cardToken, amount, salonId: salon?.id, customer },
     { headers: { Authorization: `Bearer ${token}` } },
   );
 }
@@ -184,17 +184,17 @@ const painPoints = [
 ];
 
 const featuresList = [
-  { Icon: CalendarCheck, title: "Agendamento online", text: "Clientes escolhem serviço, barbeiro e horário em poucos passos." },
+  { Icon: CalendarCheck, title: "Agendamento online", text: "Clientes escolhem serviço, profissional e horário em poucos passos." },
   { Icon: Wallet, title: "Financeiro integrado", text: "Pagamentos, comissões e recorrências em uma visão organizada." },
-  { Icon: Scissors, title: "Gestão de profissionais", text: "Controle barbeiros, permissões e desempenho individual." },
+  { Icon: Scissors, title: "Gestão de profissionais", text: "Controle profissionais, permissões e desempenho individual." },
   { Icon: Store, title: "Produtos e serviços", text: "Venda adicionais junto do atendimento e acompanhe o estoque." },
-  { Icon: ShieldCheck, title: "Acessos por perfil", text: "Administração, recepção e barbeiros com permissões adequadas." },
+  { Icon: ShieldCheck, title: "Acessos por perfil", text: "Administração, recepção e profissionais com permissões adequadas." },
   { Icon: TrendingUp, title: "Relatórios práticos", text: "Indicadores para entender faturamento, agenda e crescimento." },
 ];
 
 const differentials = [
-  { Icon: BadgeCheck, title: "Implantação guiada", text: "Estrutura inicial, cadastro e primeiros ajustes com foco na rotina real da barbearia." },
-  { Icon: Users, title: "Pensado para equipes", text: "Fluxos simples para administrador, recepção e barbeiros trabalharem sem atrito." },
+  { Icon: BadgeCheck, title: "Implantação guiada", text: "Estrutura inicial, cadastro e primeiros ajustes com foco na rotina real da salão." },
+  { Icon: Users, title: "Pensado para equipes", text: "Fluxos simples para administrador, recepção e profissionais trabalharem sem atrito." },
   { Icon: ClipboardCheck, title: "Operação mais previsível", text: "Menos improviso no balcão e mais controle sobre agenda, clientes e recebimentos." },
 ];
 
@@ -243,7 +243,7 @@ function RegisterModal({ plan, onClose, onRegistered }: {
   onRegistered: (result: RegisterResult) => void;
 }) {
   const empty: RegForm = {
-    barbershopName: "",
+    salonName: "",
     slug: "",
     cnpj: "",
     phone: "",
@@ -265,7 +265,7 @@ function RegisterModal({ plan, onClose, onRegistered }: {
     e.preventDefault();
     setFormError("");
 
-    if (!form.barbershopName.trim() || !form.adminName.trim() || !form.adminEmail.trim() || !form.password) {
+    if (!form.salonName.trim() || !form.adminName.trim() || !form.adminEmail.trim() || !form.password) {
       setFormError("Preencha todos os campos obrigatórios."); return;
     }
     if (form.slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug)) {
@@ -298,7 +298,7 @@ function RegisterModal({ plan, onClose, onRegistered }: {
 
         <div className="p-6 border-b border-neutral-800">
           <span className="text-primary text-xs font-semibold uppercase tracking-wider">Cadastro rápido</span>
-          <h3 className="text-xl font-bold text-white mt-1 mb-1">Cadastro da Barbearia</h3>
+          <h3 className="text-xl font-bold text-white mt-1 mb-1">Cadastro da Salão</h3>
           <p className="text-neutral-400 text-sm">
             Você selecionou o <strong className="text-white">{plan.name}</strong>. Complete os dados para criar sua conta e seguir para o pagamento.
           </p>
@@ -318,15 +318,15 @@ function RegisterModal({ plan, onClose, onRegistered }: {
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div>
-            <h4 className="text-white font-semibold text-sm mb-3 pb-2 border-b border-neutral-800">Dados da Barbearia</h4>
+            <h4 className="text-white font-semibold text-sm mb-3 pb-2 border-b border-neutral-800">Dados da Salão</h4>
             <div className="space-y-3">
               <label className="block text-neutral-400 text-sm">
-                Nome da barbearia *
-                <input type="text" className={inputClass} value={form.barbershopName} onChange={(e) => set("barbershopName", e.target.value)} placeholder="Ex: Barbearia Rodrigues" required disabled={submitting} />
+                Nome da salão *
+                <input type="text" className={inputClass} value={form.salonName} onChange={(e) => set("salonName", e.target.value)} placeholder="Ex: Salão Rodrigues" required disabled={submitting} />
               </label>
               <label className="block text-neutral-400 text-sm">
-                Slug da barbearia
-                <input type="text" className={inputClass} value={form.slug} onChange={(e) => set("slug", e.target.value.toLowerCase())} placeholder="Ex: barbearia-rodrigues" disabled={submitting} />
+                Slug da salão
+                <input type="text" className={inputClass} value={form.slug} onChange={(e) => set("slug", e.target.value.toLowerCase())} placeholder="Ex: salão-rodrigues" disabled={submitting} />
                 <small className="text-neutral-500 text-xs mt-1 block">Se não informar, o sistema gera automaticamente.</small>
               </label>
               <div className="grid grid-cols-2 gap-3">
@@ -343,7 +343,7 @@ function RegisterModal({ plan, onClose, onRegistered }: {
           </div>
 
           <div>
-            <h4 className="text-white font-semibold text-sm mb-3 pb-2 border-b border-neutral-800">Regra de Barbeiro para Assinantes</h4>
+            <h4 className="text-white font-semibold text-sm mb-3 pb-2 border-b border-neutral-800">Regra de Profissional para Assinantes</h4>
             <div className="grid gap-3 md:grid-cols-2">
               <label className={`block cursor-pointer rounded-xl border p-4 transition-colors ${form.subscriptionBarberRule === "fixed" ? "border-primary bg-primary/10" : "border-neutral-800 bg-neutral-900/50 hover:border-neutral-700"}`}>
                 <input
@@ -355,9 +355,9 @@ function RegisterModal({ plan, onClose, onRegistered }: {
                   onChange={() => set("subscriptionBarberRule", "fixed")}
                   disabled={submitting}
                 />
-                <span className="block text-sm font-semibold text-white">Barbeiro fixo</span>
+                <span className="block text-sm font-semibold text-white">Profissional fixo</span>
                 <span className="mt-1 block text-xs leading-5 text-neutral-400">
-                  Cliente com plano fica vinculado ao barbeiro escolhido no primeiro agendamento e troca apenas na renovacao mensal ou apos 30 dias.
+                  Cliente com plano fica vinculado ao profissional escolhido no primeiro agendamento e troca apenas na renovacao mensal ou apos 30 dias.
                 </span>
               </label>
               <label className={`block cursor-pointer rounded-xl border p-4 transition-colors ${form.subscriptionBarberRule === "free_choice" ? "border-primary bg-primary/10" : "border-neutral-800 bg-neutral-900/50 hover:border-neutral-700"}`}>
@@ -372,7 +372,7 @@ function RegisterModal({ plan, onClose, onRegistered }: {
                 />
                 <span className="block text-sm font-semibold text-white">Livre escolha</span>
                 <span className="mt-1 block text-xs leading-5 text-neutral-400">
-                  Cliente com plano escolhe qualquer barbeiro disponivel na data e horario, desde que realize o servico solicitado.
+                  Cliente com plano escolhe qualquer profissional disponivel na data e horario, desde que realize o servico solicitado.
                 </span>
               </label>
             </div>
@@ -488,7 +488,7 @@ function SubscriptionPaymentModal({ plan, customerName, customerEmail, onClose, 
           </div>
           <h3 className="text-2xl font-black text-white mb-2">Assinatura confirmada!</h3>
           <p className="text-neutral-400 mb-1">Plano <strong className="text-white">{plan.name}</strong> ativado com sucesso.</p>
-          <p className="text-neutral-500 text-sm mb-8">Acesse o sistema para começar a usar sua barbearia.</p>
+          <p className="text-neutral-500 text-sm mb-8">Acesse o sistema para começar a usar sua salão.</p>
           <button onClick={onSuccess}
             className="w-full py-3 bg-gradient-to-r from-brand-purple-dark to-primary hover:from-primary hover:to-brand-pink text-black font-bold rounded-lg transition-all">
             Acessar o sistema
@@ -693,7 +693,7 @@ export function LandingPage() {
       <header className="fixed top-0 left-0 right-0 z-50 bg-black/85 backdrop-blur-md border-b border-neutral-800">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-28 flex items-center justify-between">
           <a href="#topo" aria-label="SalaOne">
-            <img src={salaOneLogo} alt="SalaOne" className="h-24 w-auto object-contain" />
+            <img src={salaOneLogo} alt="SalaOne" className="h-20 w-20 rounded-full object-cover" />
           </a>
 
           <nav className="hidden md:flex items-center gap-6" aria-label="Navegação principal">
@@ -740,7 +740,7 @@ export function LandingPage() {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 border border-primary/25 rounded-full text-brand-pink text-sm mb-6">
               <Scissors size={14} />
-              Sistema de gestão para barbearias
+              Sistema de gestão para salões
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-[1.1] tracking-tight mb-6">
@@ -752,7 +752,7 @@ export function LandingPage() {
 
             <p className="text-neutral-400 text-lg leading-relaxed mb-8">
               A SALAONE organiza agendamentos, assinaturas, comissões e relatórios para
-              barbearias que querem vender mais sem perder o controle da operação.
+              salões que querem vender mais sem perder o controle da operação.
             </p>
 
             <div className="flex flex-wrap gap-3 mb-8">
@@ -781,7 +781,7 @@ export function LandingPage() {
               <div className="absolute inset-8 rounded-full border border-primary/10 lp-o2" />
               <div className="absolute inset-16 rounded-full border border-neutral-800" />
               <div className="relative z-10 w-52 h-52 rounded-full bg-gradient-to-br from-brand-purple-dark/20 to-brand-purple/10 border-2 border-primary/40 flex items-center justify-center overflow-hidden shadow-2xl shadow-primary/20">
-                <img src={salaOneLogo} alt="SalaOne" className="w-36 h-36 object-contain" />
+                <img src={salaOneLogo} alt="SalaOne" className="h-36 w-36 rounded-full object-cover" />
               </div>
               <div className="absolute top-6 right-4 flex items-center gap-2 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 shadow-xl">
                 <CalendarCheck size={15} className="text-brand-pink" />
@@ -806,7 +806,7 @@ export function LandingPage() {
           <div className="text-center mb-12">
             <span className="text-primary text-sm font-semibold uppercase tracking-wider">Desafios reais</span>
             <h2 className="text-3xl sm:text-4xl font-black text-white mt-2 mb-0">
-              Quando a barbearia cresce, improviso começa a custar caro.
+              Quando a salão cresce, improviso começa a custar caro.
             </h2>
           </div>
           <div className="grid sm:grid-cols-3 gap-5 mb-8">
@@ -835,7 +835,7 @@ export function LandingPage() {
           <div className="text-center mb-12">
             <span className="text-primary text-sm font-semibold uppercase tracking-wider">Solução</span>
             <h2 className="text-3xl sm:text-4xl font-black text-white mt-2 mb-4">
-              Uma plataforma completa para o dia a dia da sua barbearia.
+              Uma plataforma completa para o dia a dia da sua salão.
             </h2>
             <p className="text-neutral-400 max-w-xl mx-auto leading-relaxed">
               Recursos essenciais em uma experiência direta, feita para quem precisa operar rápido
@@ -976,7 +976,7 @@ export function LandingPage() {
             <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-brand-purple/30 rounded-full blur-3xl pointer-events-none" />
             <div className="relative z-10">
               <span className="text-brand-blush text-sm font-semibold uppercase tracking-wider">
-                Pronto para organizar sua barbearia?
+                Pronto para organizar sua salão?
               </span>
               <h2 className="text-3xl sm:text-4xl font-black text-black mt-3 mb-8 max-w-xl mx-auto leading-tight">
                 Comece pelo plano ideal e avance para o pagamento com cadastro guiado.
@@ -1000,7 +1000,7 @@ export function LandingPage() {
       <footer className="bg-neutral-950 border-t border-neutral-800">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
-            <img src={salaOneLogo} alt="SalaOne" className="h-24 w-auto object-contain" />
+            <img src={salaOneLogo} alt="SalaOne" className="h-20 w-20 rounded-full object-cover" />
             <div className="flex flex-wrap gap-5 text-sm">
               <a href="https://www.salaone.com.br" target="_blank" rel="noopener noreferrer"
                 className="text-neutral-400 hover:text-white transition-colors">

@@ -91,7 +91,7 @@ export interface EmployeePayrollRow {
   subscriptionPoints?: number;
   subscriptionParticipationPercent?: number;
   totalRevenue: number;
-  barbershopShare: number;
+  salonShare: number;
   extraPago: number;
   folhaPago: number;
   vales: EmployeeVale[];

@@ -313,7 +313,7 @@ function buildPasswordForm(): CustomerFormState {
 export function CustomersPage() {
   const { user } = useAuth();
   const { can, isAdmin } = usePermissions();
-  // Barbeiro vê somente leitura por padrão; apenas admins e barbeiros com manageCustomers podem editar
+  // Profissional vê somente leitura por padrão; apenas admins e profissionais com manageCustomers podem editar
   const canEdit = isAdmin || user?.role !== "barber" || can("manageCustomers");
 
   const [customers, setCustomers] = useState<UserProfile[]>([]);
@@ -1070,7 +1070,7 @@ export function CustomersPage() {
               <DialogDescription>
                 {editingCustomer
                   ? "Altere apenas a senha de acesso do cliente."
-                  : "Cadastre um cliente para esta barbearia."}
+                  : "Cadastre um cliente para esta salão."}
               </DialogDescription>
             </DialogHeader>
 
@@ -1272,7 +1272,7 @@ export function CustomersPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remover cliente?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acao remove {customerToDelete?.name} do cadastro da barbearia.
+              Esta acao remove {customerToDelete?.name} do cadastro da salão.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -6,7 +6,7 @@ import { PasswordInput } from '@/components/PasswordInput';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from '@/hooks/useAuth';
-import { getBarbershopProfile } from '@/service/barbershopProfileService';
+import { getSalonProfile } from '@/service/salonProfileService';
 import { uploadProfilePhoto } from '@/service/uploadService';
 import {
   changePassword,
@@ -50,7 +50,7 @@ function getApiErrorMessage(error: unknown) {
 
 function getStoredSlug(): string {
   try {
-    const stored = localStorage.getItem('barbershop');
+    const stored = localStorage.getItem('salon');
     if (!stored) return '';
     const parsed = JSON.parse(stored) as { slug?: string };
     return parsed.slug ?? '';
@@ -78,12 +78,12 @@ export function BarberSettingsPage() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // Link de cadastro
-  const [barbershopSlug, setBarbershopSlug] = useState(getStoredSlug);
+  const [salonSlug, setSalonSlug] = useState(getStoredSlug);
   const [copied, setCopied] = useState(false);
   const registrationLink = useMemo(() => {
-    if (!barbershopSlug) return '';
-    return `${window.location.origin}/register/${barbershopSlug}`;
-  }, [barbershopSlug]);
+    if (!salonSlug) return '';
+    return `${window.location.origin}/register/${salonSlug}`;
+  }, [salonSlug]);
 
   // Alterar senha
   const [passwordForm, setPasswordForm] = useState({
@@ -94,11 +94,11 @@ export function BarberSettingsPage() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   useEffect(() => {
-    if (barbershopSlug) return;
-    getBarbershopProfile()
-      .then((profile) => { if (profile.slug) setBarbershopSlug(profile.slug); })
+    if (salonSlug) return;
+    getSalonProfile()
+      .then((profile) => { if (profile.slug) setSalonSlug(profile.slug); })
       .catch(() => {});
-  }, [barbershopSlug]);
+  }, [salonSlug]);
 
   async function handlePhotoUpload(file: File) {
     if (!user?.id) return;
@@ -329,7 +329,7 @@ export function BarberSettingsPage() {
         </div>
       </div>
 
-      {/* Link de Cadastro da Barbearia */}
+      {/* Link de Cadastro da Salão */}
       <div className="bg-card rounded-xl border border-border p-6">
         <div className="mb-4 flex items-start gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
@@ -338,7 +338,7 @@ export function BarberSettingsPage() {
           <div>
             <h3 className="text-lg font-medium text-foreground">Link de cadastro</h3>
             <p className="text-sm text-muted-foreground">
-              Compartilhe este link para que novos clientes se cadastrem diretamente nesta barbearia.
+              Compartilhe este link para que novos clientes se cadastrem diretamente nesta salão.
             </p>
           </div>
         </div>

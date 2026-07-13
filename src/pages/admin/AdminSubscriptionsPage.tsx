@@ -266,7 +266,7 @@ export function AdminSubscriptionsPage() {
       await updateSubscription(barberDialogSubscription.id, {
         monthlyBarberId: selectedBarberId || null,
       });
-      toast.success(selectedBarberId ? "Barbeiro do cliente atualizado." : "Barbeiro fixo removido.");
+      toast.success(selectedBarberId ? "Profissional do cliente atualizado." : "Profissional fixo removido.");
       setBarberDialogSubscription(null);
       setSelectedBarberId("");
       await loadSubscriptions();
@@ -430,7 +430,7 @@ export function AdminSubscriptionsPage() {
                     Ciclo
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Barbeiro
+                    Profissional
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Valor
@@ -508,7 +508,7 @@ export function AdminSubscriptionsPage() {
                         <div className="flex items-center gap-2 text-sm text-foreground">
                           <Scissors size={14} className="text-muted-foreground" />
                           <span className="max-w-40 truncate">
-                            {subscription.monthlyBarber?.displayName ?? "Sem barbeiro fixo"}
+                            {subscription.monthlyBarber?.displayName ?? "Sem profissional fixo"}
                           </span>
                         </div>
                       </td>
@@ -583,7 +583,7 @@ export function AdminSubscriptionsPage() {
                             {subscription.status === "active" && (
                               <DropdownMenuItem onClick={() => openBarberDialog(subscription)}>
                                 <Scissors size={14} />
-                                Trocar barbeiro
+                                Trocar profissional
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuItem
@@ -630,9 +630,9 @@ export function AdminSubscriptionsPage() {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Trocar barbeiro do cliente</DialogTitle>
+            <DialogTitle>Trocar profissional do cliente</DialogTitle>
             <DialogDescription>
-              Altere o barbeiro fixo da assinatura de {barberDialogSubscription?.user?.name ?? "este cliente"}.
+              Altere o profissional fixo da assinatura de {barberDialogSubscription?.user?.name ?? "este cliente"}.
               Esta acao pode ser feita pelo admin a qualquer momento.
             </DialogDescription>
           </DialogHeader>
@@ -641,18 +641,18 @@ export function AdminSubscriptionsPage() {
             <div className="rounded-md border border-border bg-secondary/30 p-3 text-sm">
               <p className="font-medium text-foreground">{barberDialogSubscription?.plan?.name ?? "Plano"}</p>
               <p className="text-xs text-muted-foreground">
-                Atual: {barberDialogSubscription?.monthlyBarber?.displayName ?? "Sem barbeiro fixo"}
+                Atual: {barberDialogSubscription?.monthlyBarber?.displayName ?? "Sem profissional fixo"}
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label>Novo barbeiro fixo</Label>
+              <Label>Novo profissional fixo</Label>
               <Select value={selectedBarberId || "none"} onValueChange={(value) => setSelectedBarberId(value === "none" ? "" : value)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder={barbersLoading ? "Carregando barbeiros..." : "Selecionar barbeiro"} />
+                  <SelectValue placeholder={barbersLoading ? "Carregando profissionais..." : "Selecionar profissional"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Sem barbeiro fixo</SelectItem>
+                  <SelectItem value="none">Sem profissional fixo</SelectItem>
                   {barbers.map((barber) => (
                     <SelectItem key={barber.id} value={barber.id}>
                       {barber.displayName}
@@ -677,7 +677,7 @@ export function AdminSubscriptionsPage() {
             </Button>
             <Button type="button" disabled={savingBarber || barbersLoading} onClick={() => void handleSaveMonthlyBarber()}>
               {savingBarber && <Loader2 size={14} className="animate-spin" />}
-              Salvar barbeiro
+              Salvar profissional
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -17,21 +17,21 @@ interface AppHeaderProps {
   actionHref: string;
 }
 
-type StoredBarbershop = {
+type StoredSalon = {
   name?: string;
   slug?: string;
   logoUrl?: string;
 };
 
-function getStoredBarbershop() {
-  const storedBarbershop = localStorage.getItem("barbershop");
+function getStoredSalon() {
+  const storedSalon = localStorage.getItem("salon");
 
-  if (!storedBarbershop) {
+  if (!storedSalon) {
     return null;
   }
 
   try {
-    return JSON.parse(storedBarbershop) as StoredBarbershop;
+    return JSON.parse(storedSalon) as StoredSalon;
   } catch {
     return null;
   }
@@ -45,14 +45,14 @@ export function AppHeader({
 }: AppHeaderProps) {
   const { user } = useAuth();
   const { setOpen: setSidebarOpen } = useSidebarMobile();
-  const [barbershop, setBarbershop] = useState<StoredBarbershop | null>(() =>
-    getStoredBarbershop()
+  const [salon, setSalon] = useState<StoredSalon | null>(() =>
+    getStoredSalon()
   );
   const profileConfig = getProfileConfig(user?.role);
   const userName = user?.name?.trim() || "Usuario";
-  const barbershopName = barbershop?.name?.trim() || "SalaOne";
-  const logoUrl = barbershop?.logoUrl?.trim() || "";
-  const barbershopInitial = barbershopName[0]?.toUpperCase() || "B";
+  const salonName = salon?.name?.trim() || "SalaOne";
+  const logoUrl = salon?.logoUrl?.trim() || "";
+  const salonInitial = salonName[0]?.toUpperCase() || "S";
   const initials = userName
     .split(" ")
     .filter(Boolean)
@@ -63,16 +63,16 @@ export function AppHeader({
   const hideActionOnMobile = actionLabel === "Resumo";
 
   useEffect(() => {
-    function refreshBarbershop() {
-      setBarbershop(getStoredBarbershop());
+    function refreshSalon() {
+      setSalon(getStoredSalon());
     }
 
-    window.addEventListener("storage", refreshBarbershop);
-    window.addEventListener("barbershop:updated", refreshBarbershop);
+    window.addEventListener("storage", refreshSalon);
+    window.addEventListener("salon:updated", refreshSalon);
 
     return () => {
-      window.removeEventListener("storage", refreshBarbershop);
-      window.removeEventListener("barbershop:updated", refreshBarbershop);
+      window.removeEventListener("storage", refreshSalon);
+      window.removeEventListener("salon:updated", refreshSalon);
     };
   }, []);
 
@@ -90,10 +90,10 @@ export function AppHeader({
         </button>
         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary">
           {logoUrl ? (
-            <img src={logoUrl} alt={barbershopName} className="h-full w-full object-cover" />
+            <img src={logoUrl} alt={salonName} className="h-full w-full object-cover" />
           ) : (
             <span className="text-sm font-bold text-primary-foreground">
-              {barbershopInitial}
+              {salonInitial}
             </span>
           )}
         </div>
@@ -124,7 +124,7 @@ export function AppHeader({
           <Link to={actionHref}>{actionLabel}</Link>
         </Button>
 
-        {user?.role === "admin" && <AresChatButton barbershopSlug={barbershop?.slug} />}
+        {user?.role === "admin" && <AresChatButton salonSlug={salon?.slug} />}
 
         <div className="flex items-center gap-3 border-l border-border pl-3">
           <Avatar className="h-9 w-9">

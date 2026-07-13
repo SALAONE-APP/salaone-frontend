@@ -12,51 +12,51 @@ export const barberRoutes: AppRoute[] = [
   {
     path: "/home",
     title: "Home",
-    breadcrumbs: ["Barbeiro", "Home"],
+    breadcrumbs: ["Profissional", "Home"],
     Component: BarberDashboard,
   },
   {
     path: "/schedules",
     title: "Agenda do dia",
-    breadcrumbs: ["Barbeiro", "Agenda"],
+    breadcrumbs: ["Profissional", "Agenda"],
     Component: BarberSchedulePage,
   },
   {
     path: "/bookings",
     title: "Agendamentos",
-    breadcrumbs: ["Barbeiro", "Agendamentos"],
+    breadcrumbs: ["Profissional", "Agendamentos"],
     Component: BarberBookingsPage,
     // sempre visível — permissões controlam as ações dentro da página
   },
   {
     path: "/customers",
     title: "Clientes",
-    breadcrumbs: ["Barbeiro", "Clientes"],
+    breadcrumbs: ["Profissional", "Clientes"],
     Component: CustomersPage,
   },
   {
     path: "/services",
     title: "Servicos",
-    breadcrumbs: ["Barbeiro", "Servicos"],
+    breadcrumbs: ["Profissional", "Servicos"],
     Component: ServicesPage,
   },
   {
     path: "/payments",
     title: "Ganhos",
-    breadcrumbs: ["Barbeiro", "Ganhos"],
+    breadcrumbs: ["Profissional", "Ganhos"],
     Component: BarberEarningsPage,
-    // sempre visível — é direito do barbeiro ver os próprios ganhos
+    // sempre visível — é direito do profissional ver os próprios ganhos
   },
   {
     path: "/settings",
     title: "Configuracoes",
-    breadcrumbs: ["Barbeiro", "Configuracoes"],
+    breadcrumbs: ["Profissional", "Configuracoes"],
     Component: BarberSettingsPage,
   },
   {
     path: "/help",
     title: "Central de Ajuda",
-    breadcrumbs: ["Barbeiro", "Ajuda"],
+    breadcrumbs: ["Profissional", "Ajuda"],
     Component: HelpCenterPage,
   },
 ];

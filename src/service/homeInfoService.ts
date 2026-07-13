@@ -2,7 +2,7 @@ import api from "./api";
 
 export interface HomeInfo {
   id?: string;
-  barbershop_id?: string;
+  salon_id?: string;
   hero_title?: string | null;
   hero_subtitle?: string | null;
   hero_image?: string | null;

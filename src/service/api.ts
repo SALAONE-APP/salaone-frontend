@@ -40,7 +40,7 @@ api.interceptors.response.use(
       localStorage.removeItem("token");
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("user");
-      localStorage.removeItem("barbershop");
+      localStorage.removeItem("salon");
 
       if (window.location.pathname !== "/login") {
         window.location.replace("/login");

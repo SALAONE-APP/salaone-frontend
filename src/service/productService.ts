@@ -14,7 +14,7 @@ export interface Product {
   active: boolean;
   createdAt?: string;
   updatedAt?: string;
-  barbershopId?: string;
+  salonId?: string;
 }
 
 export interface ListProductsParams {
@@ -41,7 +41,7 @@ export interface ProductStockMovement {
   productId: string;
   productName: string;
   productCode: string;
-  barbershopId: string;
+  salonId: string;
   type: ProductStockMovementType;
   quantity: number;
   purchasePrice?: number | null;

@@ -2,7 +2,7 @@ import api from "./api";
 
 export interface CustomerReview {
   id: string;
-  barbershopId: string;
+  salonId: string;
   appointmentId?: string | null;
   barberId: string;
   clientId: string;

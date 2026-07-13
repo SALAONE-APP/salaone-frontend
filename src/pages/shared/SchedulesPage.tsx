@@ -662,7 +662,7 @@ export function SchedulesPage() {
         <div className="flex flex-col gap-3 p-4 border-b border-border lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h3 className="text-base font-medium text-foreground">Datas Bloqueadas</h3>
-            <p className="text-sm text-muted-foreground">Indisponibilidades da barbearia ou de funcionarios especificos.</p>
+            <p className="text-sm text-muted-foreground">Indisponibilidades da salão ou de funcionarios especificos.</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative">
@@ -718,7 +718,7 @@ export function SchedulesPage() {
                       <td className="px-4 py-3 text-sm font-medium text-foreground">{formatDate(item.date)}</td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{item.reason || "Sem motivo informado"}</td>
                       <td className="px-4 py-3 text-sm text-foreground">
-                        {item.barberId ? "Funcionario especifico" : "Barbearia inteira"}
+                        {item.barberId ? "Funcionario especifico" : "Salão inteira"}
                       </td>
                       <td className="px-4 py-3 text-sm text-foreground">{item.barber?.displayName ?? "Todos"}</td>
                       <td className="px-4 py-3">
@@ -795,7 +795,7 @@ export function SchedulesPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Barbearia inteira</SelectItem>
+                    <SelectItem value="all">Salão inteira</SelectItem>
                     <SelectItem value="barber">Funcionario especifico</SelectItem>
                   </SelectContent>
                 </Select>

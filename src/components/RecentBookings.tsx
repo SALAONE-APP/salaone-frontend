@@ -51,7 +51,7 @@ export function RecentBookings({ appointments }: Props) {
                 Data
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Barbeiro
+                Profissional
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Status

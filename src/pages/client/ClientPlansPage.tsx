@@ -519,7 +519,7 @@ export function ClientPlansPage() {
       <div>
         <h2 className="text-xl font-semibold text-foreground">Planos disponíveis</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Assine um plano e aproveite beneficios exclusivos na barbearia.
+          Assine um plano e aproveite beneficios exclusivos na salão.
         </p>
       </div>
 
@@ -545,7 +545,7 @@ export function ClientPlansPage() {
             {mySubscription?.plan?.name ? ` - ${mySubscription.plan.name}` : ""}.
           </p>
           <p className="mt-0.5 text-xs text-amber-700/80">
-            O plano sera liberado pela barbearia apos o pagamento no local.
+            O plano sera liberado pela salão apos o pagamento no local.
           </p>
         </div>
       )}
@@ -558,7 +558,7 @@ export function ClientPlansPage() {
             foi {mySubscription?.status === "cancelled" ? "cancelada" : "expirada"}.
           </p>
           <p className="mt-0.5 text-xs text-amber-600/70">
-            Entre em contato com a barbearia para reativar seu plano.
+            Entre em contato com a salão para reativar seu plano.
           </p>
         </div>
       )}

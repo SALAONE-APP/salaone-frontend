@@ -1,6 +1,6 @@
 import api from "./api";
 
-export interface AresChatBarbershop {
+export interface AresChatSalon {
   id: string;
   name: string;
   slug: string;
@@ -50,15 +50,15 @@ export type AresChatTestRequests = Record<
 export interface AresChatSetupData {
   tokenAvailable: boolean;
   tokenMessage: string;
-  barbershop: AresChatBarbershop;
+  salon: AresChatSalon;
   credential: AresChatCredential | null;
   areschatIntegrationFields: AresChatIntegrationFields;
   testRequests?: AresChatTestRequests;
 }
 
-export async function getAresChatSetupData(barbershopId?: string | null) {
+export async function getAresChatSetupData(salonId?: string | null) {
   const { data } = await api.get<AresChatSetupData>("/integrations/areschat/setup-data", {
-    params: barbershopId ? { barbershopId } : undefined,
+    params: salonId ? { salonId } : undefined,
   });
 
   return data;
@@ -66,7 +66,7 @@ export async function getAresChatSetupData(barbershopId?: string | null) {
 
 export async function generateAresChatSetupData(payload: {
   name?: string;
-  barbershopId?: string | null;
+  salonId?: string | null;
 }) {
   const { data } = await api.post<AresChatSetupData>(
     "/integrations/areschat/setup-data/generate",

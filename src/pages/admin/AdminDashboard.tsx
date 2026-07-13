@@ -40,13 +40,13 @@ function formatCurrency(value: number) {
 const shortcuts = [
   {
     label: "Dashboard",
-    description: "Indicadores da barbearia.",
+    description: "Indicadores da salão.",
     href: "/overview",
     icon: BarChart3,
   },
   {
     label: "Funcionarios",
-    description: "Equipe e barbeiros.",
+    description: "Equipe e profissionais.",
     href: "/users",
     icon: UserCog,
   },
@@ -294,7 +294,7 @@ function CashClosingReminderDialog({
         <DialogHeader>
           <DialogTitle>Fechamento de caixa</DialogTitle>
           <DialogDescription>
-            Existe uma pendencia relacionada ao caixa da barbearia.
+            Existe uma pendencia relacionada ao caixa da salão.
           </DialogDescription>
         </DialogHeader>
 

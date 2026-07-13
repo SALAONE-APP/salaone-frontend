@@ -92,7 +92,7 @@ export function ReceptionistDashboard() {
           Bem-vindo, {userName}
         </h2>
         <p className="max-w-3xl text-muted-foreground">
-          Gerencie agendamentos, clientes e pagamentos da barbearia.
+          Gerencie agendamentos, clientes e pagamentos da salão.
         </p>
       </section>
 

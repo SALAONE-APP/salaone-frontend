@@ -59,5 +59,5 @@ export function BarberSidebar() {
     ...(bottomItems.length > 0 ? [{ items: bottomItems }] : []),
   ];
 
-  return <ProfileSidebar title="Painel do Barbeiro" homeHref="/home" sections={sections} />;
+  return <ProfileSidebar title="Painel do Profissional" homeHref="/home" sections={sections} />;
 }

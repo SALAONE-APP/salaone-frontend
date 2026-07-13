@@ -1,29 +1,8 @@
 import api from "./api";
 
-function maskToken(token?: string) {
-  if (!token) {
-    return null;
-  }
-
-  return `${token.slice(0, 8)}...${token.slice(-4)}`;
-}
-
-export class TrialExpiredError extends Error {
-  trialExpiredAt: string;
-  barbershopName: string;
-
-  constructor(message: string, trialExpiredAt: string, barbershopName: string) {
-    super(message);
-    this.name = "TrialExpiredError";
-    this.trialExpiredAt = trialExpiredAt;
-    this.barbershopName = barbershopName;
-  }
-}
-
 export interface LoginPayload {
   email: string;
   password: string;
-  barbershopId?: string;
 }
 
 export interface RegisterPayload {
@@ -32,13 +11,27 @@ export interface RegisterPayload {
   password: string;
 }
 
+export interface SalonMembership {
+  salon_id: string;
+  role: string;
+  permissions?: Record<string, boolean> | null;
+  status: string;
+}
+
+export interface StoredSalon {
+  id: string;
+  name: string;
+  slug: string;
+  status?: string;
+  logoUrl?: string;
+}
+
 export interface AuthResponse {
   accessToken?: string;
   token?: string;
-  refreshToken: string;
+  refreshToken?: string;
   trialExpired?: boolean;
   trialExpiredAt?: string;
-  barbershopName?: string;
   message?: string;
   requiresProfileCompletion?: boolean;
   created?: boolean;
@@ -51,129 +44,81 @@ export interface AuthResponse {
     photoUrl?: string | null;
     permissions?: Record<string, boolean> | null;
   };
-  barbershop?: {
-    id: string;
-    name: string;
-    slug: string;
-    status?: string;
-    logoUrl?: string;
-  } | null;
-  currentBarbershop?: {
-    id: string;
-    name: string;
-    slug: string;
-    status?: string;
-    logoUrl?: string;
-  } | null;
+  memberships?: SalonMembership[];
+  salon?: StoredSalon | null;
 }
 
-export async function login(data: LoginPayload) {
-  console.info("[authService] Enviando login para /auth/login.", {
+interface BackendAuthResponse {
+  token: string;
+  user: AuthResponse["user"];
+  memberships: SalonMembership[];
+}
+
+interface BackendSalon {
+  id: string;
+  name: string;
+  slug: string;
+  status?: string;
+  logo_url?: string | null;
+}
+
+function normalizeRole(role?: string) {
+  return role === "professional" ? "barber" : role;
+}
+
+function normalizeSalon(salon: BackendSalon): StoredSalon {
+  return {
+    id: salon.id,
+    name: salon.name,
+    slug: salon.slug,
+    status: salon.status,
+    logoUrl: salon.logo_url ?? undefined,
+  };
+}
+
+export async function login(data: LoginPayload): Promise<AuthResponse> {
+  const response = await api.post<BackendAuthResponse>("/auth/login", {
     email: data.email,
-    passwordLength: data.password.length,
+    password: data.password,
   });
 
-  const response = await api.post<AuthResponse>("/auth/login", data);
+  const membership = response.data.memberships[0];
+  const user = {
+    ...response.data.user,
+    role: normalizeRole(membership?.role ?? response.data.user.role),
+    permissions: membership?.permissions ?? null,
+  };
 
-  if (response.data.trialExpired) {
-    throw new TrialExpiredError(
-      response.data.message ?? "Período de teste expirado.",
-      response.data.trialExpiredAt ?? new Date().toISOString(),
-      response.data.barbershopName ?? ""
-    );
-  }
+  localStorage.setItem("token", response.data.token);
+  localStorage.removeItem("refreshToken");
+  localStorage.setItem("user", JSON.stringify(user));
 
-  const accessToken = response.data.accessToken || response.data.token || "";
-
-  console.info("[authService] Login retornou com sucesso.", {
-    hasAccessToken: Boolean(accessToken),
-    accessTokenPreview: maskToken(accessToken),
-    hasRefreshToken: Boolean(response.data.refreshToken),
-    refreshTokenPreview: maskToken(response.data.refreshToken),
-    userId: response.data.user?.id,
-    userEmail: response.data.user?.email,
-    currentBarbershopId: response.data.currentBarbershop?.id,
-    barbershopId: response.data.barbershop?.id,
-  });
-
-  localStorage.setItem("token", accessToken);
-  localStorage.setItem("refreshToken", response.data.refreshToken);
-  localStorage.setItem("user", JSON.stringify(response.data.user));
-
-  console.info("[authService] Dados de autenticacao salvos no localStorage.", {
-    hasToken: Boolean(localStorage.getItem("token")),
-    hasRefreshToken: Boolean(localStorage.getItem("refreshToken")),
-    hasUser: Boolean(localStorage.getItem("user")),
-  });
-
-  if (response.data.currentBarbershop) {
-    localStorage.setItem(
-      "barbershop",
-      JSON.stringify(response.data.currentBarbershop)
-    );
-
-    console.info("[authService] Barbearia atual salva no localStorage.", {
-      id: response.data.currentBarbershop.id,
-      slug: response.data.currentBarbershop.slug,
-      status: response.data.currentBarbershop.status,
-    });
+  let salon: StoredSalon | null = null;
+  if (membership) {
+    const salonResponse = await api.get<{ salon: BackendSalon }>("/salons/me");
+    salon = normalizeSalon(salonResponse.data.salon);
+    localStorage.setItem("salon", JSON.stringify(salon));
   } else {
-    console.warn("[authService] Resposta de login sem currentBarbershop.");
+    localStorage.removeItem("salon");
   }
 
-  return response.data;
+  return {
+    token: response.data.token,
+    user,
+    memberships: response.data.memberships,
+    salon,
+  };
 }
 
-export async function googleLogin(
-  accessToken: string,
-  profileData?: {
-    phone?: string;
-    cpf?: string;
-    birthDate?: string;
-    password?: string;
-  },
-  slug?: string
-) {
-  const response = await api.post<AuthResponse>("/auth/google", {
-    accessToken,
-    ...(slug ? { slug } : {}),
-    ...(profileData ? { profileData } : {}),
-  });
-
-  const token = response.data.accessToken || response.data.token || "";
-
-  localStorage.setItem("token", token);
-  localStorage.setItem("refreshToken", response.data.refreshToken);
-  localStorage.setItem("user", JSON.stringify(response.data.user));
-
-  if (response.data.currentBarbershop) {
-    localStorage.setItem("barbershop", JSON.stringify(response.data.currentBarbershop));
-  }
-
-  return response.data;
-}
-
-export async function register(data: RegisterPayload) {
-  console.info("[authService] Enviando cadastro para /auth/register.", {
-    name: data.name,
-    email: data.email,
-    passwordLength: data.password.length,
-  });
-
-  const response = await api.post("/auth/register", data);
-
-  console.info("[authService] Cadastro retornou com sucesso.", {
-    status: response.status,
-  });
-
-  return response.data;
+export async function register(_data: RegisterPayload) {
+  throw new Error("O backend atual não oferece autocadastro público.");
 }
 
 export function logout() {
   localStorage.removeItem("token");
   localStorage.removeItem("refreshToken");
   localStorage.removeItem("user");
-  localStorage.removeItem("barbershop");
+  localStorage.removeItem("salon");
 }
 
 export function isAuthenticated() {
@@ -182,26 +127,25 @@ export function isAuthenticated() {
 
 export async function fetchMe() {
   const response = await api.get<{
-    id: string;
-    name: string;
-    email: string;
-    role?: string;
-    isAdmin?: boolean;
-    photoUrl?: string | null;
-    permissions?: Record<string, boolean> | null;
-    phone?: string | null;
-    cpf?: string | null;
-    birthDate?: string | null;
+    user: AuthResponse["user"];
+    memberships: SalonMembership[];
+    tenantContext: { salonId: string } | null;
   }>("/auth/me");
-  return response.data;
+  const membership = response.data.memberships.find(
+    (item) => item.salon_id === response.data.tenantContext?.salonId,
+  ) ?? response.data.memberships[0];
+
+  return {
+    ...response.data.user,
+    role: normalizeRole(membership?.role ?? response.data.user.role),
+    permissions: membership?.permissions ?? null,
+  };
 }
 
-export async function forgotPassword(email: string) {
-  const response = await api.post<{ message: string }>("/auth/forgot-password", { email });
-  return response.data;
+export async function forgotPassword(_email: string): Promise<{ message: string }> {
+  throw new Error("O backend atual não oferece recuperação de senha.");
 }
 
-export async function resetPassword(password: string, token: string) {
-  const response = await api.post<{ message: string }>("/auth/reset-password", { password, token });
-  return response.data;
+export async function resetPassword(_password: string, _token: string): Promise<{ message: string }> {
+  throw new Error("O backend atual não oferece redefinição pública de senha.");
 }

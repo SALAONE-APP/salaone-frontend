@@ -2,32 +2,32 @@ import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { listSuperAdminBarbershops, type SuperAdminBarbershop } from "@/service/superAdminService";
+import { listSuperAdminSalons, type SuperAdminSalon } from "@/service/superAdminService";
 
 export function SuperAdminReportsPage() {
-  const [barbershops, setBarbershops] = useState<SuperAdminBarbershop[]>([]);
+  const [salons, setSalons] = useState<SuperAdminSalon[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     void (async () => {
       setLoading(true);
       try {
-        const all: SuperAdminBarbershop[] = [];
+        const all: SuperAdminSalon[] = [];
         let page = 1;
         while (true) {
-          const result = await listSuperAdminBarbershops({ limit: 100, page, sortBy: "createdAt", sortOrder: "desc" });
+          const result = await listSuperAdminSalons({ limit: 100, page, sortBy: "createdAt", sortOrder: "desc" });
           const items = Array.isArray(result?.items) ? result.items : [];
           all.push(...items);
           if (all.length >= (result?.total ?? 0) || items.length < 100) break;
           page++;
         }
-        setBarbershops(all);
+        setSalons(all);
       } catch { toast.error("Nao foi possivel carregar os relatorios."); } finally { setLoading(false); }
     })();
   }, []);
 
   const summary = useMemo(() =>
-    barbershops.reduce(
+    salons.reduce(
       (acc, shop) => {
         const s = String(shop?.status || "").toLowerCase();
         if (s === "active") acc.active += 1;
@@ -40,7 +40,7 @@ export function SuperAdminReportsPage() {
       },
       { active: 0, inactive: 0, blocked: 0, pending: 0, totalAppointments: 0, totalClients: 0 }
     ),
-    [barbershops]
+    [salons]
   );
 
   if (loading) {
@@ -55,7 +55,7 @@ export function SuperAdminReportsPage() {
     <div className="space-y-4">
       <div>
         <h3 className="text-base font-semibold text-foreground">Relatorios Operacionais</h3>
-        <p className="text-sm text-muted-foreground">Consulte distribuicao de status e atividade por barbearia.</p>
+        <p className="text-sm text-muted-foreground">Consulte distribuicao de status e atividade por salão.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">

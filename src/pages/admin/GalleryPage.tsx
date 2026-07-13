@@ -407,7 +407,7 @@ export function GalleryPage() {
                   id="gallery-alt"
                   value={form.alt}
                   onChange={(event) => setField("alt", event.target.value)}
-                  placeholder="Ex: Ambiente da barbearia"
+                  placeholder="Ex: Ambiente da salão"
                 />
               </div>
               <div className="space-y-2">

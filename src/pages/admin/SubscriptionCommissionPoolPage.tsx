@@ -226,7 +226,7 @@ export function SubscriptionCommissionPoolPage() {
           <div class="header">
             <h1 class="title">Relatório de Comissão de Assinaturas</h1>
             <div class="subtitle">Período: ${periodStart.split("-").reverse().join("/")} a ${periodEnd.split("-").reverse().join("/")}</div>
-            <div class="subtitle">Regra de Agendamento: ${isFreeChoice ? "Livre Escolha" : "Barbeiro Fixo"}${isFreeChoice ? ` | Comissão do Pote: ${customPercentLabel}%` : ""}</div>
+            <div class="subtitle">Regra de Agendamento: ${isFreeChoice ? "Livre Escolha" : "Profissional Fixo"}${isFreeChoice ? ` | Comissão do Pote: ${customPercentLabel}%` : ""}</div>
           </div>
           
           <div class="info-grid">
@@ -252,7 +252,7 @@ export function SubscriptionCommissionPoolPage() {
           <table>
             <thead>
               <tr>
-                <th>Barbeiro</th>
+                <th>Profissional</th>
                 <th class="text-right">Faturamento Individual</th>
                 <th class="text-right">Atendimentos</th>
                 <th class="text-right">Pontos</th>
@@ -263,7 +263,7 @@ export function SubscriptionCommissionPoolPage() {
             <tbody>
               ${distributions.map(item => `
                 <tr>
-                  <td class="font-semibold">${item.barberName ?? "Barbeiro"}</td>
+                  <td class="font-semibold">${item.barberName ?? "Profissional"}</td>
                   <td class="text-right">${formatCurrency(item.revenue)}</td>
                   <td class="text-right">${item.appointments}</td>
                   <td class="text-right">${item.points}</td>
@@ -297,7 +297,7 @@ export function SubscriptionCommissionPoolPage() {
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-semibold text-foreground">Pote de comissao de assinaturas</h3>
             <Badge variant={isFreeChoice ? "default" : "secondary"}>
-              {isFreeChoice ? "Livre escolha" : "Barbeiro fixo"}
+              {isFreeChoice ? "Livre escolha" : "Profissional fixo"}
             </Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -345,7 +345,7 @@ export function SubscriptionCommissionPoolPage() {
               </div>
               {!isFreeChoice && (
                 <p className="text-xs text-muted-foreground">
-                  No modo barbeiro fixo, a comissao usa o percentual configurado no servico/barbeiro.
+                  No modo profissional fixo, a comissao usa o percentual configurado no servico/profissional.
                 </p>
               )}
             </div>
@@ -398,7 +398,7 @@ export function SubscriptionCommissionPoolPage() {
                 <thead>
                   <tr className="border-b border-border">
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      Barbeiro
+                      Profissional
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       Faturamento
@@ -429,7 +429,7 @@ export function SubscriptionCommissionPoolPage() {
                     distributions.map((item) => (
                       <tr key={item.employeeId} className="border-b border-border last:border-b-0">
                         <td className="px-4 py-3 font-medium text-foreground">
-                          {item.barberName ?? "Barbeiro"}
+                          {item.barberName ?? "Profissional"}
                         </td>
                         <td className="px-4 py-3 text-right text-muted-foreground">
                           {formatCurrency(item.revenue)}

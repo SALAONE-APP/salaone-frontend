@@ -143,7 +143,7 @@ export function BarberDashboard() {
   return (
     <div className="space-y-6">
       <section className="rounded-xl border border-primary/20 bg-primary/10 p-6">
-        <p className="mb-2 text-sm font-medium text-primary">Barbeiro</p>
+        <p className="mb-2 text-sm font-medium text-primary">Profissional</p>
         <h2 className="mb-2 text-2xl font-semibold text-foreground">
           Agenda de hoje, {displayName}
         </h2>

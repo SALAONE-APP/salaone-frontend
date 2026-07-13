@@ -62,7 +62,7 @@ import {
 } from "@/service/appointmentService";
 import { listBarbers, type Barber } from "@/service/barberService";
 import { listBlockedDates, type BlockedDate } from "@/service/blockedDateService";
-import { getBarbershopProfile, type BarbershopProfile } from "@/service/barbershopProfileService";
+import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
 import { listServices, type Service } from "@/service/serviceService";
 import { isFitAppointment } from "@/utils/fitAppointment";
 import { ClientPickerModal } from "@/components/ClientPickerModal";
@@ -214,7 +214,7 @@ export function BookingsPage() {
   const [transferBarberId, setTransferBarberId] = useState("");
   const [transferSaving, setTransferSaving] = useState(false);
   const [blockedDateWarning, setBlockedDateWarning] = useState<BlockedDate | null>(null);
-  const [barbershopProfile, setBarbershopProfile] = useState<BarbershopProfile | null>(null);
+  const [salonProfile, setSalonProfile] = useState<SalonProfile | null>(null);
   const [todayCount, setTodayCount] = useState<number | null>(null);
   const [sendingWhatsAppId, setSendingWhatsAppId] = useState<string | null>(null);
 
@@ -249,7 +249,7 @@ export function BookingsPage() {
   }, [loadAppointments]);
 
   useEffect(() => {
-    getBarbershopProfile().then(setBarbershopProfile).catch(() => null);
+    getSalonProfile().then(setSalonProfile).catch(() => null);
   }, []);
 
   useEffect(() => {
@@ -325,7 +325,7 @@ export function BookingsPage() {
     };
   }, [dialogOpen, form.allowOutsideBusinessHours, form.barberId, form.date, totalDuration]);
 
-  // Verifica se a data/barbeiro selecionado tem bloqueio
+  // Verifica se a data/profissional selecionado tem bloqueio
   useEffect(() => {
     if (!dialogOpen || !form.date || !form.barberId) {
       setBlockedDateWarning(null);
@@ -336,7 +336,7 @@ export function BookingsPage() {
       .then((items) => {
         const block = items.find((b) => {
           if (!b.barberId && !form.barberId) return true;
-          if (!b.barberId) return true; // barbearia inteira
+          if (!b.barberId) return true; // salão inteira
           return b.barberId === form.barberId;
         });
         setBlockedDateWarning(block ?? null);
@@ -415,7 +415,7 @@ export function BookingsPage() {
 
   function validateForm() {
     if (!form.clientId) return "Selecione o cliente.";
-    if (!form.barberId) return "Selecione o barbeiro.";
+    if (!form.barberId) return "Selecione o profissional.";
     if (!form.date) return "Selecione a data.";
     if (!form.time) return "Selecione ou informe o horario.";
     if (form.serviceIds.length === 0) return "Selecione pelo menos um servico.";
@@ -483,7 +483,7 @@ export function BookingsPage() {
         return;
       }
 
-      sendAppointmentWhatsApp(targetAppointment, barbershopProfile);
+      sendAppointmentWhatsApp(targetAppointment, salonProfile);
     } catch (err) {
       toast.error(getApiMessage(err));
     } finally {
@@ -534,13 +534,13 @@ export function BookingsPage() {
   async function handleTransfer() {
     if (!appointmentToTransfer || !transferBarberId) return;
     if (transferBarberId === appointmentToTransfer.barber?.id) {
-      toast.error("Selecione um barbeiro diferente do atual.");
+      toast.error("Selecione um profissional diferente do atual.");
       return;
     }
     setTransferSaving(true);
     try {
       await updateAppointment(appointmentToTransfer.id, { barberId: transferBarberId });
-      const newBarberName = barbers.find((b) => b.id === transferBarberId)?.displayName ?? "novo barbeiro";
+      const newBarberName = barbers.find((b) => b.id === transferBarberId)?.displayName ?? "novo profissional";
       toast.success(`Agendamento transferido para ${newBarberName}!`);
       setTransferDialogOpen(false);
       await loadAppointments();
@@ -674,7 +674,7 @@ export function BookingsPage() {
                     Data e Hora
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Barbeiro
+                    Profissional
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Valor
@@ -706,7 +706,7 @@ export function BookingsPage() {
                       appointment.services.map((service) => service.serviceName).join(", ") ||
                       "Sem servico";
                     const clientName = appointment.dependent?.name || appointment.client?.name || "Cliente";
-                    const barberName = appointment.barber?.displayName || "Sem barbeiro";
+                    const barberName = appointment.barber?.displayName || "Sem profissional";
 
                     return (
                       <tr
@@ -818,7 +818,7 @@ export function BookingsPage() {
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem onClick={() => openTransferDialog(appointment)}>
                                     <ArrowLeftRight size={14} />
-                                    Transferir barbeiro
+                                    Transferir profissional
                                   </DropdownMenuItem>
                                 </>
                               )}
@@ -876,13 +876,13 @@ export function BookingsPage() {
         </div>
       </div>
 
-      {/* Dialog de transferência de barbeiro */}
+      {/* Dialog de transferência de profissional */}
       <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Transferir Agendamento</DialogTitle>
             <DialogDescription>
-              Altere o barbeiro responsavel por este agendamento.
+              Altere o profissional responsavel por este agendamento.
             </DialogDescription>
           </DialogHeader>
 
@@ -895,7 +895,7 @@ export function BookingsPage() {
                 </span>
               </p>
               <p className="text-sm text-muted-foreground">
-                Barbeiro atual:{" "}
+                Profissional atual:{" "}
                 <span className="font-medium text-foreground">
                   {appointmentToTransfer?.barber?.displayName || "—"}
                 </span>
@@ -903,10 +903,10 @@ export function BookingsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Novo barbeiro</Label>
+              <Label>Novo profissional</Label>
               <Select value={transferBarberId} onValueChange={setTransferBarberId}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecionar barbeiro" />
+                  <SelectValue placeholder="Selecionar profissional" />
                 </SelectTrigger>
                 <SelectContent>
                   {barbers.map((barber) => (
@@ -962,7 +962,7 @@ export function BookingsPage() {
               <DialogDescription>
                 {form.allowOutsideBusinessHours
                   ? "Informe manualmente um horario fora da grade comercial."
-                  : "Escolha um dos horarios disponiveis para o barbeiro selecionado."}
+                  : "Escolha um dos horarios disponiveis para o profissional selecionado."}
               </DialogDescription>
             </DialogHeader>
 
@@ -1005,7 +1005,7 @@ export function BookingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Barbeiro</Label>
+                <Label>Profissional</Label>
                 <Select
                   value={form.barberId}
                   onValueChange={(value) => {
@@ -1014,7 +1014,7 @@ export function BookingsPage() {
                   }}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecionar barbeiro" />
+                    <SelectValue placeholder="Selecionar profissional" />
                   </SelectTrigger>
                   <SelectContent>
                     {barbers.map((barber) => (
@@ -1110,7 +1110,7 @@ export function BookingsPage() {
               {form.allowOutsideBusinessHours ? (
                 <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 md:col-span-2">
                   Este agendamento sera criado fora do horario comercial e ainda respeita conflitos
-                  de agenda do barbeiro.
+                  de agenda do profissional.
                 </div>
               ) : null}
 
@@ -1118,10 +1118,10 @@ export function BookingsPage() {
                 <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive md:col-span-2">
                   <strong>Data bloqueada:</strong>{" "}
                   {blockedDateWarning.startTime && blockedDateWarning.endTime
-                    ? `${blockedDateWarning.barberId ? "Barbeiro bloqueado" : "Barbearia bloqueada"} das ${blockedDateWarning.startTime} às ${blockedDateWarning.endTime}`
+                    ? `${blockedDateWarning.barberId ? "Profissional bloqueado" : "Salão bloqueada"} das ${blockedDateWarning.startTime} às ${blockedDateWarning.endTime}`
                     : blockedDateWarning.barberId
-                      ? "O barbeiro está indisponível neste dia"
-                      : "A barbearia está fechada neste dia"}
+                      ? "O profissional está indisponível neste dia"
+                      : "A salão está fechada neste dia"}
                   {blockedDateWarning.reason ? ` — ${blockedDateWarning.reason}` : ""}
                 </div>
               )}

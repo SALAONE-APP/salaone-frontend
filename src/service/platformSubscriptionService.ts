@@ -28,13 +28,13 @@ export interface PlatformSubscription {
   createdAt: string | null;
 }
 
-export async function getBarbershopPlatformSubscription(): Promise<{ subscription: PlatformSubscription | null }> {
-  const { data } = await api.get('/pagarme/subscriptions/barbershop-platform-subscriptions/current');
+export async function getSalonPlatformSubscription(): Promise<{ subscription: PlatformSubscription | null }> {
+  const { data } = await api.get('/pagarme/subscriptions/salon-platform-subscriptions/current');
   return data;
 }
 
-export async function cancelBarbershopPlatformSubscription(): Promise<{ ok: boolean }> {
-  const { data } = await api.post('/pagarme/subscriptions/barbershop-platform-subscriptions/cancel');
+export async function cancelSalonPlatformSubscription(): Promise<{ ok: boolean }> {
+  const { data } = await api.post('/pagarme/subscriptions/salon-platform-subscriptions/cancel');
   return data;
 }
 
@@ -104,10 +104,10 @@ export async function confirmClientPlanPixOrder(payload: {
   return data;
 }
 
-export async function subscribeBarbershopPlatformPlan(payload: SubscribePlatformPayload) {
+export async function subscribeSalonPlatformPlan(payload: SubscribePlatformPayload) {
   const cardToken = await createPagarmeCardToken(payload.cardForm);
 
-  const { data } = await api.post('/pagarme/subscriptions/barbershop-platform-subscriptions', {
+  const { data } = await api.post('/pagarme/subscriptions/salon-platform-subscriptions', {
     platformPlanId: payload.platformPlanId,
     amount: payload.amount,
     cardToken,

@@ -575,7 +575,7 @@ export function ProductsPage() {
                 {editingProduct ? "Editar Produto" : "Adicionar Produto"}
               </DialogTitle>
               <DialogDescription>
-                Cadastre produtos vendidos pela barbearia e controle estoque.
+                Cadastre produtos vendidos pela salão e controle estoque.
               </DialogDescription>
             </DialogHeader>
 

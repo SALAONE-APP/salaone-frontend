@@ -67,7 +67,7 @@ import {
   getMyActiveSubscription,
   type Subscription,
 } from "@/service/subscriptionService";
-import { getBarbershopProfile, type BarbershopProfile } from "@/service/barbershopProfileService";
+import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
 import { getSettings, type BookingPaymentMethod, type SubscriptionBarberRule } from "@/service/settingsService";
 import { createAppointmentPayment } from "@/service/paymentService";
 import { createReview } from "@/service/reviewService";
@@ -190,9 +190,9 @@ function getServicePrice(s: Service) {
   return s.promotionalPrice && s.promotionalPrice > 0 ? s.promotionalPrice : (s.basePrice ?? 0);
 }
 
-function getStoredBarbershopId(): string {
+function getStoredSalonId(): string {
   try {
-    const raw = localStorage.getItem("barbershop");
+    const raw = localStorage.getItem("salon");
     if (!raw) return "";
     return (JSON.parse(raw) as { id?: string }).id ?? "";
   } catch {
@@ -242,12 +242,12 @@ export function ClientBookingsPage() {
     paymentId: string;
   } | null>(null);
 
-  // Regra de barbeiro por assinatura
+  // Regra de profissional por assinatura
   const [subscriptionBarberRule, setSubscriptionBarberRule] = useState<SubscriptionBarberRule>("fixed");
   const [hiddenPaymentMethods, setHiddenPaymentMethods] = useState<BookingPaymentMethod[]>([]);
 
-  // Perfil da barbearia (para WhatsApp)
-  const [barbershopProfile, setBarbershopProfile] = useState<BarbershopProfile | null>(null);
+  // Perfil da salão (para WhatsApp)
+  const [salonProfile, setSalonProfile] = useState<SalonProfile | null>(null);
 
   // Modal de sucesso com botão WhatsApp
   const [whatsAppData, setWhatsAppData] = useState<WhatsAppMessageData | null>(null);
@@ -294,15 +294,15 @@ export function ClientBookingsPage() {
     if (!bookingOpen) return;
     async function load() {
       try {
-        const barbershopId = getStoredBarbershopId();
+        const salonId = getStoredSalonId();
         const [b, s, profile] = await Promise.all([
-          listBarbers({ page: 1, limit: 100, barbershopId }),
-          listServices({ includeInactive: false, page: 1, limit: 100, barbershopId }),
-          getBarbershopProfile(barbershopId),
+          listBarbers({ page: 1, limit: 100, salonId }),
+          listServices({ includeInactive: false, page: 1, limit: 100, salonId }),
+          getSalonProfile(salonId),
         ]);
         setBarbers(b.items);
         setServices(s.items.filter((sv) => sv.active));
-        setBarbershopProfile(profile);
+        setSalonProfile(profile);
       } catch (err) { toast.error(getApiMessage(err)); }
 
       try {
@@ -420,7 +420,7 @@ export function ClientBookingsPage() {
   }
 
   function validateForm(): string | null {
-    if (!form.barberId) return "Selecione o barbeiro.";
+    if (!form.barberId) return "Selecione o profissional.";
     if (!form.date) return "Selecione a data.";
     if (form.serviceIds.length === 0) return "Selecione pelo menos um servico.";
     if (!form.time) return "Selecione o horario.";
@@ -470,14 +470,14 @@ export function ClientBookingsPage() {
 
       setWhatsAppData({
         clientName: bookingForDependent ? `${bookingForDependent.name} (Dependente de ${user?.name})` : (user?.name ?? ""),
-        barbershopName: barbershopProfile?.name || "Barbearia",
+        salonName: salonProfile?.name || "Salão",
         barberName: barbers.find((b) => b.id === form.barberId)?.displayName ?? "",
         date: formatDateBR(form.date),
         time: form.time,
         services: selectedServices.map((s) => s.name),
         total: totalPrice,
         notes: form.notes?.trim(),
-        googleMapsUrl: barbershopProfile?.googleMapsUrl,
+        googleMapsUrl: salonProfile?.googleMapsUrl,
       });
       setBookingOpen(false);
       setBookingForDependent(null);
@@ -525,14 +525,14 @@ export function ClientBookingsPage() {
 
       setWhatsAppData({
         clientName: bookingForDependent ? `${bookingForDependent.name} (Dependente de ${user?.name})` : (user?.name ?? ""),
-        barbershopName: barbershopProfile?.name || "Barbearia",
+        salonName: salonProfile?.name || "Salão",
         barberName: barbers.find((b) => b.id === form.barberId)?.displayName ?? "",
         date: formatDateBR(form.date),
         time: form.time,
         services: selectedServices.map((s) => s.name),
         total: 0, // 0 custo extra
         notes: form.notes?.trim(),
-        googleMapsUrl: barbershopProfile?.googleMapsUrl,
+        googleMapsUrl: salonProfile?.googleMapsUrl,
       });
       setBookingOpen(false);
       setBookingForDependent(null);
@@ -580,14 +580,14 @@ export function ClientBookingsPage() {
         // Se falhar o registro de pagamento, confirma como agendamento sem pagamento online
         setWhatsAppData({
           clientName: bookingForDependent ? `${bookingForDependent.name} (Dependente de ${user?.name})` : (user?.name ?? ""),
-          barbershopName: barbershopProfile?.name || "Barbearia",
+          salonName: salonProfile?.name || "Salão",
           barberName: barbers.find((b) => b.id === form.barberId)?.displayName ?? "",
           date: formatDateBR(form.date),
           time: form.time,
           services: selectedServices.map((s) => s.name),
           total: totalPrice,
           notes: form.notes?.trim(),
-          googleMapsUrl: barbershopProfile?.googleMapsUrl,
+          googleMapsUrl: salonProfile?.googleMapsUrl,
         });
         setBookingOpen(false);
         setBookingForDependent(null);
@@ -626,14 +626,14 @@ export function ClientBookingsPage() {
   async function handlePaymentSuccess() {
     setWhatsAppData({
       clientName: user?.name ?? "",
-      barbershopName: barbershopProfile?.name || "Barbearia",
+      salonName: salonProfile?.name || "Salão",
       barberName: barbers.find((b) => b.id === form.barberId)?.displayName ?? "",
       date: formatDateBR(form.date),
       time: form.time,
       services: selectedServices.map((s) => s.name),
       total: totalPrice,
       notes: form.notes?.trim(),
-      googleMapsUrl: barbershopProfile?.googleMapsUrl,
+      googleMapsUrl: salonProfile?.googleMapsUrl,
     });
     setPaymentOpen(false);
     setBookingOpen(false);
@@ -754,7 +754,7 @@ export function ClientBookingsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  {["Servico", "Data e Hora", "Barbeiro", "Valor", "Status"].map((col) => (
+                  {["Servico", "Data e Hora", "Profissional", "Valor", "Status"].map((col) => (
                     <th key={col} className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">{col}</th>
                   ))}
                   <th className="w-10 px-4 py-3" />
@@ -769,7 +769,7 @@ export function ClientBookingsPage() {
                   filteredAppointments.map((appt) => {
                     const start = formatDateTime(appt.startAt);
                     const serviceText = appt.services.map((s) => s.serviceName).join(", ") || "Sem servico";
-                    const barberName = appt.barber?.displayName || "Sem barbeiro";
+                    const barberName = appt.barber?.displayName || "Sem profissional";
                     const canCancel = appt.status === "scheduled" || appt.status === "confirmed";
                     const canReview = appt.status === "completed";
 
@@ -861,7 +861,7 @@ export function ClientBookingsPage() {
             <DialogHeader className="flex-shrink-0">
               <DialogTitle>Marcar Horario</DialogTitle>
               <DialogDescription>
-                Escolha o barbeiro, servico e um horario disponivel.
+                Escolha o profissional, servico e um horario disponivel.
               </DialogDescription>
             </DialogHeader>
 
@@ -909,14 +909,14 @@ export function ClientBookingsPage() {
               )}
 
               <div className="space-y-2">
-                <Label>Barbeiro</Label>
+                <Label>Profissional</Label>
                 <Select
                   value={form.barberId}
                   onValueChange={(v) => { setField("barberId", v); setField("time", ""); }}
                   disabled={hasLockedBarber}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecionar barbeiro" />
+                    <SelectValue placeholder="Selecionar profissional" />
                   </SelectTrigger>
                   <SelectContent>
                     {barbers.map((b) => (
@@ -929,12 +929,12 @@ export function ClientBookingsPage() {
                 {hasLockedBarber ? (
                   <p className="flex items-center gap-1.5 text-xs text-amber-600">
                     <Lock size={11} />
-                    Barbeiro fixo do seu plano.
+                    Profissional fixo do seu plano.
                   </p>
                 ) : isFixedRule && hasActiveSubscriptionForBooking ? (
                   <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Info size={11} />
-                    O barbeiro escolhido será vinculado ao seu plano após o agendamento.
+                    O profissional escolhido será vinculado ao seu plano após o agendamento.
                   </p>
                 ) : null}
               </div>
@@ -1031,7 +1031,7 @@ export function ClientBookingsPage() {
           <DialogHeader>
             <DialogTitle>Avaliar atendimento</DialogTitle>
             <DialogDescription>
-              Sua avaliacao sera enviada para a barbearia.
+              Sua avaliacao sera enviada para a salão.
             </DialogDescription>
           </DialogHeader>
 
@@ -1129,7 +1129,7 @@ export function ClientBookingsPage() {
             userId: user?.id ?? "",
             userEmail: user?.email ?? "",
             userName: user?.name ?? "",
-            barbershopId: getStoredBarbershopId(),
+            salonId: getStoredSalonId(),
           }}
           onSuccess={handlePaymentSuccess}
         />
@@ -1149,7 +1149,7 @@ export function ClientBookingsPage() {
 
           {whatsAppData && (
             <div className="space-y-1 rounded-md border border-border bg-secondary/40 p-4 text-sm">
-              <p><span className="font-medium">Barbeiro:</span> {whatsAppData.barberName}</p>
+              <p><span className="font-medium">Profissional:</span> {whatsAppData.barberName}</p>
               <p><span className="font-medium">Data:</span> {whatsAppData.date}</p>
               <p><span className="font-medium">Horário:</span> {whatsAppData.time}</p>
               <p><span className="font-medium">Serviços:</span> {whatsAppData.services.join(", ")}</p>
@@ -1161,7 +1161,7 @@ export function ClientBookingsPage() {
               className="w-full bg-[#25D366] text-white hover:bg-[#1ebe5a]"
               onClick={() => {
                 if (whatsAppData) {
-                  openWhatsApp(barbershopProfile?.phone, buildWhatsAppMessage(whatsAppData));
+                  openWhatsApp(salonProfile?.phone, buildWhatsAppMessage(whatsAppData));
                 }
                 setWhatsAppData(null);
               }}

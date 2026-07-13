@@ -1,4 +1,4 @@
-import logoPdf from "@/assets/image/salaone-logo.svg";
+import logoPdf from "@/assets/image/logo-icone-salaone.jpeg";
 
 export interface ReportColumn<TRow> {
   header: string;

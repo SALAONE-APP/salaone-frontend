@@ -510,7 +510,7 @@ export default function AdminAppointmentsCalendar({
                   </div>
                 )}
                 <div className="apt-detail-row">
-                  <span className="apt-detail-label">Barbeiro</span>
+                  <span className="apt-detail-label">Profissional</span>
                   <span className="apt-detail-value">{barber.displayName}</span>
                 </div>
                 <div className="apt-detail-row">

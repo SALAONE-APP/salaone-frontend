@@ -196,7 +196,7 @@ export function ClientReviewsPage() {
               const review = reviewsByAppointment.get(appointment.id);
               const start = formatDateTime(appointment.startAt);
               const serviceText = appointment.services.map((service) => service.serviceName).join(", ") || "Sem servico";
-              const barberName = appointment.barber?.displayName || "Sem barbeiro";
+              const barberName = appointment.barber?.displayName || "Sem profissional";
 
               return (
                 <div key={appointment.id} className="grid gap-4 p-4 md:grid-cols-[1fr_auto] md:items-center">
@@ -263,7 +263,7 @@ export function ClientReviewsPage() {
           <DialogHeader>
             <DialogTitle>Avaliar atendimento</DialogTitle>
             <DialogDescription>
-              Sua avaliacao sera enviada para a barbearia.
+              Sua avaliacao sera enviada para a salão.
             </DialogDescription>
           </DialogHeader>
 

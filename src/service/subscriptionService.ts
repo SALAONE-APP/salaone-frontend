@@ -22,7 +22,7 @@ export interface Subscription {
   id: string;
   userId: string;
   planId: string;
-  barbershopId: string;
+  salonId: string;
   user: SubscriptionUser | null;
   plan: SubscriptionPlan | null;
   amount: number;

@@ -2,11 +2,11 @@ import areschatIcon from '../assets/iconeAresChat.png';
 import { buildAresChatRedirectUrl } from '@/utils/areschat';
 
 interface AresChatButtonProps {
-  barbershopSlug?: string | null;
+  salonSlug?: string | null;
 }
 
-export function AresChatButton({ barbershopSlug }: AresChatButtonProps) {
-  const areschatUrl = buildAresChatRedirectUrl(barbershopSlug);
+export function AresChatButton({ salonSlug }: AresChatButtonProps) {
+  const areschatUrl = buildAresChatRedirectUrl(salonSlug);
 
   return (
     <a

@@ -2,7 +2,7 @@ import api from "./api";
 
 export interface BlockedDate {
   id: string;
-  barbershopId: string;
+  salonId: string;
   date: string;
   reason?: string | null;
   barberId?: string | null;

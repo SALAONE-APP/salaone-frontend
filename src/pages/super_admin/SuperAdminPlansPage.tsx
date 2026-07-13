@@ -57,7 +57,7 @@ const FORM_FIELDS: { label: string; id: string; key: keyof PlanForm; type?: stri
   { label: "Qtd. do intervalo", id: "pn-ic", key: "intervalCount", type: "number", min: "1", placeholder: "1" },
   { label: "Dias gratis (trial)", id: "pn-trial", key: "trialPeriodDays", type: "number", min: "0", placeholder: "0" },
   { label: "Ordem na landing", id: "pn-sort", key: "sortOrder", type: "number", placeholder: "0" },
-  { label: "Max. barbeiros", id: "pn-mb", key: "maxBarbers", type: "number", min: "0", placeholder: "Vazio = ilimitado" },
+  { label: "Max. profissionais", id: "pn-mb", key: "maxBarbers", type: "number", min: "0", placeholder: "Vazio = ilimitado" },
   { label: "Max. admins", id: "pn-ma", key: "maxAdmins", type: "number", min: "0", placeholder: "Vazio = ilimitado" },
   { label: "Max. recepcionistas", id: "pn-mr", key: "maxReceptionists", type: "number", min: "0", placeholder: "Vazio = ilimitado" },
   { label: "Descricao na fatura (max. 13)", id: "pn-stmt", key: "statementDescriptor", maxLength: 13, placeholder: "SALAONE" },
@@ -235,7 +235,7 @@ export function SuperAdminPlansPage() {
           <div className="col-span-full space-y-1.5">
             <label htmlFor="pn-features" className="text-xs font-medium text-muted-foreground">Beneficios do plano (um por linha)</label>
             <textarea id="pn-features" rows={4} value={form.features} onChange={(e) => setForm((p) => ({ ...p, features: e.target.value }))}
-              placeholder={"Ex.: Ate 2 barbeiros\nAgenda online\nRelatorios basicos"}
+              placeholder={"Ex.: Ate 2 profissionais\nAgenda online\nRelatorios basicos"}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40" />
           </div>
         </div>
@@ -354,7 +354,7 @@ export function SuperAdminPlansPage() {
                   <label className="text-xs font-medium text-muted-foreground">Ordem na landing</label>
                   <input type="number" value={editForm.sortOrder} onChange={(e) => setEditForm((p) => ({ ...p, sortOrder: e.target.value }))} className={inputCls} />
                 </div>
-                {[{ label: "Max. barbeiros", key: "maxBarbers" }, { label: "Max. admins", key: "maxAdmins" }, { label: "Max. recepcionistas", key: "maxReceptionists" }].map((f) => (
+                {[{ label: "Max. profissionais", key: "maxBarbers" }, { label: "Max. admins", key: "maxAdmins" }, { label: "Max. recepcionistas", key: "maxReceptionists" }].map((f) => (
                   <div key={f.key} className="space-y-1.5">
                     <label className="text-xs font-medium text-muted-foreground">{f.label}</label>
                     <input type="number" min="0" value={editForm[f.key as keyof PlanForm] as string}

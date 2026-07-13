@@ -89,7 +89,7 @@ export function PaymentChoiceModal({
         {/* Resumo do agendamento */}
         <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-1 text-sm">
           <p className="text-muted-foreground">
-            Barbeiro: <span className="font-medium text-foreground">{summary.barberName}</span>
+            Profissional: <span className="font-medium text-foreground">{summary.barberName}</span>
           </p>
           <p className="text-muted-foreground">
             Data: <span className="font-medium text-foreground">{summary.date}</span>
@@ -139,7 +139,7 @@ export function PaymentChoiceModal({
               <ChoiceCard
                 icon={Store}
                 title="No local"
-                description="Pague na barbearia"
+                description="Pague na salão"
                 onClick={() => handleChoose("local")}
               />
             )}

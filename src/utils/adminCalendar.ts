@@ -79,7 +79,7 @@ export const APPOINTMENT_CLIENT_STATUS_CONFIG: Record<AppointmentClientStatusKey
   no_plan: {
     key: 'no_plan',
     label: 'Cliente sem plano',
-    description: 'Cliente nao possui assinatura ativa nesta barbearia.',
+    description: 'Cliente nao possui assinatura ativa nesta salão.',
     color: {
       accent: '#f59e0b',
       border: 'rgba(245,158,11,0.50)',

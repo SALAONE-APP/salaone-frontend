@@ -14,10 +14,10 @@ function normalizeSlug(value?: string | null) {
     .replace(/[^a-z0-9-]/g, "");
 }
 
-export function buildAresChatRedirectUrl(barbershopSlug?: string | null) {
+export function buildAresChatRedirectUrl(salonSlug?: string | null) {
   const template = getAresChatUrlTemplate();
   const slug = normalizeSlug(
-    barbershopSlug || import.meta.env.VITE_BARBERSHOP_SLUG
+    salonSlug || import.meta.env.VITE_SALON_SLUG
   );
 
   if (!slug) {

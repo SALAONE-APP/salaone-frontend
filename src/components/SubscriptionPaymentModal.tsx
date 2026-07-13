@@ -3,7 +3,7 @@ import { X, CreditCard, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { subscribeBarbershopPlatformPlan, type PlatformPlan } from '@/service/platformSubscriptionService';
+import { subscribeSalonPlatformPlan, type PlatformPlan } from '@/service/platformSubscriptionService';
 import { useAuth } from '@/hooks/useAuth';
 
 interface SubscriptionPaymentModalProps {
@@ -60,7 +60,7 @@ export function SubscriptionPaymentModal({ isOpen, plan, onClose, onSuccess }: S
     if (!plan) return;
     setProcessing(true);
     try {
-      await subscribeBarbershopPlatformPlan({
+      await subscribeSalonPlatformPlan({
         platformPlanId: plan.id,
         amount,
         cardForm: { ...cardForm, number: cardForm.number.replace(/\s/g, '') },

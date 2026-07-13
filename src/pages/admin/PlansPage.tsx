@@ -915,7 +915,7 @@ export function PlansPage() {
                 </Select>
                 <p className="text-xs text-muted-foreground">
                   No cartao de credito, o cliente so consegue assinar pelo checkout seguro e a renovacao e automatica.
-                  Em "Pagar no local", a cobranca deve ser conferida pela barbearia.
+                  Em "Pagar no local", a cobranca deve ser conferida pela salão.
                 </p>
               </div>
 

@@ -5,8 +5,8 @@ import { toast } from "sonner";
 import { AresChatIntegrationModal } from "@/components/AresChatIntegrationModal";
 import { Button } from "@/components/ui/button";
 import {
-  listSuperAdminBarbershops,
-  type SuperAdminBarbershop,
+  listSuperAdminSalons,
+  type SuperAdminSalon,
 } from "@/service/superAdminService";
 
 function statusLabel(status: string) {
@@ -27,33 +27,33 @@ function fmtDate(value?: string | null) {
 }
 
 export function SuperAdminAresChatPage() {
-  const [barbershops, setBarbershops] = useState<SuperAdminBarbershop[]>([]);
+  const [salons, setSalons] = useState<SuperAdminSalon[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
-  const [selectedBarbershop, setSelectedBarbershop] = useState<SuperAdminBarbershop | null>(null);
+  const [selectedSalon, setSelectedSalon] = useState<SuperAdminSalon | null>(null);
 
-  const loadBarbershops = useCallback(async () => {
+  const loadSalons = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await listSuperAdminBarbershops({
+      const result = await listSuperAdminSalons({
         q: appliedSearch || undefined,
         page: 1,
         limit: 100,
         sortBy: "name",
         sortOrder: "asc",
       });
-      setBarbershops(Array.isArray(result.items) ? result.items : []);
+      setSalons(Array.isArray(result.items) ? result.items : []);
     } catch {
-      toast.error("Nao foi possivel carregar as barbearias.");
+      toast.error("Nao foi possivel carregar as salões.");
     } finally {
       setLoading(false);
     }
   }, [appliedSearch]);
 
   useEffect(() => {
-    void loadBarbershops();
-  }, [loadBarbershops]);
+    void loadSalons();
+  }, [loadSalons]);
 
   function handleSearchSubmit(event: FormEvent) {
     event.preventDefault();
@@ -66,7 +66,7 @@ export function SuperAdminAresChatPage() {
         <div>
           <h3 className="text-base font-semibold text-foreground">Integracao AresChat</h3>
           <p className="text-sm text-muted-foreground">
-            Consulte os dados de configuracao e gere credenciais por barbearia.
+            Consulte os dados de configuracao e gere credenciais por salão.
           </p>
         </div>
 
@@ -77,7 +77,7 @@ export function SuperAdminAresChatPage() {
               type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar barbearia"
+              placeholder="Buscar salão"
               className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
@@ -92,7 +92,7 @@ export function SuperAdminAresChatPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                <th className="px-5 py-3">Barbearia</th>
+                <th className="px-5 py-3">Salão</th>
                 <th className="px-5 py-3">Responsavel</th>
                 <th className="px-5 py-3">Status</th>
                 <th className="px-5 py-3">Criacao</th>
@@ -108,14 +108,14 @@ export function SuperAdminAresChatPage() {
                     Carregando...
                   </td>
                 </tr>
-              ) : barbershops.length === 0 ? (
+              ) : salons.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">
-                    Nenhuma barbearia encontrada.
+                    Nenhuma salão encontrada.
                   </td>
                 </tr>
               ) : (
-                barbershops.map((shop) => (
+                salons.map((shop) => (
                   <tr key={shop.id} className="border-b border-border last:border-0 hover:bg-secondary/30">
                     <td className="px-5 py-3">
                       <strong className="block text-foreground">{shop.name}</strong>
@@ -139,7 +139,7 @@ export function SuperAdminAresChatPage() {
                         type="button"
                         size="sm"
                         variant="outline"
-                        onClick={() => setSelectedBarbershop(shop)}
+                        onClick={() => setSelectedSalon(shop)}
                       >
                         <MessageSquareMore size={14} />
                         Dados AresChat
@@ -154,9 +154,9 @@ export function SuperAdminAresChatPage() {
       </div>
 
       <AresChatIntegrationModal
-        open={Boolean(selectedBarbershop)}
-        barbershopId={selectedBarbershop?.id ?? null}
-        onClose={() => setSelectedBarbershop(null)}
+        open={Boolean(selectedSalon)}
+        salonId={selectedSalon?.id ?? null}
+        onClose={() => setSelectedSalon(null)}
       />
     </div>
   );

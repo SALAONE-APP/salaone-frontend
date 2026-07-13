@@ -222,7 +222,7 @@ export function BarberSchedulePage() {
     return (
       <div className="rounded-xl border border-border bg-card p-8 text-center">
         <p className="text-muted-foreground">
-          Perfil de barbeiro nao encontrado. Solicite ao administrador para vincular seu usuario a um perfil de barbeiro.
+          Perfil de profissional nao encontrado. Solicite ao administrador para vincular seu usuario a um perfil de profissional.
         </p>
       </div>
     );

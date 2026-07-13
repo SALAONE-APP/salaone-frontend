@@ -72,7 +72,7 @@ const statusStyles: Record<EmployeePaymentStatus, string> = {
 const roleLabels: Record<RoleFilter, string> = {
   all: "Todas funcoes",
   admin: "Administradores",
-  barber: "Barbeiros",
+  barber: "Profissionais",
   receptionist: "Recepcionistas",
 };
 
@@ -468,7 +468,7 @@ export function EmployeePayrollPage() {
           <div>
             <h3 className="text-base font-medium text-foreground">Pagamento Funcionário</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Barbeiros: {frequencyLabels[paymentFrequency.barberPaymentFrequency]}
+              Profissionais: {frequencyLabels[paymentFrequency.barberPaymentFrequency]}
               {" · "}
               Outros: {frequencyLabels[paymentFrequency.employeePaymentFrequency]}
               {" · "}

@@ -1,11 +1,11 @@
 import { toast } from "sonner";
 
 import type { Appointment } from "@/service/appointmentService";
-import type { BarbershopProfile } from "@/service/barbershopProfileService";
+import type { SalonProfile } from "@/service/salonProfileService";
 
 export interface WhatsAppMessageData {
   clientName: string;
-  barbershopName: string;
+  salonName: string;
   barberName: string;
   date: string;
   time: string;
@@ -65,8 +65,8 @@ export function buildWhatsAppMessage(data: WhatsAppMessageData): string {
     ``,
     `Seu agendamento foi confirmado com sucesso.`,
     ``,
-    `*Barbearia:* ${data.barbershopName}`,
-    `*Barbeiro:* ${data.barberName}`,
+    `*Salão:* ${data.salonName}`,
+    `*Profissional:* ${data.barberName}`,
     `*Data:* ${data.date}`,
     `*Horario:* ${data.time}`,
     `*Servicos:*`,
@@ -131,7 +131,7 @@ export function openWhatsAppShare(message: string): void {
 
 function buildConfirmationMessage(
   appointment: Appointment,
-  barbershop: BarbershopProfile | null,
+  salon: SalonProfile | null,
 ): string {
   const clientName =
     appointment.dependent?.name ??
@@ -139,7 +139,7 @@ function buildConfirmationMessage(
     "Cliente";
   const { date, time } = formatDateTimeBR(appointment.startAt);
   const services = appointment.services.map((s) => s.serviceName).join(" e ");
-  const barberName = appointment.barber?.displayName ?? "Barbeiro";
+  const barberName = appointment.barber?.displayName ?? "Profissional";
 
   return [
     `Ola ${clientName}!`,
@@ -149,21 +149,21 @@ function buildConfirmationMessage(
     ` Data: ${date}`,
     ` Horario: ${time}`,
     ` Servico: ${services}`,
-    ` Barbeiro: ${barberName}`,
+    ` Profissional: ${barberName}`,
     ...(appointment.notes?.trim() ? [``, ` Observacao: ${appointment.notes.trim()}`] : []),
-    ...(barbershop?.googleMapsUrl?.trim()
-      ? [``, ` Localizacao: ${barbershop.googleMapsUrl.trim()}`]
+    ...(salon?.googleMapsUrl?.trim()
+      ? [``, ` Localizacao: ${salon.googleMapsUrl.trim()}`]
       : []),
   ].join("\n");
 }
 
 export function sendAppointmentWhatsApp(
   appointment: Appointment,
-  barbershop: BarbershopProfile | null,
+  salon: SalonProfile | null,
 ): void {
   const clientPhone = appointment.client?.phone ?? "";
-  console.log("[WhatsApp] Dados da barbearia:", barbershop);
+  console.log("[WhatsApp] Dados da salão:", salon);
   console.log("[WhatsApp] Telefone do cliente:", clientPhone);
 
-  openWhatsApp(clientPhone, buildConfirmationMessage(appointment, barbershop));
+  openWhatsApp(clientPhone, buildConfirmationMessage(appointment, salon));
 }

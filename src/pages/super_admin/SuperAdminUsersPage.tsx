@@ -119,7 +119,7 @@ export function SuperAdminUsersPage() {
           <option value="">Todos os papeis</option>
           <option value="super_admin">Super Admin</option>
           <option value="admin">Admin</option>
-          <option value="barber">Barbeiro</option>
+          <option value="barber">Profissional</option>
           <option value="receptionist">Recepcionista</option>
           <option value="client">Cliente</option>
         </select>
@@ -134,7 +134,7 @@ export function SuperAdminUsersPage() {
                 <th className="px-5 py-3">Usuario</th>
                 <th className="px-5 py-3">Contato</th>
                 <th className="px-5 py-3">Papel</th>
-                <th className="px-5 py-3">Barbearia atual</th>
+                <th className="px-5 py-3">Salão atual</th>
                 <th className="px-5 py-3">Criacao</th>
                 <th className="px-5 py-3">Acoes</th>
               </tr>
@@ -162,8 +162,8 @@ export function SuperAdminUsersPage() {
                     </span>
                   </td>
                   <td className="px-5 py-3">
-                    <strong className="block text-foreground">{user.barbershop?.name ?? "-"}</strong>
-                    <small className="text-muted-foreground">{user.barbershop?.slug ?? "-"}</small>
+                    <strong className="block text-foreground">{user.salon?.name ?? "-"}</strong>
+                    <small className="text-muted-foreground">{user.salon?.slug ?? "-"}</small>
                   </td>
                   <td className="px-5 py-3 text-muted-foreground">{fmtDate(user.createdAt)}</td>
                   <td className="px-5 py-3">

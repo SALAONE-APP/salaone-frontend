@@ -6,13 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { SubscriptionPaymentModal } from '@/components/SubscriptionPaymentModal';
 import {
-  getBarbershopPlatformSubscription,
-  cancelBarbershopPlatformSubscription,
+  getSalonPlatformSubscription,
+  cancelSalonPlatformSubscription,
   getPublicPlatformPlans,
   type PlatformPlan,
   type PlatformSubscription,
 } from '@/service/platformSubscriptionService';
-import { getBarbershopProfile } from '@/service/barbershopProfileService';
+import { getSalonProfile } from '@/service/salonProfileService';
 
 const TRIAL_PERIOD_DAYS = 14;
 
@@ -109,7 +109,7 @@ export function PlatformSubscriptionTab() {
     setLoadingSubscription(true);
     setSubscriptionError(null);
     try {
-      const data = await getBarbershopPlatformSubscription();
+      const data = await getSalonPlatformSubscription();
       setCurrentSub(data.subscription);
     } catch (err) {
       setSubscriptionError('Não foi possível carregar a assinatura atual. Tente novamente.');
@@ -134,7 +134,7 @@ export function PlatformSubscriptionTab() {
   useEffect(() => {
     loadSubscription();
     loadPlans();
-    getBarbershopProfile()
+    getSalonProfile()
       .then((profile) => {
         const info = computeTrialInfo(profile.createdAt, profile.platformSubscriptionStatus);
         setTrialInfo(info);
@@ -155,7 +155,7 @@ export function PlatformSubscriptionTab() {
   async function handleCancelAndChangePlan() {
     setCancelling(true);
     try {
-      await cancelBarbershopPlatformSubscription();
+      await cancelSalonPlatformSubscription();
       await loadSubscription();
       setSelectedPlan(changePlanTarget);
       setChangePlanTarget(null);
@@ -171,7 +171,7 @@ export function PlatformSubscriptionTab() {
     setConfirmCancel(false);
     setCancelling(true);
     try {
-      await cancelBarbershopPlatformSubscription();
+      await cancelSalonPlatformSubscription();
       toast.success('Assinatura cancelada com sucesso.');
       await loadSubscription();
     } catch (err) {

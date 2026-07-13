@@ -1,10 +1,10 @@
 import { Link } from "react-router-dom";
-import salaOneLogo from "@/assets/image/salaone-logo.svg";
+import salaOneLogo from "@/assets/image/logo-icone-salaone.jpeg";
 
 export function PrivacyPolicyPage() {
   return <main className="min-h-screen bg-black px-4 py-10 text-neutral-300">
     <article className="mx-auto max-w-3xl rounded-2xl border border-neutral-800 bg-neutral-950 p-6 sm:p-10">
-      <Link to="/" aria-label="Voltar para a página inicial"><img src={salaOneLogo} alt="SalaOne" className="mb-8 h-20 w-auto" /></Link>
+      <Link to="/" aria-label="Voltar para a página inicial"><img src={salaOneLogo} alt="SalaOne" className="mb-8 h-20 w-20 rounded-full object-cover" /></Link>
       <h1 className="text-3xl font-bold text-white">Política de Privacidade</h1>
       <p className="mt-2 text-sm text-neutral-500">Última atualização: 10 de julho de 2026</p>
       <div className="mt-8 space-y-6 leading-relaxed">

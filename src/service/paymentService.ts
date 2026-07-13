@@ -6,7 +6,7 @@ export type PaymentType = "appointment" | "subscription";
 
 export interface PaymentRecord {
   id: string;
-  barbershopId: string;
+  salonId: string;
   userId?: string | null;
   user?: {
     id: string;

@@ -3,15 +3,15 @@ import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 
-import salaOneLogo from "../assets/image/salaone-logo.svg";
+import salaOneLogo from "../assets/image/logo-icone-salaone.jpeg";
 import { AppCalendar } from "../components/AppCalendar";
 import { useAuth } from "../hooks/useAuth";
 import {
-  listPublicBarbershops,
+  listPublicSalons,
   registerClient,
 } from "../service/registerService";
 
-type PublicBarbershop = {
+type PublicSalon = {
   id: string;
   name: string;
   slug: string;
@@ -91,48 +91,48 @@ export function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [barbershops, setBarbershops] = useState<PublicBarbershop[]>([]);
-  const [loadingBarbershops, setLoadingBarbershops] = useState(false);
+  const [salons, setSalons] = useState<PublicSalon[]>([]);
+  const [loadingSalons, setLoadingSalons] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const shouldShowBarbershopSelect = !slugFromUrl;
+  const shouldShowSalonSelect = !slugFromUrl;
 
   useEffect(() => {
-    if (!shouldShowBarbershopSelect) {
-      setBarbershops([]);
+    if (!shouldShowSalonSelect) {
+      setSalons([]);
       setSelectedSlug("");
       return;
     }
 
     let ignore = false;
 
-    async function loadBarbershops() {
+    async function loadSalons() {
       try {
-        setLoadingBarbershops(true);
-        const data = await listPublicBarbershops();
+        setLoadingSalons(true);
+        const data = await listPublicSalons();
 
         if (!ignore) {
-          setBarbershops(data);
+          setSalons(data);
         }
       } catch {
         if (!ignore) {
-          setError("Nao foi possivel carregar as barbearias.");
+          setError("Não foi possível carregar os salões.");
         }
       } finally {
         if (!ignore) {
-          setLoadingBarbershops(false);
+          setLoadingSalons(false);
         }
       }
     }
 
-    loadBarbershops();
+    loadSalons();
 
     return () => {
       ignore = true;
     };
-  }, [shouldShowBarbershopSelect]);
+  }, [shouldShowSalonSelect]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -162,7 +162,7 @@ export function Register() {
     const finalSlug = slugFromUrl ?? selectedSlug;
 
     if (!finalSlug) {
-      setError("Selecione uma barbearia.");
+      setError("Selecione um salão.");
       return;
     }
 
@@ -198,7 +198,7 @@ export function Register() {
       <img
         src={salaOneLogo}
         alt="SalaOne"
-        className="absolute left-6 top-6 z-20 h-auto w-48 object-contain sm:w-60"
+        className="absolute left-6 top-6 z-20 h-20 w-20 rounded-full object-cover sm:h-24 sm:w-24"
       />
 
       <form
@@ -299,28 +299,28 @@ export function Register() {
               />
             </div>
 
-            {shouldShowBarbershopSelect && (
+            {shouldShowSalonSelect && (
               <div>
                 <label className="mb-2 block text-sm font-medium text-foreground">
-                  Barbearia
+                  Salão
                 </label>
 
                 <select
                   value={selectedSlug}
                   onChange={(event) => setSelectedSlug(event.target.value)}
                   className="h-11 w-full rounded-lg border border-border bg-background px-4 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
-                  disabled={loadingBarbershops}
+                  disabled={loadingSalons}
                   required
                 >
                   <option value="">
-                    {loadingBarbershops
-                      ? "Carregando barbearias..."
-                      : "Selecione uma barbearia"}
+                    {loadingSalons
+                      ? "Carregando salões..."
+                      : "Selecione um salão"}
                   </option>
 
-                  {barbershops.map((barbershop) => (
-                    <option key={barbershop.id} value={barbershop.slug}>
-                      {barbershop.name}
+                  {salons.map((salon) => (
+                    <option key={salon.id} value={salon.slug}>
+                      {salon.name}
                     </option>
                   ))}
                 </select>

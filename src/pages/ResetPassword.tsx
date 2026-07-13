@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Lock, Loader2, ArrowLeft, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import salaOneLogo from "../assets/image/salaone-logo.svg";
+import salaOneLogo from "../assets/image/logo-icone-salaone.jpeg";
 import { PasswordInput } from "../components/PasswordInput";
 import { resetPassword } from "../service/authService";
 
@@ -65,7 +65,7 @@ export function ResetPassword() {
           <img
             src={salaOneLogo}
             alt="SalaOne"
-            className="block h-auto w-full max-w-[180px] object-contain"
+            className="block h-24 w-24 rounded-full object-cover"
             draggable={false}
           />
         </div>

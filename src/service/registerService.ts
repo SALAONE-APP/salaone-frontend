@@ -23,7 +23,7 @@ export interface RegisterClientResponse {
     isAdmin: boolean;
   };
 
-  barbershop: {
+  salon: {
     id: string;
     name: string;
     slug: string;
@@ -32,16 +32,19 @@ export interface RegisterClientResponse {
   };
 }
 
-export interface PublicBarbershop {
+export interface PublicSalon {
   id: string;
   name: string;
   slug: string;
   logoUrl?: string;
 }
 
-export async function listPublicBarbershops() {
-  const response = await api.get<PublicBarbershop[]>("/barbershops/public");
-  return response.data;
+export async function listPublicSalons() {
+  const response = await api.get<PublicSalon[] | { salons: PublicSalon[] }>("/salons");
+  const payload = response.data;
+
+  if (Array.isArray(payload)) return payload;
+  return Array.isArray(payload.salons) ? payload.salons : [];
 }
 
 export async function registerClient(
@@ -71,10 +74,7 @@ export async function registerClient(
     JSON.stringify(response.data.user)
   );
 
-  localStorage.setItem(
-    "barbershop",
-    JSON.stringify(response.data.barbershop)
-  );
+  localStorage.setItem("salon", JSON.stringify(response.data.salon));
 
   return response.data;
 }

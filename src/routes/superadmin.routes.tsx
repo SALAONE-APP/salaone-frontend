@@ -1,5 +1,5 @@
 import { SuperAdminDashboardPage } from "../pages/super_admin/SuperAdminDashboardPage";
-import { SuperAdminBarbershopsPage } from "../pages/super_admin/SuperAdminBarbershopsPage";
+import { SuperAdminSalonsPage } from "../pages/super_admin/SuperAdminSalonsPage";
 import { SuperAdminUsersPage } from "../pages/super_admin/SuperAdminUsersPage";
 import { SuperAdminSubscriptionsPage } from "../pages/super_admin/SuperAdminSubscriptionsPage";
 import { SuperAdminPlansPage } from "../pages/super_admin/SuperAdminPlansPage";
@@ -17,10 +17,10 @@ export const superAdminRoutes: AppRoute[] = [
     Component: SuperAdminDashboardPage,
   },
   {
-    path: "/barbershops",
-    title: "Barbearias",
-    breadcrumbs: ["Super Admin", "Barbearias"],
-    Component: SuperAdminBarbershopsPage,
+    path: "/salons",
+    title: "Salões",
+    breadcrumbs: ["Super Admin", "Salões"],
+    Component: SuperAdminSalonsPage,
   },
   {
     path: "/users",

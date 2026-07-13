@@ -31,7 +31,7 @@ import {
 interface AresChatIntegrationModalProps {
   open: boolean;
   onClose: () => void;
-  barbershopId?: string | null;
+  salonId?: string | null;
 }
 
 const FIELD_LABELS: Record<keyof AresChatIntegrationFields, string> = {
@@ -97,9 +97,9 @@ function buildAllDataText(data: AresChatSetupData) {
   const lines = [
     "Dados de integracao AresChat - SalaOne",
     "",
-    "Barbearia",
-    `Nome: ${data.barbershop.name}`,
-    `Status: ${data.barbershop.status}`,
+    "Salão",
+    `Nome: ${data.salon.name}`,
+    `Status: ${data.salon.status}`,
     "",
     "Credencial ativa",
     `ID: ${data.credential?.id ?? "-"}`,
@@ -117,7 +117,7 @@ function buildAllDataText(data: AresChatSetupData) {
 export function AresChatIntegrationModal({
   open,
   onClose,
-  barbershopId,
+  salonId,
 }: AresChatIntegrationModalProps) {
   const [data, setData] = useState<AresChatSetupData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -137,7 +137,7 @@ export function AresChatIntegrationModal({
     async function load() {
       setLoading(true);
       try {
-        const result = await getAresChatSetupData(barbershopId);
+        const result = await getAresChatSetupData(salonId);
         if (!ignore) setData(result);
       } catch (error) {
         toast.error(getApiErrorMessage(error) || "Nao foi possivel carregar os dados AresChat.");
@@ -150,7 +150,7 @@ export function AresChatIntegrationModal({
     return () => {
       ignore = true;
     };
-  }, [barbershopId, open]);
+  }, [salonId, open]);
 
   const jsonText = useMemo(() => {
     if (!data) return "";
@@ -167,13 +167,13 @@ export function AresChatIntegrationModal({
   }
 
   async function handleGenerate() {
-    if (!data?.barbershop) return;
+    if (!data?.salon) return;
 
     setGenerating(true);
     try {
       const result = await generateAresChatSetupData({
-        barbershopId,
-        name: `AresChat - ${data.barbershop.name}`,
+        salonId,
+        name: `AresChat - ${data.salon.name}`,
       });
       setData(result);
       toast.success("Nova credencial AresChat gerada.");
@@ -195,7 +195,7 @@ export function AresChatIntegrationModal({
           <DialogHeader>
             <DialogTitle>Integracao AresChat</DialogTitle>
             <DialogDescription>
-              Dados para configurar a barbearia no painel do AresChat.
+              Dados para configurar a salão no painel do AresChat.
             </DialogDescription>
           </DialogHeader>
 
@@ -211,12 +211,12 @@ export function AresChatIntegrationModal({
           ) : (
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
               <section className="rounded-lg border border-border p-4">
-                <h3 className="mb-3 text-sm font-semibold text-foreground">Dados da barbearia</h3>
+                <h3 className="mb-3 text-sm font-semibold text-foreground">Dados da salão</h3>
                 <div className="grid gap-3 text-sm md:grid-cols-2">
-                  <InfoRow label="Nome" value={data.barbershop.name} />
-                  <InfoRow label="Status" value={data.barbershop.status} />
-                  <InfoRow label="Slug" value={data.barbershop.slug} />
-                  <InfoRow label="ID" value={data.barbershop.id} canCopy onCopy={copyText} />
+                  <InfoRow label="Nome" value={data.salon.name} />
+                  <InfoRow label="Status" value={data.salon.status} />
+                  <InfoRow label="Slug" value={data.salon.slug} />
+                  <InfoRow label="ID" value={data.salon.id} canCopy onCopy={copyText} />
                 </div>
               </section>
 

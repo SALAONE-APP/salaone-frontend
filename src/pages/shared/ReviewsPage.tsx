@@ -121,7 +121,7 @@ export function ReviewsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  {["Data", "Nota", "Cliente", "Barbeiro", "Servico", "Comentario"].map((col) => (
+                  {["Data", "Nota", "Cliente", "Profissional", "Servico", "Comentario"].map((col) => (
                     <th
                       key={col}
                       className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground"

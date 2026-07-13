@@ -41,7 +41,7 @@ export interface PaymentModalData {
   userId: string;
   userEmail: string;
   userName: string;
-  barbershopId: string;
+  salonId: string;
 }
 
 interface PaymentModalProps {
@@ -145,7 +145,7 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
         isAppointmentPayment: "true",
         paymentId: data.paymentId,
         appointmentId: data.appointmentId,
-        barbershopId: data.barbershopId,
+        salonId: data.salonId,
       },
     };
   }

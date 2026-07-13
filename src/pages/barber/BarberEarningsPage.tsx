@@ -177,9 +177,9 @@ interface EarningsStats {
   // Status de pagamento baseado no que o admin efetuou
   adminPaidAmount: number;
   pendingPayment: number;
-  // Parte da barbearia (receita dos realizados - comissão dos realizados)
+  // Parte da salão (receita dos realizados - comissão dos realizados)
   shopEarnings: number;
-  // Percentual de comissão do barbeiro
+  // Percentual de comissão do profissional
   commissionPercent: number;
   commissionLabel: string;
   // Listas para exibição
@@ -271,7 +271,7 @@ export function BarberEarningsPage() {
       const commission = apt.commissionAmount ?? 0;
 
       if (isPaidStatus(apt.status)) {
-        // Atendimento realizado (confirmado/finalizado) → entra nos ganhos do barbeiro
+        // Atendimento realizado (confirmado/finalizado) → entra nos ganhos do profissional
         earnedRevenue += total;
         earnedCommission += commission;
         appointmentsCount++;
@@ -309,7 +309,7 @@ export function BarberEarningsPage() {
     );
 
     const shopEarnings = roundMoney(
-      row ? Number(row.barbershopShare || 0) : Math.max(earnedRevenue - earnedCommission, 0)
+      row ? Number(row.salonShare || 0) : Math.max(earnedRevenue - earnedCommission, 0)
     );
     const commissionPercent = barber?.commissionPercent ?? 50;
     const hasSubscriptionPool = Number(row?.subscriptionPoolCommission || 0) > 0;
@@ -421,14 +421,14 @@ export function BarberEarningsPage() {
             </div>
 
             <div className="rounded-xl border border-border bg-card p-4">
-              <p className="text-xs text-muted-foreground">Barbearia</p>
+              <p className="text-xs text-muted-foreground">Salão</p>
               <p className="mt-1 text-xl font-bold text-foreground">
                 {formatCurrency(stats.shopEarnings)}
               </p>
             </div>
           </div>
 
-          {/* Card de estatísticas do barbeiro */}
+          {/* Card de estatísticas do profissional */}
           <div className="overflow-hidden rounded-xl border border-border bg-card">
             <div className="flex items-center gap-4 border-b border-border px-5 py-4">
               {barber?.photoUrl ? (
@@ -445,7 +445,7 @@ export function BarberEarningsPage() {
               <div>
                 <p className="font-semibold text-foreground">{barber?.displayName}</p>
                 <p className="text-sm text-muted-foreground">
-                  {barber?.specialty ?? "Barbeiro"}
+                  {barber?.specialty ?? "Profissional"}
                 </p>
               </div>
             </div>
@@ -479,7 +479,7 @@ export function BarberEarningsPage() {
                     value: formatCurrency(stats.payrollPaymentsTotal),
                   },
                   {
-                    label: "Barbearia",
+                    label: "Salão",
                     value: formatCurrency(stats.shopEarnings),
                   },
                   {

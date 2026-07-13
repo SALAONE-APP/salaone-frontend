@@ -32,9 +32,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
 import { AppSelect } from '@/components/shared/AppSelect';
 import {
-  getBarbershopProfile,
-  updateBarbershopProfile,
-} from '../../service/barbershopProfileService';
+  getSalonProfile,
+  updateSalonProfile,
+} from '../../service/salonProfileService';
 import {
   createPagarmeRecipient,
   getPagarmeRecipient,
@@ -63,7 +63,7 @@ import {
 } from '../../service/settingsService';
 import { changePassword, updateProfilePhoto } from '../../service/userService';
 
-type StoredBarbershop = {
+type StoredSalon = {
   id?: string;
   name?: string;
   slug?: string;
@@ -85,15 +85,15 @@ interface SettingsProps {
   canShareRegistrationLink?: boolean;
 }
 
-function getStoredBarbershop() {
-  const storedBarbershop = localStorage.getItem('barbershop');
+function getStoredSalon() {
+  const storedSalon = localStorage.getItem('salon');
 
-  if (!storedBarbershop) {
+  if (!storedSalon) {
     return null;
   }
 
   try {
-    return JSON.parse(storedBarbershop) as StoredBarbershop;
+    return JSON.parse(storedSalon) as StoredSalon;
   } catch {
     return null;
   }
@@ -209,7 +209,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   const [isLoadingBusinessProfile, setIsLoadingBusinessProfile] = useState(false);
   const [isLoadingHomeInfo, setIsLoadingHomeInfo] = useState(false);
   const [isSavingGeneralSettings, setIsSavingGeneralSettings] = useState(false);
-  const [isSavingBarbershopData, setIsSavingBarbershopData] = useState(false);
+  const [isSavingSalonData, setIsSavingSalonData] = useState(false);
 
   // Recebedor Pagar.me
   const [pagarmeRecipientId, setPagarmeRecipientId] = useState<string | null>(null);
@@ -259,18 +259,18 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   const [subscriptionBarberRule, setSubscriptionBarberRule] = useState<SubscriptionBarberRule>('fixed');
   const [hasLoadedBarberRule, setHasLoadedBarberRule] = useState(false);
   const [isSavingBarberRule, setIsSavingBarberRule] = useState(false);
-  const barbershop = useMemo(() => getStoredBarbershop(), []);
+  const salon = useMemo(() => getStoredSalon(), []);
   const canManageSecurityDocuments = user?.role === 'admin' || user?.isAdmin === true;
   const isAdmin = user?.role === 'admin' || user?.isAdmin === true;
   const registrationLink = useMemo(() => {
-    const slug = businessSlug || barbershop?.slug;
+    const slug = businessSlug || salon?.slug;
 
     if (!slug) {
       return '';
     }
 
     return `${window.location.origin}/register/${slug}`;
-  }, [barbershop?.slug, businessSlug]);
+  }, [salon?.slug, businessSlug]);
 
   useEffect(() => {
     let isMounted = true;
@@ -279,7 +279,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       setIsLoadingBusinessProfile(true);
 
       try {
-        const profile = await getBarbershopProfile();
+        const profile = await getSalonProfile();
 
         if (!isMounted) {
           return;
@@ -367,7 +367,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
             })
             .finally(() => { if (isMounted) setIsLoadingRecipient(false); });
         } else {
-          // Pré-popula com dados da barbearia para facilitar o cadastro
+          // Pré-popula com dados da salão para facilitar o cadastro
           setRecipientForm((prev) => ({
             ...prev,
             name: profile.name ?? '',
@@ -382,7 +382,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         }
       } catch {
         if (isMounted) {
-          toast.error('Erro ao carregar dados da barbearia.');
+          toast.error('Erro ao carregar dados da salão.');
         }
       } finally {
         if (isMounted) {
@@ -578,15 +578,15 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     }));
   }
 
-  async function saveBarbershopData() {
+  async function saveSalonData() {
     if (!businessForm.name.trim()) {
       toast.error('O nome comercial é obrigatório.');
       return;
     }
 
-    setIsSavingBarbershopData(true);
+    setIsSavingSalonData(true);
     try {
-      const profile = await updateBarbershopProfile({
+      const profile = await updateSalonProfile({
         name: businessForm.name.trim(),
         email: businessForm.email.trim(),
         phone: businessForm.phone.trim(),
@@ -603,35 +603,35 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         googleMapsUrl: profile.googleMapsUrl ?? '',
       });
       setBusinessSlug(profile.slug ?? '');
-      persistStoredBarbershop(profile);
+      persistStoredSalon(profile);
 
       const isNew = !businessForm.cnpj.replace(/\D/g, '');
       toast.success(isNew ? 'Dados cadastrados com sucesso.' : 'Dados atualizados com sucesso.');
     } catch (error) {
       const message = getApiErrorMessage(error);
-      toast.error(message || 'Erro ao salvar dados da barbearia.');
+      toast.error(message || 'Erro ao salvar dados da salão.');
     } finally {
-      setIsSavingBarbershopData(false);
+      setIsSavingSalonData(false);
     }
   }
 
-  function persistStoredBarbershop(profile: {
+  function persistStoredSalon(profile: {
     id: string;
     name: string;
     slug: string;
     logoUrl?: string;
   }) {
     localStorage.setItem(
-      'barbershop',
+      'salon',
       JSON.stringify({
-        ...getStoredBarbershop(),
+        ...getStoredSalon(),
         id: profile.id,
         name: profile.name,
         slug: profile.slug,
         logoUrl: profile.logoUrl ?? '',
       })
     );
-    window.dispatchEvent(new Event('barbershop:updated'));
+    window.dispatchEvent(new Event('salon:updated'));
   }
 
   function updateWorkingHoursField(
@@ -729,7 +729,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   }
 
   async function saveBusinessLogo(logoUrl: string, successMessage: string) {
-    const profile = await updateBarbershopProfile({
+    const profile = await updateSalonProfile({
       name: businessForm.name,
       email: businessForm.email,
       phone: businessForm.phone,
@@ -747,7 +747,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     });
     setBusinessSlug(profile.slug ?? '');
     setBusinessLogoUrl(profile.logoUrl ?? '');
-    persistStoredBarbershop(profile);
+    persistStoredSalon(profile);
     toast.success(successMessage);
   }
 
@@ -769,7 +769,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       await saveBusinessLogo(secureUrl, 'Logo atualizada com sucesso.');
     } catch (error) {
       const message = getApiErrorMessage(error);
-      toast.error(message || 'Erro ao atualizar logo da barbearia.');
+      toast.error(message || 'Erro ao atualizar logo da salão.');
     } finally {
       setIsUploadingBusinessLogo(false);
       if (businessLogoFileInputRef.current) {
@@ -799,7 +799,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       await saveBusinessLogo('', 'Logo removida com sucesso.');
     } catch (error) {
       const message = getApiErrorMessage(error);
-      toast.error(message || 'Erro ao remover logo da barbearia.');
+      toast.error(message || 'Erro ao remover logo da salão.');
     } finally {
       setIsUploadingBusinessLogo(false);
     }
@@ -974,8 +974,8 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       return;
     }
 
-    const barbershop = getStoredBarbershop();
-    if (!barbershop?.id) { toast.error('Barbearia não encontrada.'); return; }
+    const salon = getStoredSalon();
+    if (!salon?.id) { toast.error('Salão não encontrada.'); return; }
 
     const phoneDigits = f.phone.replace(/\D/g, '');
     const mustReplaceRecipient = Boolean(
@@ -1010,10 +1010,10 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       phone_numbers: [{ ddd: phoneDigits.slice(0, 2), number: phoneDigits.slice(2), type: 'mobile' }], address,
     };
     const payload = {
-      barbershopId: barbershop.id,
-      linkBarbershop: true as const,
+      salonId: salon.id,
+      linkSalon: true as const,
       ...(pagarmeRecipientId && !mustReplaceRecipient ? { recipientId: pagarmeRecipientId } : {}),
-      ...(mustReplaceRecipient ? { code: `barbershop_${barbershop.id}_replacement_${Date.now()}` } : {}),
+      ...(mustReplaceRecipient ? { code: `salon_${salon.id}_replacement_${Date.now()}` } : {}),
       register_information: registerInformation,
       default_bank_account: {
         holder_name: f.bankHolderName.trim(),
@@ -1101,7 +1101,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
 
     try {
       const [profile, updatedHomeInfo] = await Promise.all([
-        updateBarbershopProfile({
+        updateSalonProfile({
           name: businessForm.name,
           email: businessForm.email,
           phone: businessForm.phone,
@@ -1127,7 +1127,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       });
       setBusinessSlug(profile.slug ?? '');
       setBusinessLogoUrl(profile.logoUrl ?? '');
-      persistStoredBarbershop(profile);
+      persistStoredSalon(profile);
       setHomeInfo(updatedHomeInfo);
       setHeroForm({
         hero_title: updatedHomeInfo.hero_title ?? '',
@@ -1178,7 +1178,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
 
     try {
       const [profile, updatedHomeInfo] = await Promise.all([
-        updateBarbershopProfile({
+        updateSalonProfile({
           name: businessForm.name,
           email: businessForm.email,
           phone: businessForm.phone,
@@ -1201,7 +1201,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       });
       setBusinessSlug(profile.slug ?? '');
       setBusinessLogoUrl(profile.logoUrl ?? '');
-      persistStoredBarbershop(profile);
+      persistStoredSalon(profile);
       setHomeInfo(updatedHomeInfo);
       setHeroForm({
         hero_title: updatedHomeInfo.hero_title ?? '',
@@ -1220,7 +1220,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
 
   async function copyRegistrationLink() {
     if (!registrationLink) {
-      toast.error('Slug da barbearia nao encontrado.');
+      toast.error('Slug da salão nao encontrado.');
       return;
     }
 
@@ -1410,11 +1410,11 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       });
 
       setSettings(updatedSettings);
-      window.dispatchEvent(new Event('barbershop:updated'));
-      toast.success('Regras de barbeiro salvas com sucesso.');
+      window.dispatchEvent(new Event('salon:updated'));
+      toast.success('Regras de profissional salvas com sucesso.');
     } catch (error) {
       const message = getApiErrorMessage(error);
-      toast.error(message || 'Erro ao salvar regra de barbeiro.');
+      toast.error(message || 'Erro ao salvar regra de profissional.');
     } finally {
       setIsSavingBarberRule(false);
     }
@@ -1470,10 +1470,10 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
                 </div>
                 <div>
                   <h3 className="text-lg font-medium text-foreground">
-                    Link de cadastro da barbearia
+                    Link de cadastro da salão
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Envie este link para clientes se cadastrarem diretamente nesta barbearia.
+                    Envie este link para clientes se cadastrarem diretamente nesta salão.
                   </p>
                 </div>
               </div>
@@ -1481,7 +1481,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
               <div className="flex flex-col gap-3 md:flex-row">
                 <input
                   type="text"
-                  value={registrationLink || 'Slug da barbearia nao encontrado'}
+                  value={registrationLink || 'Slug da salão nao encontrado'}
                   readOnly
                   className="h-10 flex-1 rounded-md border border-border bg-secondary px-3 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
                 />
@@ -1560,20 +1560,20 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
             <div className="mt-6 flex justify-end">
               <button
                 type="button"
-                onClick={saveBarbershopData}
-                disabled={isSavingBarbershopData || isLoadingBusinessProfile}
+                onClick={saveSalonData}
+                disabled={isSavingSalonData || isLoadingBusinessProfile}
                 className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSavingBarbershopData ? 'Salvando...' : 'Salvar informações'}
+                {isSavingSalonData ? 'Salvando...' : 'Salvar informações'}
               </button>
             </div>
           </div>
 
           {isAdmin && (
             <div className="bg-card rounded-xl border border-border p-6">
-              <h3 className="text-lg font-medium text-foreground mb-1">Regra de Barbeiro para Assinantes</h3>
+              <h3 className="text-lg font-medium text-foreground mb-1">Regra de Profissional para Assinantes</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Define como clientes com plano ativo escolhem o barbeiro ao agendar.
+                Define como clientes com plano ativo escolhem o profissional ao agendar.
               </p>
               <div className="space-y-3">
                 <label className="flex items-start gap-3 cursor-pointer group">
@@ -1586,9 +1586,9 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
                     className="mt-1 accent-primary"
                   />
                   <div>
-                    <span className="text-sm font-medium text-foreground">Barbeiro fixo</span>
+                    <span className="text-sm font-medium text-foreground">Profissional fixo</span>
                     <p className="text-xs text-muted-foreground">
-                      O cliente fica vinculado ao barbeiro escolhido no primeiro agendamento após assinar. Pode trocar somente na renovação mensal ou após 30 dias.
+                      O cliente fica vinculado ao profissional escolhido no primeiro agendamento após assinar. Pode trocar somente na renovação mensal ou após 30 dias.
                     </p>
                   </div>
                 </label>
@@ -1604,7 +1604,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
                   <div>
                     <span className="text-sm font-medium text-foreground">Livre escolha</span>
                     <p className="text-xs text-muted-foreground">
-                      O cliente pode escolher qualquer barbeiro disponível no horário e data desejados, desde que o barbeiro realize o serviço solicitado.
+                      O cliente pode escolher qualquer profissional disponível no horário e data desejados, desde que o profissional realize o serviço solicitado.
                     </p>
                   </div>
                 </label>
@@ -1861,8 +1861,8 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
               <div>
                 <h3 className="text-lg font-medium text-foreground">Recebedor Pagar.me</h3>
                 <p className="text-sm text-muted-foreground">
-                  Cadastre o recebedor da barbearia depois do onboarding inicial. Assim o cadastro
-                  da barbearia continua simples e os dados financeiros ficam para a etapa de
+                  Cadastre o recebedor da salão depois do onboarding inicial. Assim o cadastro
+                  da salão continua simples e os dados financeiros ficam para a etapa de
                   administração.
                 </p>
               </div>
@@ -1935,7 +1935,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div className="space-y-1">
                       <label className="text-sm font-medium text-foreground">E-mail <span className="text-destructive">*</span></label>
-                      <input type="email" value={recipientForm.email} onChange={(e) => updateRecipientField('email', e.target.value)} disabled={isSavingRecipient} placeholder="email@barbearia.com" className={recipientFieldClass('email', 'w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60')} />
+                      <input type="email" value={recipientForm.email} onChange={(e) => updateRecipientField('email', e.target.value)} disabled={isSavingRecipient} placeholder="email@salão.com" className={recipientFieldClass('email', 'w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60')} />
                     </div>
                     <div className="space-y-1">
                       <label className="text-sm font-medium text-foreground">Tipo detectado pelo documento</label>
@@ -2157,7 +2157,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
                     Termos e documentos
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Envie o PDF que sera usado como termo ou documento oficial da barbearia.
+                    Envie o PDF que sera usado como termo ou documento oficial da salão.
                   </p>
                 </div>
               </div>
@@ -2255,7 +2255,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
                 {
                   id: 'local' as const,
                   name: 'Dinheiro/Pagamento Local',
-                  description: 'Permitir pagamento presencial na barbearia.',
+                  description: 'Permitir pagamento presencial na salão.',
                   icon: Banknote,
                 },
               ].map((method) => {
@@ -2285,7 +2285,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
             <h3 className="text-lg font-medium text-foreground mb-4">Frequencia de Pagamento</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <AppSelect
-                label="Frequencia de pagamento - Barbeiros"
+                label="Frequencia de pagamento - Profissionais"
                 value={barberPaymentFrequency}
                 onChange={(value) =>
                   setBarberPaymentFrequency(value as PaymentFrequency)
@@ -2455,7 +2455,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
                 {businessLogoUrl ? (
                   <img
                     src={businessLogoUrl}
-                    alt="Logo da barbearia"
+                    alt="Logo da salão"
                     className="h-full w-full object-cover"
                   />
                 ) : (

@@ -4,10 +4,10 @@ import { toast } from "sonner";
 
 import {
   activatePixPlatformSubscription,
-  listSuperAdminBarbershops,
+  listSuperAdminSalons,
   getPlatformPlans,
   type PlatformPlan,
-  type SuperAdminBarbershop,
+  type SuperAdminSalon,
 } from "@/service/superAdminService";
 
 function fmtDate(value?: string | null) {
@@ -25,13 +25,13 @@ function fmtCurrency(value?: number | null) {
 }
 
 export function SuperAdminSubscriptionsPage() {
-  const [barbershops, setBarbershops] = useState<SuperAdminBarbershop[]>([]);
+  const [salons, setSalons] = useState<SuperAdminSalon[]>([]);
   const [plans, setPlans] = useState<PlatformPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [pixModal, setPixModal] = useState({
     open: false,
-    barbershopId: "",
-    barbershopName: "",
+    salonId: "",
+    salonName: "",
     platformPlanId: "",
     paidAt: new Date().toISOString().slice(0, 10),
     nextBillingDate: "",
@@ -48,16 +48,16 @@ export function SuperAdminSubscriptionsPage() {
       const activePlans = plansData.filter((plan) => plan.active !== false);
       setPlans(activePlans);
 
-      const all: SuperAdminBarbershop[] = [];
+      const all: SuperAdminSalon[] = [];
       let page = 1;
       while (true) {
-        const result = await listSuperAdminBarbershops({ limit: 100, page, sortBy: "name", sortOrder: "asc" });
+        const result = await listSuperAdminSalons({ limit: 100, page, sortBy: "name", sortOrder: "asc" });
         const items = Array.isArray(result?.items) ? result.items : [];
         all.push(...items);
         if (all.length >= (result?.total ?? 0) || items.length < 100) break;
         page++;
       }
-      setBarbershops(all);
+      setSalons(all);
     } catch { toast.error("Nao foi possivel carregar as assinaturas."); } finally { setLoading(false); }
   };
 
@@ -65,13 +65,13 @@ export function SuperAdminSubscriptionsPage() {
     void loadData();
   }, []);
 
-  const openPixModal = (shop: SuperAdminBarbershop) => {
+  const openPixModal = (shop: SuperAdminSalon) => {
     const currentPlanId = shop.platformSubscription?.platform_plans?.id ?? plans[0]?.id ?? "";
     const selectedPlan = plans.find((plan) => plan.id === currentPlanId) ?? plans[0];
     setPixModal({
       open: true,
-      barbershopId: shop.id,
-      barbershopName: shop.name,
+      salonId: shop.id,
+      salonName: shop.name,
       platformPlanId: currentPlanId,
       paidAt: new Date().toISOString().slice(0, 10),
       nextBillingDate: "",
@@ -107,13 +107,13 @@ export function SuperAdminSubscriptionsPage() {
 
     setPixModal((prev) => ({ ...prev, isSubmitting: true }));
     try {
-      await activatePixPlatformSubscription(pixModal.barbershopId, {
+      await activatePixPlatformSubscription(pixModal.salonId, {
         platformPlanId: pixModal.platformPlanId,
         paidAt: pixModal.paidAt || undefined,
         nextBillingDate: pixModal.nextBillingDate || undefined,
         amount,
       });
-      toast.success("Assinatura PIX liberada e barbearia ativada.");
+      toast.success("Assinatura PIX liberada e salão ativada.");
       closePixModal();
       await loadData();
     } catch {
@@ -123,7 +123,7 @@ export function SuperAdminSubscriptionsPage() {
   };
 
   const rows = useMemo(() =>
-    barbershops.map((shop) => ({
+    salons.map((shop) => ({
       id: shop.id,
       name: shop.name,
       shop,
@@ -133,7 +133,7 @@ export function SuperAdminSubscriptionsPage() {
       nextBillingAt: shop.platformSubscription?.next_billing_date ?? null,
       price: shop.platformSubscription?.amount ?? shop.platformSubscription?.platform_plans?.price ?? null,
     })),
-    [barbershops]
+    [salons]
   );
 
   return (
@@ -148,7 +148,7 @@ export function SuperAdminSubscriptionsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                <th className="px-5 py-3">Barbearia</th>
+                <th className="px-5 py-3">Salão</th>
                 <th className="px-5 py-3">Plano</th>
                 <th className="px-5 py-3">Status</th>
                 <th className="px-5 py-3">Pagamento</th>
@@ -210,7 +210,7 @@ export function SuperAdminSubscriptionsPage() {
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-foreground">Liberar assinatura PIX</h3>
-                <p className="text-sm text-muted-foreground">{pixModal.barbershopName}</p>
+                <p className="text-sm text-muted-foreground">{pixModal.salonName}</p>
               </div>
               <button type="button" onClick={closePixModal} className="rounded border border-border px-3 py-1 text-sm text-muted-foreground hover:bg-secondary">Fechar</button>
             </div>

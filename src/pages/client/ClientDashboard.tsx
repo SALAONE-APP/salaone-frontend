@@ -116,7 +116,7 @@ export function ClientDashboard() {
       })
       .catch(() => {
         setReviews([]);
-        setTopBarbersError("Nao foi possivel carregar o ranking de barbeiros.");
+        setTopBarbersError("Nao foi possivel carregar o ranking de profissionais.");
       })
       .finally(() => {
         setTopBarbersLoading(false);
@@ -139,7 +139,7 @@ export function ClientDashboard() {
 
       const current = grouped.get(review.barberId) ?? {
         id: review.barberId,
-        name: review.barberName || "Barbeiro",
+        name: review.barberName || "Profissional",
         reviewCount: 0,
         ratingSum: 0,
       };
@@ -165,7 +165,7 @@ export function ClientDashboard() {
   const shortcuts = [
     {
       label: "Marcar horario",
-      description: "Escolha servico, barbeiro e data.",
+      description: "Escolha servico, profissional e data.",
       href: "/bookings",
       icon: Calendar,
     },
@@ -253,7 +253,7 @@ export function ClientDashboard() {
       <section className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="flex items-center justify-between border-b border-border p-4">
           <div>
-            <h3 className="text-base font-medium text-foreground">Top barbeiros mais avaliados</h3>
+            <h3 className="text-base font-medium text-foreground">Top profissionais mais avaliados</h3>
             <p className="text-sm text-muted-foreground">Ranking por quantidade de avaliacoes recebidas.</p>
           </div>
           <Trophy className="h-5 w-5 text-amber-500" />

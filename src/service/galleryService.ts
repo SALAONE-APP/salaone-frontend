@@ -2,7 +2,7 @@ import api from "./api";
 
 export interface GalleryImage {
   id: string;
-  barbershopId?: string;
+  salonId?: string;
   url: string;
   alt?: string | null;
   sortOrder: number;
