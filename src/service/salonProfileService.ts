@@ -25,6 +25,7 @@ export interface UpdateSalonProfilePayload {
 }
 
 export async function getSalonProfile(_salonId?: string): Promise<SalonProfile> {
+  void _salonId;
   const response = await api.get<{
     salon: {
       id: string;
@@ -54,5 +55,6 @@ export async function getSalonProfile(_salonId?: string): Promise<SalonProfile> 
 export async function updateSalonProfile(
   _data: UpdateSalonProfilePayload
 ): Promise<SalonProfile> {
+  void _data;
   throw new Error("O backend atual ainda não oferece atualização de salão.");
 }

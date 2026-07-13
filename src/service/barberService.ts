@@ -41,6 +41,7 @@ function normalizeProfessional(employee: BackendEmployee): Barber {
 export async function listBarbers(
   _params: { q?: string; page?: number; limit?: number; salonId?: string } = {},
 ): Promise<ListBarbersResponse> {
+  void _params;
   const response = await api.get<{ employees: BackendEmployee[] }>("/employees");
   const items = response.data.employees
     .filter((employee) => employee.is_professional !== false)

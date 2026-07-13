@@ -44,19 +44,11 @@ function App() {
           />
           <Route
             path="/register"
-            element={
-              <PublicRoute>
-                <Register />
-              </PublicRoute>
-            }
+            element={<Register />}
           />
           <Route
             path="/register/:slug"
-            element={
-              <PublicRoute>
-                <Register />
-              </PublicRoute>
-            }
+            element={<Register />}
           />
           <Route path="/*" element={<AppRoutes />} />
         </Routes>

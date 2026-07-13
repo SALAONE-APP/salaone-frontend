@@ -9,7 +9,7 @@ import {
   ShieldCheck, Star, Store, TrendingUp, Users, Wallet, X,
 } from "lucide-react";
 import salaOneLogo from "../assets/image/logo-icone-salaone.jpeg";
-import axios from "axios";
+import api from "../service/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -57,11 +57,6 @@ interface RegisterResult {
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
-
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  headers: { "Content-Type": "application/json" },
-});
 
 async function apiFetchPlans(): Promise<Plan[]> {
   const { data } = await api.get<{ items: Plan[] } | Plan[]>("/public/platform-plans");

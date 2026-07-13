@@ -12,7 +12,7 @@ export interface RegisterClientPayload {
 
 export interface RegisterClientResponse {
   token: string;
-  refreshToken: string;
+  refreshToken?: string;
 
   user: {
     id: string;
@@ -40,7 +40,7 @@ export interface PublicSalon {
 }
 
 export async function listPublicSalons() {
-  const response = await api.get<PublicSalon[] | { salons: PublicSalon[] }>("/salons");
+  const response = await api.get<PublicSalon[] | { salons: PublicSalon[] }>("/salons/public");
   const payload = response.data;
 
   if (Array.isArray(payload)) return payload;
@@ -64,10 +64,11 @@ export async function registerClient(
 
   localStorage.setItem("token", response.data.token);
 
-  localStorage.setItem(
-    "refreshToken",
-    response.data.refreshToken
-  );
+  if (response.data.refreshToken) {
+    localStorage.setItem("refreshToken", response.data.refreshToken);
+  } else {
+    localStorage.removeItem("refreshToken");
+  }
 
   localStorage.setItem(
     "user",
