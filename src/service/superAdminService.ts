@@ -160,6 +160,9 @@ interface BackendSalon {
   updated_at?: string;
   selected_plan_id?: string | null;
   logo_url?: string | null;
+  blocked_reason?: string | null;
+  blocked_at?: string | null;
+  deactivated_at?: string | null;
 }
 
 interface BackendSalonUser {
@@ -186,6 +189,9 @@ function mapBackendSalon(salon: BackendSalon): SuperAdminSalon {
     phone: salon.phone ?? null,
     status: salon.status,
     createdAt: salon.created_at,
+    blockedReason: salon.blocked_reason ?? null,
+    blockedAt: salon.blocked_at ?? null,
+    deactivatedAt: salon.deactivated_at ?? null,
     metrics: {
       appointmentsCount: 0,
       servicesCount: 0,
