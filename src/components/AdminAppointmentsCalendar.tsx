@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { APPOINTMENT_CLIENT_STATUS_CONFIG, getStableCalendarColor, CALENDAR_END_MINUTES } from '@/utils/adminCalendar';
 import type { CalendarAppointment, CalendarColor, FreeSlot } from '@/utils/adminCalendar';
-import type { Barber } from '@/service/barberService';
+import type { Professional } from '@/service/professionalService';
 import type { Appointment } from '@/service/appointmentService';
 import './AdminAppointmentsCalendar.css';
 
@@ -37,7 +37,7 @@ const getAppointmentClientInfo = (appointment: CalendarAppointment) => {
 
 interface AptModalState {
   appointment: CalendarAppointment;
-  barber: Barber;
+  professional: Professional;
   calDate: Date | null;
   clientName: string;
   dependentName: string;
@@ -49,17 +49,17 @@ interface Props {
   activeDateLabel: string;
   activeDateKey: string;
   appointmentDateFilter: Date | null;
-  barbers: Barber[];
-  barberColors: Map<string, CalendarColor>;
+  professionals: Professional[];
+  professionalColors: Map<string, CalendarColor>;
   timeSlots: string[];
-  appointmentsByBarber: Map<string, CalendarAppointment[]>;
-  freeSlotsByBarber: Map<string, FreeSlot[]>;
+  appointmentsByProfessional: Map<string, CalendarAppointment[]>;
+  freeSlotsByProfessional: Map<string, FreeSlot[]>;
   bodyHeight: number;
   slotHeight: number;
   minutesPerSlot: number;
   startMinutes: number;
   nowMinutes?: number | null;
-  onFreeFitBooking: (barberId: string, date: Date, startMinutes: number, durationMinutes: number) => void;
+  onFreeFitBooking: (professionalId: string, date: Date, startMinutes: number, durationMinutes: number) => void;
   getAppointmentStartDate: (appointment: Appointment) => Date | null;
 }
 
@@ -67,11 +67,11 @@ export default function AdminAppointmentsCalendar({
   activeDateLabel,
   activeDateKey,
   appointmentDateFilter,
-  barbers,
-  barberColors,
+  professionals,
+  professionalColors,
   timeSlots,
-  appointmentsByBarber,
-  freeSlotsByBarber,
+  appointmentsByProfessional,
+  freeSlotsByProfessional,
   bodyHeight,
   slotHeight,
   minutesPerSlot,
@@ -135,33 +135,33 @@ export default function AdminAppointmentsCalendar({
         </div>
 
         <div className="calendar-grid-scroll-shell">
-          <div className="calendar-grid-inner" style={{ minWidth: `${64 + barbers.length * 180}px` }}>
+          <div className="calendar-grid-inner" style={{ minWidth: `${64 + professionals.length * 180}px` }}>
             {/* Header */}
             <div
               className="calendar-grid-header"
-              style={{ gridTemplateColumns: `64px repeat(${barbers.length}, minmax(180px, 1fr))` }}
+              style={{ gridTemplateColumns: `64px repeat(${professionals.length}, minmax(180px, 1fr))` }}
             >
               <div className="calendar-grid-corner">Horário</div>
-              {barbers.map((barber, barberIndex) => {
-                const barberPhoto = (barber as any).photo || (barber as any).avatar || barber.photoUrl || '';
-                const barberInitial = String(barber.displayName || '').trim().charAt(0).toUpperCase() || '?';
-                const barberColor = barberColors.get(barber.id) || getStableCalendarColor(barber, barberIndex);
+              {professionals.map((professional, professionalIndex) => {
+                const professionalPhoto = (professional as any).photo || (professional as any).avatar || professional.photoUrl || '';
+                const professionalInitial = String(professional.displayName || '').trim().charAt(0).toUpperCase() || '?';
+                const professionalColor = professionalColors.get(professional.id) || getStableCalendarColor(professional, professionalIndex);
 
                 return (
                   <div
-                    key={barber.id}
-                    className="calendar-grid-barber-header"
+                    key={professional.id}
+                    className="calendar-grid-professional-header"
                     style={{
-                      '--barber-accent': barberColor.accent,
-                      '--barber-tint': barberColor.tintStrong,
-                      '--barber-border': barberColor.border,
+                      '--professional-accent': professionalColor.accent,
+                      '--professional-tint': professionalColor.tintStrong,
+                      '--professional-border': professionalColor.border,
                     } as React.CSSProperties}
                   >
-                    {barberPhoto ? (
+                    {professionalPhoto ? (
                       <img
-                        src={barberPhoto}
-                        alt={barber.displayName}
-                        className="calendar-barber-photo"
+                        src={professionalPhoto}
+                        alt={professional.displayName}
+                        className="calendar-professional-photo"
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none';
                           (e.target as HTMLImageElement).nextElementSibling?.setAttribute('style', 'display:flex');
@@ -169,12 +169,12 @@ export default function AdminAppointmentsCalendar({
                       />
                     ) : null}
                     <div
-                      className="calendar-barber-photo-fallback"
-                      style={{ display: barberPhoto ? 'none' : 'flex' }}
+                      className="calendar-professional-photo-fallback"
+                      style={{ display: professionalPhoto ? 'none' : 'flex' }}
                     >
-                      {barberInitial}
+                      {professionalInitial}
                     </div>
-                    <span className="calendar-barber-name">{barber.displayName}</span>
+                    <span className="calendar-professional-name">{professional.displayName}</span>
                   </div>
                 );
               })}
@@ -208,16 +208,16 @@ export default function AdminAppointmentsCalendar({
                     <div
                       key={timeSlot}
                       className={`calendar-grid-row ${timeLabelType}${isPast ? ' past-slot' : ''}`}
-                      style={{ gridTemplateColumns: `64px repeat(${barbers.length}, minmax(180px, 1fr))` }}
+                      style={{ gridTemplateColumns: `64px repeat(${professionals.length}, minmax(180px, 1fr))` }}
                     >
                       <div className={`calendar-time-cell ${timeLabelType}`}>{timeLabel}</div>
-                      {barbers.map((barber) => {
-                        const barberColor = barberColors.get(barber.id) || getStableCalendarColor(barber);
+                      {professionals.map((professional) => {
+                        const professionalColor = professionalColors.get(professional.id) || getStableCalendarColor(professional);
                         return (
                           <div
-                            key={barber.id}
+                            key={professional.id}
                             className="calendar-slot-cell"
-                            style={{ '--barber-accent': barberColor.accent, '--barber-tint': barberColor.tint, '--barber-border': barberColor.border } as React.CSSProperties}
+                            style={{ '--professional-accent': professionalColor.accent, '--professional-tint': professionalColor.tint, '--professional-border': professionalColor.border } as React.CSSProperties}
                           />
                         );
                       })}
@@ -239,18 +239,18 @@ export default function AdminAppointmentsCalendar({
                 {/* Appointments layer */}
                 <div
                   className="calendar-appointments-layer"
-                  style={{ gridTemplateColumns: `64px repeat(${barbers.length}, minmax(180px, 1fr))`, height: `${bodyHeight}px` }}
+                  style={{ gridTemplateColumns: `64px repeat(${professionals.length}, minmax(180px, 1fr))`, height: `${bodyHeight}px` }}
                 >
                   <div className="calendar-appointments-layer-spacer" />
 
-                  {barbers.map((barber) => {
-                    const barberApts = appointmentsByBarber.get(barber.id) || [];
-                    const rawFreeSlots = freeSlotsByBarber.get(barber.id) || [];
-                    const barberFreeSlots = rawFreeSlots.filter((fs) => shouldShowFreeSlotBetweenAppointments(fs, barberApts));
+                  {professionals.map((professional) => {
+                    const professionalApts = appointmentsByProfessional.get(professional.id) || [];
+                    const rawFreeSlots = freeSlotsByProfessional.get(professional.id) || [];
+                    const professionalFreeSlots = rawFreeSlots.filter((fs) => shouldShowFreeSlotBetweenAppointments(fs, professionalApts));
 
                     const calDate = activeDateKey ? new Date(`${activeDateKey}T00:00:00`) : null;
-                    const regularApts = barberApts.filter((a) => !a.isFitAppointment);
-                    const fitApts = barberApts.filter((a) => a.isFitAppointment);
+                    const regularApts = professionalApts.filter((a) => !a.isFitAppointment);
+                    const fitApts = professionalApts.filter((a) => a.isFitAppointment);
 
                     const aptOverlapsRegular = (apt: CalendarAppointment): boolean => {
                       const [fh, fm] = String(apt.startTime || '00:00').split(':').map(Number);
@@ -278,8 +278,8 @@ export default function AdminAppointmentsCalendar({
                       clickedDate.setHours(Math.floor(clickedMinutes / 60), clickedMinutes % 60, 0, 0);
                       if (clickedDate < new Date()) return;
 
-                      const barberApts = appointmentsByBarber.get(barber.id) ?? [];
-                      const nextAptStart = barberApts
+                      const professionalApts = appointmentsByProfessional.get(professional.id) ?? [];
+                      const nextAptStart = professionalApts
                         .map((apt) => {
                           const [h, m] = String(apt.startTime ?? '00:00').split(':').map(Number);
                           return (h ?? 0) * 60 + (m ?? 0);
@@ -292,13 +292,13 @@ export default function AdminAppointmentsCalendar({
                         : CALENDAR_END_MINUTES - clickedMinutes;
                       const duration = Math.max(5, Math.min(maxAvail, 60));
 
-                      onFreeFitBooking(barber.id, calDate, clickedMinutes, duration);
+                      onFreeFitBooking(professional.id, calDate, clickedMinutes, duration);
                     };
 
                     return (
-                      <div key={barber.id} className="calendar-appointments-column" style={{ cursor: 'pointer' }} onClick={handleColumnClick}>
+                      <div key={professional.id} className="calendar-appointments-column" style={{ cursor: 'pointer' }} onClick={handleColumnClick}>
                         {/* Free fit slots */}
-                        {barberFreeSlots.map((freeSlot, freeIdx) => {
+                        {professionalFreeSlots.map((freeSlot, freeIdx) => {
                           const freeTop = ((freeSlot.startMinutes - startMinutes) / minutesPerSlot) * slotHeight;
                           const freeHeight = (freeSlot.durationMinutes / minutesPerSlot) * slotHeight;
 
@@ -316,7 +316,7 @@ export default function AdminAppointmentsCalendar({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (isFreeFitPast || !calDate) return;
-                                onFreeFitBooking(barber.id, calDate, freeSlot.startMinutes, freeSlot.durationMinutes);
+                                onFreeFitBooking(professional.id, calDate, freeSlot.startMinutes, freeSlot.durationMinutes);
                               }}
                             >
                               Agenda livre &bull; {freeSlot.durationMinutes} min
@@ -362,7 +362,7 @@ export default function AdminAppointmentsCalendar({
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (!isAptPast) setAptModal({ appointment, barber, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
+                                if (!isAptPast) setAptModal({ appointment, professional, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
                               }}
                             >
                               {eventHeight <= 28 ? (
@@ -423,7 +423,7 @@ export default function AdminAppointmentsCalendar({
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (!isAptPast) setAptModal({ appointment, barber, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
+                                if (!isAptPast) setAptModal({ appointment, professional, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
                               }}
                             >
                               {eventHeight <= 28 ? (
@@ -461,7 +461,7 @@ export default function AdminAppointmentsCalendar({
 
       {/* Detail modal */}
       {aptModal && (() => {
-        const { appointment, barber, calDate, clientName, dependentName, isDependentAppointment, servicesNames } = aptModal;
+        const { appointment, professional, calDate, clientName, dependentName, isDependentAppointment, servicesNames } = aptModal;
         const aptEndMinutes = (() => {
           const [h, m] = String(appointment.startTime || '00:00').split(':').map(Number);
           return (h ?? 0) * 60 + (m ?? 0) + Number(appointment.duration || 0);
@@ -511,7 +511,7 @@ export default function AdminAppointmentsCalendar({
                 )}
                 <div className="apt-detail-row">
                   <span className="apt-detail-label">Profissional</span>
-                  <span className="apt-detail-value">{barber.displayName}</span>
+                  <span className="apt-detail-value">{professional.displayName}</span>
                 </div>
                 <div className="apt-detail-row">
                   <span className="apt-detail-label">Serviço</span>

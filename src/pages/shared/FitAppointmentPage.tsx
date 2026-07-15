@@ -32,12 +32,12 @@ import {
   listAppointments,
   type Appointment,
 } from "@/service/appointmentService";
-import { listBarbers, type Barber } from "@/service/barberService";
+import { listProfessionals, type Professional } from "@/service/professionalService";
 import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
 import { listServices, type Service } from "@/service/serviceService";
 import {
-  buildCalendarAppointmentsByBarber,
-  buildCalendarFreeSlotsByBarber,
+  buildCalendarAppointmentsByProfessional,
+  buildCalendarFreeSlotsByProfessional,
   buildCalendarTimeSlots,
   APPOINTMENT_CLIENT_STATUS_CONFIG,
   CALENDAR_END_MINUTES,
@@ -88,15 +88,15 @@ function formatDateLong(date: Date): string {
 }
 
 function buildAvailableSlotsMessage({
-  barbers,
+  professionals,
   salon,
   date,
-  freeSlotsByBarber,
+  freeSlotsByProfessional,
 }: {
-  barbers: Barber[];
+  professionals: Professional[];
   salon: SalonProfile | null;
   date: Date;
-  freeSlotsByBarber: Map<string, FreeSlot[]>;
+  freeSlotsByProfessional: Map<string, FreeSlot[]>;
 }): string {
   const lines: string[] = [
     `*Horarios disponiveis${salon?.name ? ` - ${salon.name}` : ""}*`,
@@ -106,8 +106,8 @@ function buildAvailableSlotsMessage({
 
   let hasAnySlot = false;
 
-  barbers.forEach((barber) => {
-    const slots = freeSlotsByBarber.get(barber.id) ?? [];
+  professionals.forEach((professional) => {
+    const slots = freeSlotsByProfessional.get(professional.id) ?? [];
     const times = slots
       .flatMap((slot) => {
         const result: string[] = [];
@@ -123,14 +123,14 @@ function buildAvailableSlotsMessage({
 
     if (times) {
       hasAnySlot = true;
-      lines.push(`*${barber.displayName}:* ${times}`);
+      lines.push(`*${professional.displayName}:* ${times}`);
       return;
     }
 
-    lines.push(`*${barber.displayName}:* sem horarios disponiveis`);
+    lines.push(`*${professional.displayName}:* sem horarios disponiveis`);
   });
 
-  if (barbers.length === 0) {
+  if (professionals.length === 0) {
     lines.push("Nenhum profissional cadastrado.");
   } else if (!hasAnySlot) {
     lines.push("No momento nao temos horarios disponiveis para essa data.");
@@ -168,8 +168,8 @@ function getCurrentSaoPauloMinutes(): number {
 /* ── FitBookingDialog ── */
 
 interface FitSlotInfo {
-  barberId: string;
-  barberName: string;
+  professionalId: string;
+  professionalName: string;
   date: Date;
   startMinutes: number;
   durationMinutes: number;
@@ -230,7 +230,7 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
     setSaving(true);
     try {
       await createAppointment({
-        barberId: slotInfo.barberId,
+        professionalId: slotInfo.professionalId,
         clientId,
         date: dateKey,
         time,
@@ -262,7 +262,7 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
           <DialogHeader>
             <DialogTitle>Criar Agenda</DialogTitle>
             <DialogDescription>
-              {slotInfo.barberName}
+              {slotInfo.professionalName}
               {" · "}
               {slotInfo.date.toLocaleDateString("pt-BR", {
                 weekday: "short",
@@ -388,10 +388,10 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
 /* ── FitAppointmentPage ── */
 
 export function FitAppointmentPage() {
-  const [barbers, setBarbers] = useState<Barber[]>([]);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(getTodaySaoPaulo);
-  const [loadingBarbers, setLoadingBarbers] = useState(true);
+  const [loadingProfessionals, setLoadingProfessionals] = useState(true);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
   const [fitSlot, setFitSlot] = useState<FitSlotInfo | null>(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -417,12 +417,12 @@ export function FitAppointmentPage() {
     return () => clearInterval(interval);
   }, [isToday]);
 
-  /* Load barbers once */
+  /* Load professionals once */
   useEffect(() => {
-    listBarbers({ page: 1, limit: 100 })
-      .then((r) => setBarbers(r.items))
+    listProfessionals({ page: 1, limit: 100 })
+      .then((r) => setProfessionals(r.items))
       .catch((err) => toast.error(getApiMessage(err)))
-      .finally(() => setLoadingBarbers(false));
+      .finally(() => setLoadingProfessionals(false));
   }, []);
 
   useEffect(() => {
@@ -450,11 +450,11 @@ export function FitAppointmentPage() {
 
   useEffect(() => { void loadAppointments(); }, [loadAppointments]);
 
-  const barberColors = useMemo(() => {
+  const professionalColors = useMemo(() => {
     const map = new Map<string, CalendarColor>();
-    barbers.forEach((b, i) => map.set(b.id, getStableCalendarColor(b, i)));
+    professionals.forEach((b, i) => map.set(b.id, getStableCalendarColor(b, i)));
     return map;
-  }, [barbers]);
+  }, [professionals]);
 
   const getAppointmentStartDate = useCallback((apt: Appointment): Date | null => {
     const raw = (apt as any).startAt || (apt as any).start_at;
@@ -463,32 +463,32 @@ export function FitAppointmentPage() {
     return Number.isNaN(d.getTime()) ? null : d;
   }, []);
 
-  const appointmentsByBarber = useMemo(
-    () => buildCalendarAppointmentsByBarber({
-      appointments, barbers, activeDateKey, getAppointmentStartDate,
+  const appointmentsByProfessional = useMemo(
+    () => buildCalendarAppointmentsByProfessional({
+      appointments, professionals, activeDateKey, getAppointmentStartDate,
     }),
-    [appointments, barbers, activeDateKey, getAppointmentStartDate],
+    [appointments, professionals, activeDateKey, getAppointmentStartDate],
   );
 
-  const freeSlotsByBarber = useMemo(
-    () => buildCalendarFreeSlotsByBarber({
-      barbers, appointmentsByBarber,
+  const freeSlotsByProfessional = useMemo(
+    () => buildCalendarFreeSlotsByProfessional({
+      professionals, appointmentsByProfessional,
       startMinutes: CALENDAR_START_MINUTES, endMinutes: CALENDAR_END_MINUTES,
       minutesPerSlot: CALENDAR_MINUTES_PER_SLOT, fitSlotMaxMinutes: CALENDAR_FIT_SLOT_MAX_MINUTES,
       nowMinutes,
     }),
-    [barbers, appointmentsByBarber, nowMinutes],
+    [professionals, appointmentsByProfessional, nowMinutes],
   );
 
-  const shareFreeSlotsByBarber = useMemo(
-    () => buildCalendarFreeSlotsByBarber({
-      barbers, appointmentsByBarber,
+  const shareFreeSlotsByProfessional = useMemo(
+    () => buildCalendarFreeSlotsByProfessional({
+      professionals, appointmentsByProfessional,
       startMinutes: CALENDAR_START_MINUTES, endMinutes: CALENDAR_END_MINUTES,
       minutesPerSlot: CALENDAR_MINUTES_PER_SLOT,
       fitSlotMaxMinutes: CALENDAR_END_MINUTES - CALENDAR_START_MINUTES,
       nowMinutes,
     }),
-    [barbers, appointmentsByBarber, nowMinutes],
+    [professionals, appointmentsByProfessional, nowMinutes],
   );
 
   const timeSlots = useMemo(() => buildCalendarTimeSlots(), []);
@@ -498,32 +498,32 @@ export function FitAppointmentPage() {
 
   const totalFreeSlots = useMemo(() => {
     let n = 0;
-    freeSlotsByBarber.forEach((s) => { n += s.length; });
+    freeSlotsByProfessional.forEach((s) => { n += s.length; });
     return n;
-  }, [freeSlotsByBarber]);
+  }, [freeSlotsByProfessional]);
 
   const availableSlotsMessage = useMemo(
     () =>
       buildAvailableSlotsMessage({
-        barbers,
+        professionals,
         salon: salonProfile,
         date: selectedDate,
-        freeSlotsByBarber: shareFreeSlotsByBarber,
+        freeSlotsByProfessional: shareFreeSlotsByProfessional,
       }),
-    [barbers, salonProfile, selectedDate, shareFreeSlotsByBarber],
+    [professionals, salonProfile, selectedDate, shareFreeSlotsByProfessional],
   );
 
   const totalShareableSlots = useMemo(() => {
     let total = 0;
 
-    shareFreeSlotsByBarber.forEach((slots) => {
+    shareFreeSlotsByProfessional.forEach((slots) => {
       slots.forEach((slot) => {
         total += Math.ceil(slot.durationMinutes / CALENDAR_MINUTES_PER_SLOT);
       });
     });
 
     return total;
-  }, [shareFreeSlotsByBarber]);
+  }, [shareFreeSlotsByProfessional]);
 
   const activeAptCount = useMemo(
     () => appointments.filter((a) => a.status === "scheduled" || a.status === "confirmed").length,
@@ -535,11 +535,11 @@ export function FitAppointmentPage() {
     [appointments],
   );
 
-  function handleFreeFitBooking(barberId: string, date: Date, startMins: number, durationMins: number) {
-    const barber = barbers.find((b) => b.id === barberId);
+  function handleFreeFitBooking(professionalId: string, date: Date, startMins: number, durationMins: number) {
+    const professional = professionals.find((b) => b.id === professionalId);
     setFitSlot({
-      barberId,
-      barberName: barber?.displayName ?? "Profissional",
+      professionalId,
+      professionalName: professional?.displayName ?? "Profissional",
       date,
       startMinutes: startMins,
       durationMinutes: durationMins,
@@ -619,7 +619,7 @@ export function FitAppointmentPage() {
           <div>
             <p className="text-sm text-muted-foreground mb-1">Profissionais</p>
             <h3 className="text-2xl font-semibold text-foreground">
-              {loadingBarbers ? <Loader2 size={18} className="animate-spin" /> : barbers.length}
+              {loadingProfessionals ? <Loader2 size={18} className="animate-spin" /> : professionals.length}
             </h3>
           </div>
         </div>
@@ -701,7 +701,7 @@ export function FitAppointmentPage() {
               variant="outline"
               size="sm"
               className="gap-2"
-              disabled={loadingBarbers || loadingAppointments}
+              disabled={loadingProfessionals || loadingAppointments}
               onClick={() => setShareDialogOpen(true)}
             >
               <WhatsAppIcon size={14} />
@@ -714,7 +714,7 @@ export function FitAppointmentPage() {
         <div className="overflow-hidden rounded-b-xl">
 
         {/* Loading */}
-        {(loadingBarbers || loadingAppointments) && (
+        {(loadingProfessionals || loadingAppointments) && (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-2">
               <Loader2 size={16} className="animate-spin" />
@@ -723,8 +723,8 @@ export function FitAppointmentPage() {
           </div>
         )}
 
-        {/* Empty: no barbers */}
-        {!loadingBarbers && !loadingAppointments && barbers.length === 0 && (
+        {/* Empty: no professionals */}
+        {!loadingProfessionals && !loadingAppointments && professionals.length === 0 && (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">
             <div className="inline-flex flex-col items-center gap-3">
               <Scissors size={36} className="opacity-20" />
@@ -734,16 +734,16 @@ export function FitAppointmentPage() {
         )}
 
         {/* Calendar grid */}
-        {!loadingBarbers && !loadingAppointments && barbers.length > 0 && (
+        {!loadingProfessionals && !loadingAppointments && professionals.length > 0 && (
           <AdminAppointmentsCalendar
             activeDateLabel={activeDateLabel}
             activeDateKey={activeDateKey}
             appointmentDateFilter={selectedDate}
-            barbers={barbers}
-            barberColors={barberColors}
+            professionals={professionals}
+            professionalColors={professionalColors}
             timeSlots={timeSlots}
-            appointmentsByBarber={appointmentsByBarber}
-            freeSlotsByBarber={freeSlotsByBarber}
+            appointmentsByProfessional={appointmentsByProfessional}
+            freeSlotsByProfessional={freeSlotsByProfessional}
             bodyHeight={bodyHeight}
             slotHeight={CALENDAR_SLOT_HEIGHT}
             minutesPerSlot={CALENDAR_MINUTES_PER_SLOT}

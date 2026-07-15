@@ -4,7 +4,7 @@ import { usePermissions } from "../../hooks/usePermissions";
 import { ProfileSidebar } from "../shared/ProfileSidebar";
 import type { SidebarItem, SidebarSection } from "../shared/ProfileSidebar";
 
-export function BarberSidebar() {
+export function ProfessionalSidebar() {
   const { can } = usePermissions();
 
   const operationItems: SidebarItem[] = [

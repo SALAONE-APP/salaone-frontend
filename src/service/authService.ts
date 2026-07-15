@@ -63,7 +63,7 @@ interface BackendSalon {
 }
 
 function normalizeRole(role?: string) {
-  return role === "professional" ? "barber" : role;
+  return role === "professional" ? "professional" : role;
 }
 
 function normalizeSalon(salon: BackendSalon): StoredSalon {

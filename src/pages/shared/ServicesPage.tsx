@@ -74,7 +74,7 @@ import {
 } from "@/service/serviceService";
 import { getMyActiveSubscription, type Subscription } from "@/service/subscriptionService";
 import { uploadImage } from "@/service/uploadService";
-import { getSettings, type SubscriptionBarberRule } from "@/service/settingsService";
+import { getSettings, type SubscriptionProfessionalRule } from "@/service/settingsService";
 
 const normalizeText = (value: string) => {
   return value
@@ -181,15 +181,15 @@ export function ServicesPage() {
   const [serviceToDeactivate, setServiceToDeactivate] = useState<Service | null>(null);
   const [serviceToReactivate, setServiceToReactivate] = useState<Service | null>(null);
   const [form, setForm] = useState<ServiceFormState>(emptyForm);
-  const [subscriptionBarberRule, setSubscriptionBarberRule] = useState<SubscriptionBarberRule>("fixed");
+  const [subscriptionProfessionalRule, setSubscriptionProfessionalRule] = useState<SubscriptionProfessionalRule>("fixed");
 
   useEffect(() => {
     getSettings()
-      .then((s) => setSubscriptionBarberRule(s.subscriptionBarberRule ?? "fixed"))
+      .then((s) => setSubscriptionProfessionalRule(s.subscriptionProfessionalRule ?? "fixed"))
       .catch(() => {});
   }, []);
 
-  const isFreeChoice = subscriptionBarberRule === "free_choice" && user?.role !== "client";
+  const isFreeChoice = subscriptionProfessionalRule === "free_choice" && user?.role !== "client";
 
   const [mySubscription, setMySubscription] = useState<Subscription | null>(null);
 

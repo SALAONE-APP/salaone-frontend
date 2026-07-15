@@ -46,7 +46,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useMyBarber } from "@/hooks/useMyBarber";
+import { useMyProfessional } from "@/hooks/useMyProfessional";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
   cancelAppointment,
@@ -159,8 +159,8 @@ const emptyForm: BookingFormState = {
 
 /* ─── component ─── */
 
-export function BarberBookingsPage() {
-  const { barber, loading: barberLoading } = useMyBarber();
+export function ProfessionalBookingsPage() {
+  const { professional, loading: professionalLoading } = useMyProfessional();
   const { can } = usePermissions();
   const canManage = can("manageAgendamentos");
 
@@ -184,11 +184,11 @@ export function BarberBookingsPage() {
   const limit = 20;
 
   const loadAppointments = useCallback(
-    async (barberId: string) => {
+    async (professionalId: string) => {
       setLoading(true);
       try {
         const result = await listAppointments({
-          barberId,
+          professionalId,
           allAppointments: true,
           status: statusFilter === "all" ? undefined : statusFilter,
           page,
@@ -209,20 +209,20 @@ export function BarberBookingsPage() {
   );
 
   useEffect(() => {
-    if (barber?.id) void loadAppointments(barber.id);
-  }, [barber, loadAppointments]);
+    if (professional?.id) void loadAppointments(professional.id);
+  }, [professional, loadAppointments]);
 
   useEffect(() => {
     getSalonProfile().then(setSalonProfile).catch(() => null);
   }, []);
 
   useEffect(() => {
-    if (!barber?.id) return;
+    if (!professional?.id) return;
     const today = dateToDateString(new Date());
-    listAppointments({ barberId: barber.id, allAppointments: true, dateFrom: today, dateTo: today, limit: 1 })
+    listAppointments({ professionalId: professional.id, allAppointments: true, dateFrom: today, dateTo: today, limit: 1 })
       .then((r) => setTodayCount(r.total))
       .catch(() => null);
-  }, [barber?.id]);
+  }, [professional?.id]);
 
   useEffect(() => {
     if (!dialogOpen) return;
@@ -248,18 +248,18 @@ export function BarberBookingsPage() {
   );
 
   useEffect(() => {
-    if (!dialogOpen || !barber?.id || !form.date || totalDuration <= 0 || form.allowOutsideBusinessHours) {
+    if (!dialogOpen || !professional?.id || !form.date || totalDuration <= 0 || form.allowOutsideBusinessHours) {
       setSlots([]);
       return;
     }
     let active = true;
     setSlotsLoading(true);
-    getAvailableSlots({ barberId: barber.id, date: form.date, duration: totalDuration })
+    getAvailableSlots({ professionalId: professional.id, date: form.date, duration: totalDuration })
       .then((s) => { if (active) setSlots(s); })
       .catch((err) => { if (active) toast.error(getApiMessage(err)); })
       .finally(() => { if (active) setSlotsLoading(false); });
     return () => { active = false; };
-  }, [dialogOpen, barber, form.allowOutsideBusinessHours, form.date, totalDuration]);
+  }, [dialogOpen, professional, form.allowOutsideBusinessHours, form.date, totalDuration]);
 
   const filteredAppointments = useMemo(() => {
     const term = normalizeText(search.trim());
@@ -308,7 +308,7 @@ export function BarberBookingsPage() {
 
   async function handleCreateSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!barber?.id) return;
+    if (!professional?.id) return;
     if (!form.clientId) { toast.error("Selecione o cliente."); return; }
     if (!form.date) { toast.error("Selecione a data."); return; }
     if (!form.time) { toast.error("Selecione ou informe o horario."); return; }
@@ -323,7 +323,7 @@ export function BarberBookingsPage() {
     try {
       await createAppointment({
         clientId: form.clientId,
-        barberId: barber.id,
+        professionalId: professional.id,
         date: form.date,
         time: form.time,
         notes: form.notes.trim() || null,
@@ -339,7 +339,7 @@ export function BarberBookingsPage() {
       });
       toast.success("Agendamento criado.");
       setDialogOpen(false);
-      void loadAppointments(barber.id);
+      void loadAppointments(professional.id);
     } catch (err) {
       toast.error(getApiMessage(err));
     } finally {
@@ -350,7 +350,7 @@ export function BarberBookingsPage() {
   async function changeStatus(appt: Appointment, status: AppointmentStatus) {
     try {
       await updateAppointment(appt.id, { status });
-      if (barber?.id) void loadAppointments(barber.id);
+      if (professional?.id) void loadAppointments(professional.id);
       if (status === "confirmed" && salonProfile?.phone) {
         toast.success("Agendamento confirmado.", {
           action: {
@@ -375,13 +375,13 @@ export function BarberBookingsPage() {
     try {
       await cancelAppointment(appt.id);
       toast.success("Agendamento cancelado.");
-      if (barber?.id) void loadAppointments(barber.id);
+      if (professional?.id) void loadAppointments(professional.id);
     } catch (err) {
       toast.error(getApiMessage(err));
     }
   }
 
-  if (barberLoading) {
+  if (professionalLoading) {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 size={24} className="animate-spin text-muted-foreground" />
@@ -389,7 +389,7 @@ export function BarberBookingsPage() {
     );
   }
 
-  if (!barber) {
+  if (!professional) {
     return (
       <div className="rounded-xl border border-border bg-card p-8 text-center">
         <p className="text-muted-foreground">
@@ -704,7 +704,7 @@ export function BarberBookingsPage() {
               <div className="space-y-2">
                 <Label>Profissional</Label>
                 <div className="flex h-9 items-center rounded-md border border-border bg-secondary/50 px-3 text-sm text-foreground">
-                  {barber.displayName}
+                  {professional.displayName}
                 </div>
               </div>
 
@@ -790,9 +790,9 @@ export function BarberBookingsPage() {
               )}
 
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="barber-booking-notes">Observacoes</Label>
+                <Label htmlFor="professional-booking-notes">Observacoes</Label>
                 <Textarea
-                  id="barber-booking-notes"
+                  id="professional-booking-notes"
                   value={form.notes}
                   onChange={(e) => setField("notes", e.target.value)}
                   placeholder="Opcional"

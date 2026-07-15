@@ -53,7 +53,7 @@ import {
   type BlockedDate,
   type BlockedDatePayload,
 } from "@/service/blockedDateService";
-import { listBarbers, type Barber } from "@/service/barberService";
+import { listProfessionals, type Professional } from "@/service/professionalService";
 import { listAppointments, type Appointment } from "@/service/appointmentService";
 
 /* ─── date helpers ─── */
@@ -138,8 +138,8 @@ function getApiMessage(error: unknown) {
 interface BlockedDateFormState {
   date: string;
   reason: string;
-  blockType: "all" | "barber";
-  barberId: string;
+  blockType: "all" | "professional";
+  professionalId: string;
   allDay: boolean;
   startTime: string;
   endTime: string;
@@ -149,7 +149,7 @@ const emptyBlockedDateForm: BlockedDateFormState = {
   date: dateToDateString(new Date()),
   reason: "",
   blockType: "all",
-  barberId: "",
+  professionalId: "",
   allDay: true,
   startTime: "09:00",
   endTime: "18:00",
@@ -159,8 +159,8 @@ function blockedDateToForm(item: BlockedDate): BlockedDateFormState {
   return {
     date: item.date,
     reason: item.reason ?? "",
-    blockType: item.barberId ? "barber" : "all",
-    barberId: item.barberId ?? "",
+    blockType: item.professionalId ? "professional" : "all",
+    professionalId: item.professionalId ?? "",
     allDay: !item.startTime || !item.endTime,
     startTime: item.startTime ?? "09:00",
     endTime: item.endTime ?? "18:00",
@@ -171,7 +171,7 @@ function buildPayload(form: BlockedDateFormState): BlockedDatePayload {
   return {
     date: form.date,
     reason: form.reason.trim() || null,
-    barberId: form.blockType === "barber" ? form.barberId : null,
+    professionalId: form.blockType === "professional" ? form.professionalId : null,
     startTime: form.allDay ? null : form.startTime,
     endTime: form.allDay ? null : form.endTime,
   };
@@ -193,7 +193,7 @@ export function SchedulesPage() {
   const [selectedDayIndex, setSelectedDayIndex] = useState(getTodayDayIndex);
 
   const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([]);
-  const [barbers, setBarbers] = useState<Barber[]>([]);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [scheduleAppointments, setScheduleAppointments] = useState<Appointment[]>([]);
 
   const [search, setSearch] = useState("");
@@ -221,12 +221,12 @@ export function SchedulesPage() {
   const loadBlockedDates = useCallback(async () => {
     try {
       setLoadingBlockedDates(true);
-      const [blockedDatesData, barbersData] = await Promise.all([
+      const [blockedDatesData, professionalsData] = await Promise.all([
         listBlockedDates(),
-        listBarbers({ limit: 100 }),
+        listProfessionals({ limit: 100 }),
       ]);
       setBlockedDates(blockedDatesData);
-      setBarbers(barbersData.items);
+      setProfessionals(professionalsData.items);
     } catch (err) {
       toast.error(getApiMessage(err));
     } finally {
@@ -286,18 +286,18 @@ export function SchedulesPage() {
 
   /* ─── derived data ─── */
 
-  // per-barber schedule for selected day
-  const barberSchedule = useMemo(() => {
-    return barbers.map((barber) => {
+  // per-professional schedule for selected day
+  const professionalSchedule = useMemo(() => {
+    return professionals.map((professional) => {
       const appts = scheduleAppointments
-        .filter((a) => a.barberId === barber.id)
+        .filter((a) => a.professionalId === professional.id)
         .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
 
       const firstStart = appts[0]?.startAt;
       const lastEnd = appts[appts.length - 1]?.endAt;
 
       return {
-        barber,
+        professional,
         appointments: appts,
         firstStart: firstStart ? formatTimeFromISO(firstStart) : "-",
         lastEnd: lastEnd ? formatTimeFromISO(lastEnd) : "-",
@@ -305,20 +305,20 @@ export function SchedulesPage() {
         isWorking: appts.length > 0,
       };
     });
-  }, [barbers, scheduleAppointments]);
+  }, [professionals, scheduleAppointments]);
 
-  const workingCount = barberSchedule.filter((b) => b.isWorking).length;
+  const workingCount = professionalSchedule.filter((b) => b.isWorking).length;
   const totalAppointmentsSelected = scheduleAppointments.length;
 
-  const filteredBarberSchedule = useMemo(() => {
+  const filteredProfessionalSchedule = useMemo(() => {
     const term = normalizeText(scheduleSearch.trim());
-    return barberSchedule.filter((row) => {
-      if (term && !normalizeText(row.barber.displayName).includes(term)) return false;
+    return professionalSchedule.filter((row) => {
+      if (term && !normalizeText(row.professional.displayName).includes(term)) return false;
       if (scheduleStatusFilter === "working" && !row.isWorking) return false;
       if (scheduleStatusFilter === "free" && row.isWorking) return false;
       return true;
     });
-  }, [barberSchedule, scheduleSearch, scheduleStatusFilter]);
+  }, [professionalSchedule, scheduleSearch, scheduleStatusFilter]);
 
   /* ─── blocked dates filter ─── */
 
@@ -329,7 +329,7 @@ export function SchedulesPage() {
       const values = [
         formatDate(item.date),
         item.reason ?? "",
-        item.barber?.displayName ?? "Todos",
+        item.professional?.displayName ?? "Todos",
         item.startTime && item.endTime ? `${item.startTime} ${item.endTime}` : "Dia inteiro",
       ];
       return values.some((value) => normalizeText(value).includes(term));
@@ -372,7 +372,7 @@ export function SchedulesPage() {
       toast.error("Informe a data bloqueada.");
       return;
     }
-    if (form.blockType === "barber" && !form.barberId) {
+    if (form.blockType === "professional" && !form.professionalId) {
       toast.error("Selecione o funcionario afetado.");
       return;
     }
@@ -425,7 +425,7 @@ export function SchedulesPage() {
           </div>
           <div>
             <p className="text-sm text-muted-foreground mb-1">Total Funcionarios</p>
-            <h3 className="text-2xl font-semibold text-foreground">{barbers.length}</h3>
+            <h3 className="text-2xl font-semibold text-foreground">{professionals.length}</h3>
           </div>
         </div>
 
@@ -583,7 +583,7 @@ export function SchedulesPage() {
               </tr>
             </thead>
             <tbody>
-              {loadingSchedule && barberSchedule.length === 0 ? (
+              {loadingSchedule && professionalSchedule.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     <span className="inline-flex items-center gap-2">
@@ -592,29 +592,29 @@ export function SchedulesPage() {
                     </span>
                   </td>
                 </tr>
-              ) : filteredBarberSchedule.length === 0 ? (
+              ) : filteredProfessionalSchedule.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                    {barberSchedule.length === 0
+                    {professionalSchedule.length === 0
                       ? "Nenhum funcionario cadastrado."
                       : "Nenhum funcionario encontrado com esses filtros."}
                   </td>
                 </tr>
               ) : (
-                filteredBarberSchedule.map(({ barber, firstStart, lastEnd, count, isWorking }) => (
-                  <tr key={barber.id} className="border-b border-border last:border-b-0 hover:bg-secondary/30 transition-colors">
+                filteredProfessionalSchedule.map(({ professional, firstStart, lastEnd, count, isWorking }) => (
+                  <tr key={professional.id} className="border-b border-border last:border-b-0 hover:bg-secondary/30 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <Avatar className="w-10 h-10">
-                          <AvatarImage src={barber.photoUrl ?? undefined} alt={barber.displayName} />
+                          <AvatarImage src={professional.photoUrl ?? undefined} alt={professional.displayName} />
                           <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                            {barber.displayName.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                            {professional.displayName.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <span className="text-sm font-medium text-foreground">{barber.displayName}</span>
-                          {barber.specialty && (
-                            <p className="text-xs text-muted-foreground">{barber.specialty}</p>
+                          <span className="text-sm font-medium text-foreground">{professional.displayName}</span>
+                          {professional.specialty && (
+                            <p className="text-xs text-muted-foreground">{professional.specialty}</p>
                           )}
                         </div>
                       </div>
@@ -718,9 +718,9 @@ export function SchedulesPage() {
                       <td className="px-4 py-3 text-sm font-medium text-foreground">{formatDate(item.date)}</td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{item.reason || "Sem motivo informado"}</td>
                       <td className="px-4 py-3 text-sm text-foreground">
-                        {item.barberId ? "Funcionario especifico" : "Salão inteira"}
+                        {item.professionalId ? "Funcionario especifico" : "Salão inteira"}
                       </td>
-                      <td className="px-4 py-3 text-sm text-foreground">{item.barber?.displayName ?? "Todos"}</td>
+                      <td className="px-4 py-3 text-sm text-foreground">{item.professional?.displayName ?? "Todos"}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 text-sm text-foreground">
                           <Clock size={14} className="text-muted-foreground" />
@@ -783,11 +783,11 @@ export function SchedulesPage() {
                 <Label>Tipo de bloqueio</Label>
                 <Select
                   value={form.blockType}
-                  onValueChange={(value: "all" | "barber") =>
+                  onValueChange={(value: "all" | "professional") =>
                     setForm((current) => ({
                       ...current,
                       blockType: value,
-                      barberId: value === "all" ? "" : current.barberId,
+                      professionalId: value === "all" ? "" : current.professionalId,
                     }))
                   }
                 >
@@ -796,26 +796,26 @@ export function SchedulesPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Salão inteira</SelectItem>
-                    <SelectItem value="barber">Funcionario especifico</SelectItem>
+                    <SelectItem value="professional">Funcionario especifico</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            {form.blockType === "barber" && (
+            {form.blockType === "professional" && (
               <div className="space-y-2">
                 <Label>Funcionario afetado</Label>
                 <Select
-                  value={form.barberId}
-                  onValueChange={(value) => setForm((current) => ({ ...current, barberId: value }))}
+                  value={form.professionalId}
+                  onValueChange={(value) => setForm((current) => ({ ...current, professionalId: value }))}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Selecione um funcionario" />
                   </SelectTrigger>
                   <SelectContent>
-                    {barbers.map((barber) => (
-                      <SelectItem key={barber.id} value={barber.id}>
-                        {barber.displayName}
+                    {professionals.map((professional) => (
+                      <SelectItem key={professional.id} value={professional.id}>
+                        {professional.displayName}
                       </SelectItem>
                     ))}
                   </SelectContent>

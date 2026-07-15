@@ -6,10 +6,10 @@ export interface ChangePasswordPayload {
 }
 
 export async function changePassword(
-  userId: string,
+  _userId: string,
   data: ChangePasswordPayload
 ) {
-  const response = await api.patch(`/users/${userId}`, {
+  const response = await api.patch("/users/me/password", {
     currentPassword: data.currentPassword,
     newPassword: data.newPassword,
   });
@@ -19,6 +19,7 @@ export async function changePassword(
 
 export interface UserProfile {
   id: string;
+  platformUserId?: string;
   name: string;
   email: string;
   phone?: string | null;
@@ -38,8 +39,8 @@ export interface UserProfile {
 }
 
 export interface ListUsersParams {
-  role?: "admin" | "barber" | "receptionist" | "client";
-  excludeRole?: "admin" | "barber" | "receptionist" | "client";
+  role?: "admin" | "professional" | "receptionist" | "client";
+  excludeRole?: "admin" | "professional" | "receptionist" | "client";
   q?: string;
   page?: number;
   limit?: number;
@@ -59,7 +60,7 @@ export interface CreateUserPayload {
   cpf?: string | null;
   birthDate?: string | null;
   password: string;
-  role: "admin" | "barber" | "receptionist" | "client";
+  role: "admin" | "professional" | "receptionist" | "client";
   isAdmin?: boolean;
   permissions?: Record<string, boolean>;
   photoUrl?: string | null;
@@ -71,7 +72,7 @@ export interface UpdateUserPayload {
   phone?: string | null;
   cpf?: string | null;
   birthDate?: string | null;
-  role?: "admin" | "barber" | "receptionist" | "client";
+  role?: "admin" | "professional" | "receptionist" | "client";
   isAdmin?: boolean;
   photoUrl?: string | null;
   salary?: number | null;

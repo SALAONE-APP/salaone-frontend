@@ -57,7 +57,7 @@ import {
   type BookingPaymentMethod,
   type PaymentFrequency,
   type Settings,
-  type SubscriptionBarberRule,
+  type SubscriptionProfessionalRule,
   updatePaymentFrequencySettings,
   updateSettings,
 } from '../../service/settingsService';
@@ -249,16 +249,16 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     pix: true,
     local: true,
   });
-  const [barberPaymentFrequency, setBarberPaymentFrequency] =
+  const [professionalPaymentFrequency, setProfessionalPaymentFrequency] =
     useState<PaymentFrequency>('monthly');
   const [employeePaymentFrequency, setEmployeePaymentFrequency] =
     useState<PaymentFrequency>('monthly');
   const [hasLoadedPaymentSettings, setHasLoadedPaymentSettings] = useState(false);
   const [isLoadingPaymentSettings, setIsLoadingPaymentSettings] = useState(false);
   const [isSavingPaymentSettings, setIsSavingPaymentSettings] = useState(false);
-  const [subscriptionBarberRule, setSubscriptionBarberRule] = useState<SubscriptionBarberRule>('fixed');
-  const [hasLoadedBarberRule, setHasLoadedBarberRule] = useState(false);
-  const [isSavingBarberRule, setIsSavingBarberRule] = useState(false);
+  const [subscriptionProfessionalRule, setSubscriptionProfessionalRule] = useState<SubscriptionProfessionalRule>('fixed');
+  const [hasLoadedProfessionalRule, setHasLoadedProfessionalRule] = useState(false);
+  const [isSavingProfessionalRule, setIsSavingProfessionalRule] = useState(false);
   const salon = useMemo(() => getStoredSalon(), []);
   const canManageSecurityDocuments = user?.role === 'admin' || user?.isAdmin === true;
   const isAdmin = user?.role === 'admin' || user?.isAdmin === true;
@@ -459,30 +459,30 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   }, [activeTab]);
 
   useEffect(() => {
-    if (activeTab !== 'general' || hasLoadedBarberRule) {
+    if (activeTab !== 'general' || hasLoadedProfessionalRule) {
       return;
     }
 
     let isMounted = true;
 
-    async function loadBarberRule() {
+    async function loadProfessionalRule() {
       try {
         const settingsData = await getSettings();
         if (!isMounted) return;
-        setSubscriptionBarberRule(settingsData.subscriptionBarberRule ?? 'fixed');
+        setSubscriptionProfessionalRule(settingsData.subscriptionProfessionalRule ?? 'fixed');
         setSettings(settingsData);
-        setHasLoadedBarberRule(true);
+        setHasLoadedProfessionalRule(true);
       } catch {
         // silently ignore — default 'fixed' remains
       }
     }
 
-    loadBarberRule();
+    loadProfessionalRule();
 
     return () => {
       isMounted = false;
     };
-  }, [activeTab, hasLoadedBarberRule]);
+  }, [activeTab, hasLoadedProfessionalRule]);
 
   useEffect(() => {
     if (activeTab !== 'payments' || hasLoadedPaymentSettings) {
@@ -510,7 +510,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
           pix: !settingsData.hiddenBookingPaymentMethods.includes('pix'),
           local: !settingsData.hiddenBookingPaymentMethods.includes('local'),
         });
-        setBarberPaymentFrequency(frequencyData.barberPaymentFrequency);
+        setProfessionalPaymentFrequency(frequencyData.professionalPaymentFrequency);
         setEmployeePaymentFrequency(frequencyData.employeePaymentFrequency);
         setHasLoadedPaymentSettings(true);
       } catch {
@@ -1297,7 +1297,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         termsDocumentName,
         hiddenBookingPaymentMethods:
           currentSettings.hiddenBookingPaymentMethods ?? getHiddenBookingPaymentMethods(),
-        subscriptionBarberRule: currentSettings.subscriptionBarberRule ?? subscriptionBarberRule,
+        subscriptionProfessionalRule: currentSettings.subscriptionProfessionalRule ?? subscriptionProfessionalRule,
       });
 
       setSettings(updatedSettings);
@@ -1368,10 +1368,10 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
           termsDocumentUrl: settings?.termsDocumentUrl ?? '',
           termsDocumentName: settings?.termsDocumentName ?? '',
           hiddenBookingPaymentMethods: getHiddenBookingPaymentMethods(),
-          subscriptionBarberRule: settings?.subscriptionBarberRule ?? subscriptionBarberRule,
+          subscriptionProfessionalRule: settings?.subscriptionProfessionalRule ?? subscriptionProfessionalRule,
         }),
         updatePaymentFrequencySettings({
-          barberPaymentFrequency,
+          professionalPaymentFrequency,
           employeePaymentFrequency,
         }),
       ]);
@@ -1382,7 +1382,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         pix: !updatedSettings.hiddenBookingPaymentMethods.includes('pix'),
         local: !updatedSettings.hiddenBookingPaymentMethods.includes('local'),
       });
-      setBarberPaymentFrequency(updatedFrequencySettings.barberPaymentFrequency);
+      setProfessionalPaymentFrequency(updatedFrequencySettings.professionalPaymentFrequency);
       setEmployeePaymentFrequency(updatedFrequencySettings.employeePaymentFrequency);
       setHasLoadedPaymentSettings(true);
       toast.success('Configuracoes de pagamento salvas com sucesso.');
@@ -1394,10 +1394,10 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     }
   }
 
-  async function saveBarberRuleSettings() {
-    if (isSavingBarberRule) return;
+  async function saveProfessionalRuleSettings() {
+    if (isSavingProfessionalRule) return;
 
-    setIsSavingBarberRule(true);
+    setIsSavingProfessionalRule(true);
 
     try {
       const currentSettings = settings ?? await getSettings();
@@ -1406,7 +1406,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         termsDocumentUrl: currentSettings.termsDocumentUrl ?? '',
         termsDocumentName: currentSettings.termsDocumentName ?? '',
         hiddenBookingPaymentMethods: currentSettings.hiddenBookingPaymentMethods ?? [],
-        subscriptionBarberRule,
+        subscriptionProfessionalRule,
       });
 
       setSettings(updatedSettings);
@@ -1416,7 +1416,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       const message = getApiErrorMessage(error);
       toast.error(message || 'Erro ao salvar regra de profissional.');
     } finally {
-      setIsSavingBarberRule(false);
+      setIsSavingProfessionalRule(false);
     }
   }
 
@@ -1579,10 +1579,10 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
                 <label className="flex items-start gap-3 cursor-pointer group">
                   <input
                     type="radio"
-                    name="subscriptionBarberRule"
+                    name="subscriptionProfessionalRule"
                     value="fixed"
-                    checked={subscriptionBarberRule === 'fixed'}
-                    onChange={() => setSubscriptionBarberRule('fixed')}
+                    checked={subscriptionProfessionalRule === 'fixed'}
+                    onChange={() => setSubscriptionProfessionalRule('fixed')}
                     className="mt-1 accent-primary"
                   />
                   <div>
@@ -1595,10 +1595,10 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
                 <label className="flex items-start gap-3 cursor-pointer group">
                   <input
                     type="radio"
-                    name="subscriptionBarberRule"
+                    name="subscriptionProfessionalRule"
                     value="free_choice"
-                    checked={subscriptionBarberRule === 'free_choice'}
-                    onChange={() => setSubscriptionBarberRule('free_choice')}
+                    checked={subscriptionProfessionalRule === 'free_choice'}
+                    onChange={() => setSubscriptionProfessionalRule('free_choice')}
                     className="mt-1 accent-primary"
                   />
                   <div>
@@ -1612,11 +1612,11 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
               <div className="mt-4 flex justify-end">
                 <button
                   type="button"
-                  onClick={saveBarberRuleSettings}
-                  disabled={isSavingBarberRule}
+                  onClick={saveProfessionalRuleSettings}
+                  disabled={isSavingProfessionalRule}
                   className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSavingBarberRule ? 'Salvando...' : 'Salvar regra'}
+                  {isSavingProfessionalRule ? 'Salvando...' : 'Salvar regra'}
                 </button>
               </div>
             </div>
@@ -2286,9 +2286,9 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <AppSelect
                 label="Frequencia de pagamento - Profissionais"
-                value={barberPaymentFrequency}
+                value={professionalPaymentFrequency}
                 onChange={(value) =>
-                  setBarberPaymentFrequency(value as PaymentFrequency)
+                  setProfessionalPaymentFrequency(value as PaymentFrequency)
                 }
                 options={PAYMENT_FREQUENCY_OPTIONS}
                 disabled={isLoadingPaymentSettings || isSavingPaymentSettings}

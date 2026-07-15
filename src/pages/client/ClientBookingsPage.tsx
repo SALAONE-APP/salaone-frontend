@@ -62,13 +62,13 @@ import {
   type Appointment,
   type AppointmentStatus,
 } from "@/service/appointmentService";
-import { listBarbers, type Barber } from "@/service/barberService";
+import { listProfessionals, type Professional } from "@/service/professionalService";
 import {
   getMyActiveSubscription,
   type Subscription,
 } from "@/service/subscriptionService";
 import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
-import { getSettings, type BookingPaymentMethod, type SubscriptionBarberRule } from "@/service/settingsService";
+import { getSettings, type BookingPaymentMethod, type SubscriptionProfessionalRule } from "@/service/settingsService";
 import { createAppointmentPayment } from "@/service/paymentService";
 import { createReview } from "@/service/reviewService";
 import { listServices, type Service } from "@/service/serviceService";
@@ -78,7 +78,7 @@ import { buildWhatsAppMessage, openWhatsApp, type WhatsAppMessageData } from "@/
 type StatusFilter = "all" | "active" | AppointmentStatus;
 
 interface BookingFormState {
-  barberId: string;
+  professionalId: string;
   date: string;
   time: string;
   serviceIds: string[];
@@ -86,7 +86,7 @@ interface BookingFormState {
 }
 
 const emptyForm: BookingFormState = {
-  barberId: "",
+  professionalId: "",
   date: dateToDateString(new Date()),
   time: "",
   serviceIds: [],
@@ -225,7 +225,7 @@ export function ClientBookingsPage() {
   const [form, setForm] = useState<BookingFormState>(emptyForm);
   const [userDependents, setUserDependents] = useState<Dependent[]>([]);
   const [bookingForDependent, setBookingForDependent] = useState<Dependent | null>(null);
-  const [barbers, setBarbers] = useState<Barber[]>([]);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
@@ -243,7 +243,7 @@ export function ClientBookingsPage() {
   } | null>(null);
 
   // Regra de profissional por assinatura
-  const [subscriptionBarberRule, setSubscriptionBarberRule] = useState<SubscriptionBarberRule>("fixed");
+  const [subscriptionProfessionalRule, setSubscriptionProfessionalRule] = useState<SubscriptionProfessionalRule>("fixed");
   const [hiddenPaymentMethods, setHiddenPaymentMethods] = useState<BookingPaymentMethod[]>([]);
 
   // Perfil da salão (para WhatsApp)
@@ -296,18 +296,18 @@ export function ClientBookingsPage() {
       try {
         const salonId = getStoredSalonId();
         const [b, s, profile] = await Promise.all([
-          listBarbers({ page: 1, limit: 100, salonId }),
+          listProfessionals({ page: 1, limit: 100, salonId }),
           listServices({ includeInactive: false, page: 1, limit: 100, salonId }),
           getSalonProfile(salonId),
         ]);
-        setBarbers(b.items);
+        setProfessionals(b.items);
         setServices(s.items.filter((sv) => sv.active));
         setSalonProfile(profile);
       } catch (err) { toast.error(getApiMessage(err)); }
 
       try {
         const settings = await getSettings();
-        setSubscriptionBarberRule(settings.subscriptionBarberRule ?? "fixed");
+        setSubscriptionProfessionalRule(settings.subscriptionProfessionalRule ?? "fixed");
         setHiddenPaymentMethods(settings.hiddenBookingPaymentMethods ?? []);
       } catch {
         // fallback para "fixed" se o endpoint não estiver acessível para o usuário
@@ -329,25 +329,25 @@ export function ClientBookingsPage() {
   const totalDuration = useMemo(() => selectedServices.reduce((sum, s) => sum + getServiceDuration(s), 0), [selectedServices]);
   const totalPrice = useMemo(() => selectedServices.reduce((sum, s) => sum + getServicePrice(s), 0), [selectedServices]);
 
-  const isFixedRule = subscriptionBarberRule === "fixed";
+  const isFixedRule = subscriptionProfessionalRule === "fixed";
   const hasActiveSubscription =
     mySubscription?.status === "active" || mySubscription?.status === "paused";
   const isBookingForDependentWithoutPlan = Boolean(bookingForDependent);
   const hasActiveSubscriptionForBooking =
     hasActiveSubscription && !isBookingForDependentWithoutPlan;
-  const lockedBarberId =
-    isFixedRule && hasActiveSubscriptionForBooking ? (mySubscription?.monthlyBarberId ?? null) : null;
-  const activeLockedBarberId = (lockedBarberId && barbers.some((b) => b.id === lockedBarberId)) ? lockedBarberId : null;
-  const hasLockedBarber = Boolean(activeLockedBarberId);
+  const lockedProfessionalId =
+    isFixedRule && hasActiveSubscriptionForBooking ? (mySubscription?.monthlyProfessionalId ?? null) : null;
+  const activeLockedProfessionalId = (lockedProfessionalId && professionals.some((b) => b.id === lockedProfessionalId)) ? lockedProfessionalId : null;
+  const hasLockedProfessional = Boolean(activeLockedProfessionalId);
   useEffect(() => {
-    if (!bookingOpen || !activeLockedBarberId) return;
+    if (!bookingOpen || !activeLockedProfessionalId) return;
 
     setForm((prev) => (
-      prev.barberId === activeLockedBarberId
+      prev.professionalId === activeLockedProfessionalId
         ? prev
-        : { ...prev, barberId: activeLockedBarberId, time: "" }
+        : { ...prev, professionalId: activeLockedProfessionalId, time: "" }
     ));
-  }, [activeLockedBarberId, bookingOpen]);
+  }, [activeLockedProfessionalId, bookingOpen]);
 
   const isServiceCoveredByPlan = useCallback(
     (s: Service) => {
@@ -371,21 +371,21 @@ export function ClientBookingsPage() {
   );
 
   useEffect(() => {
-    if (!bookingOpen || !form.barberId || !form.date || totalDuration <= 0) { setSlots([]); return; }
+    if (!bookingOpen || !form.professionalId || !form.date || totalDuration <= 0) { setSlots([]); return; }
     let active = true;
     setSlotsLoading(true);
-    getAvailableSlots({ barberId: form.barberId, date: form.date, duration: totalDuration })
+    getAvailableSlots({ professionalId: form.professionalId, date: form.date, duration: totalDuration })
       .then((s) => { if (active) setSlots(s); })
       .catch((err) => { if (active) toast.error(getApiMessage(err)); })
       .finally(() => { if (active) setSlotsLoading(false); });
     return () => { active = false; };
-  }, [bookingOpen, form.barberId, form.date, totalDuration]);
+  }, [bookingOpen, form.professionalId, form.date, totalDuration]);
 
   const filteredAppointments = useMemo(() => {
     const term = normalizeText(search.trim());
     if (!term) return appointments;
     return appointments.filter((a) => {
-      const haystack = normalizeText([a.barber?.displayName, ...a.services.map((s) => s.serviceName), a.notes].filter(Boolean).join(" "));
+      const haystack = normalizeText([a.professional?.displayName, ...a.services.map((s) => s.serviceName), a.notes].filter(Boolean).join(" "));
       return haystack.includes(term);
     });
   }, [appointments, search]);
@@ -420,7 +420,7 @@ export function ClientBookingsPage() {
   }
 
   function validateForm(): string | null {
-    if (!form.barberId) return "Selecione o profissional.";
+    if (!form.professionalId) return "Selecione o profissional.";
     if (!form.date) return "Selecione a data.";
     if (form.serviceIds.length === 0) return "Selecione pelo menos um servico.";
     if (!form.time) return "Selecione o horario.";
@@ -447,7 +447,7 @@ export function ClientBookingsPage() {
       const appt = await createAppointment({
         clientId: user.id,
         dependentId: bookingForDependent?.id || null,
-        barberId: form.barberId,
+        professionalId: form.professionalId,
         date: form.date,
         time: form.time,
         notes: form.notes.trim() || null,
@@ -471,7 +471,7 @@ export function ClientBookingsPage() {
       setWhatsAppData({
         clientName: bookingForDependent ? `${bookingForDependent.name} (Dependente de ${user?.name})` : (user?.name ?? ""),
         salonName: salonProfile?.name || "Salão",
-        barberName: barbers.find((b) => b.id === form.barberId)?.displayName ?? "",
+        professionalName: professionals.find((b) => b.id === form.professionalId)?.displayName ?? "",
         date: formatDateBR(form.date),
         time: form.time,
         services: selectedServices.map((s) => s.name),
@@ -503,7 +503,7 @@ export function ClientBookingsPage() {
       const appt = await createAppointment({
         clientId: user.id,
         dependentId: bookingForDependent?.id || null,
-        barberId: form.barberId,
+        professionalId: form.professionalId,
         date: form.date,
         time: form.time,
         notes: form.notes.trim() || null,
@@ -526,7 +526,7 @@ export function ClientBookingsPage() {
       setWhatsAppData({
         clientName: bookingForDependent ? `${bookingForDependent.name} (Dependente de ${user?.name})` : (user?.name ?? ""),
         salonName: salonProfile?.name || "Salão",
-        barberName: barbers.find((b) => b.id === form.barberId)?.displayName ?? "",
+        professionalName: professionals.find((b) => b.id === form.professionalId)?.displayName ?? "",
         date: formatDateBR(form.date),
         time: form.time,
         services: selectedServices.map((s) => s.name),
@@ -558,7 +558,7 @@ export function ClientBookingsPage() {
       const appt = await createAppointment({
         clientId: user.id,
         dependentId: bookingForDependent?.id || null,
-        barberId: form.barberId,
+        professionalId: form.professionalId,
         date: form.date,
         time: form.time,
         notes: form.notes.trim() || null,
@@ -581,7 +581,7 @@ export function ClientBookingsPage() {
         setWhatsAppData({
           clientName: bookingForDependent ? `${bookingForDependent.name} (Dependente de ${user?.name})` : (user?.name ?? ""),
           salonName: salonProfile?.name || "Salão",
-          barberName: barbers.find((b) => b.id === form.barberId)?.displayName ?? "",
+          professionalName: professionals.find((b) => b.id === form.professionalId)?.displayName ?? "",
           date: formatDateBR(form.date),
           time: form.time,
           services: selectedServices.map((s) => s.name),
@@ -627,7 +627,7 @@ export function ClientBookingsPage() {
     setWhatsAppData({
       clientName: user?.name ?? "",
       salonName: salonProfile?.name || "Salão",
-      barberName: barbers.find((b) => b.id === form.barberId)?.displayName ?? "",
+      professionalName: professionals.find((b) => b.id === form.professionalId)?.displayName ?? "",
       date: formatDateBR(form.date),
       time: form.time,
       services: selectedServices.map((s) => s.name),
@@ -680,7 +680,7 @@ export function ClientBookingsPage() {
   }
 
   const choiceSummary = {
-    barberName: barbers.find((b) => b.id === form.barberId)?.displayName ?? "—",
+    professionalName: professionals.find((b) => b.id === form.professionalId)?.displayName ?? "—",
     date: formatDateBR(form.date),
     time: form.time,
     serviceName: selectedServices.map((s) => s.name).join(", ") || "—",
@@ -741,7 +741,7 @@ export function ClientBookingsPage() {
                 </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button size="sm" className="gap-2" onClick={() => { setForm({ ...emptyForm, date: dateToDateString(new Date()), barberId: activeLockedBarberId ?? "" }); setBookingOpen(true); }}>
+            <Button size="sm" className="gap-2" onClick={() => { setForm({ ...emptyForm, date: dateToDateString(new Date()), professionalId: activeLockedProfessionalId ?? "" }); setBookingOpen(true); }}>
               <Plus size={14} /> Marcar Horario
             </Button>
           </div>
@@ -769,7 +769,7 @@ export function ClientBookingsPage() {
                   filteredAppointments.map((appt) => {
                     const start = formatDateTime(appt.startAt);
                     const serviceText = appt.services.map((s) => s.serviceName).join(", ") || "Sem servico";
-                    const barberName = appt.barber?.displayName || "Sem profissional";
+                    const professionalName = appt.professional?.displayName || "Sem profissional";
                     const canCancel = appt.status === "scheduled" || appt.status === "confirmed";
                     const canReview = appt.status === "completed";
 
@@ -797,8 +797,8 @@ export function ClientBookingsPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2 text-sm text-foreground">
-                            <Avatar className="h-7 w-7"><AvatarFallback className="bg-primary/10 text-xs text-primary">{getInitials(barberName)}</AvatarFallback></Avatar>
-                            {barberName}
+                            <Avatar className="h-7 w-7"><AvatarFallback className="bg-primary/10 text-xs text-primary">{getInitials(professionalName)}</AvatarFallback></Avatar>
+                            {professionalName}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-foreground">{formatCurrency(appt.totalAmount)}</td>
@@ -911,22 +911,22 @@ export function ClientBookingsPage() {
               <div className="space-y-2">
                 <Label>Profissional</Label>
                 <Select
-                  value={form.barberId}
-                  onValueChange={(v) => { setField("barberId", v); setField("time", ""); }}
-                  disabled={hasLockedBarber}
+                  value={form.professionalId}
+                  onValueChange={(v) => { setField("professionalId", v); setField("time", ""); }}
+                  disabled={hasLockedProfessional}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Selecionar profissional" />
                   </SelectTrigger>
                   <SelectContent>
-                    {barbers.map((b) => (
+                    {professionals.map((b) => (
                       <SelectItem key={b.id} value={b.id}>
                         {b.displayName}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {hasLockedBarber ? (
+                {hasLockedProfessional ? (
                   <p className="flex items-center gap-1.5 text-xs text-amber-600">
                     <Lock size={11} />
                     Profissional fixo do seu plano.
@@ -1000,11 +1000,11 @@ export function ClientBookingsPage() {
 
               <div className="space-y-2 md:col-span-2">
                 <Label>Horario</Label>
-                <Select value={form.time} onValueChange={(v) => setField("time", v)} disabled={!form.barberId || !form.date || totalDuration <= 0 || slotsLoading}>
+                <Select value={form.time} onValueChange={(v) => setField("time", v)} disabled={!form.professionalId || !form.date || totalDuration <= 0 || slotsLoading}>
                   <SelectTrigger className="w-full"><SelectValue placeholder={slotsLoading ? "Carregando horarios..." : "Selecionar horario"} /></SelectTrigger>
                   <SelectContent>{slots.map((slot) => <SelectItem key={slot} value={slot}>{slot}</SelectItem>)}</SelectContent>
                 </Select>
-                {!slotsLoading && totalDuration > 0 && slots.length === 0 && form.barberId && form.date ? (
+                {!slotsLoading && totalDuration > 0 && slots.length === 0 && form.professionalId && form.date ? (
                   <p className="text-xs text-muted-foreground">Nenhum horario disponivel. Tente outra data.</p>
                 ) : !slotsLoading && slots.length > 0 ? (
                   <p className="text-xs text-muted-foreground">{slots.length} horarios disponiveis para {totalDuration} min.</p>
@@ -1149,7 +1149,7 @@ export function ClientBookingsPage() {
 
           {whatsAppData && (
             <div className="space-y-1 rounded-md border border-border bg-secondary/40 p-4 text-sm">
-              <p><span className="font-medium">Profissional:</span> {whatsAppData.barberName}</p>
+              <p><span className="font-medium">Profissional:</span> {whatsAppData.professionalName}</p>
               <p><span className="font-medium">Data:</span> {whatsAppData.date}</p>
               <p><span className="font-medium">Horário:</span> {whatsAppData.time}</p>
               <p><span className="font-medium">Serviços:</span> {whatsAppData.services.join(", ")}</p>

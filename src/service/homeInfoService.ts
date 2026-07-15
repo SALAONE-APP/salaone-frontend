@@ -19,7 +19,7 @@ export interface HomeInfo {
   location_title?: string | null;
   location_address?: string | null;
   location_city?: string | null;
-  barber_payment_frequency?: string | null;
+  professional_payment_frequency?: string | null;
   employee_payment_frequency?: string | null;
 }
 

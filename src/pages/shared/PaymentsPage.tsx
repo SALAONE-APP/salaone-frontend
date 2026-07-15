@@ -228,7 +228,7 @@ export function PaymentsPage() {
           payment.user?.name,
           payment.user?.email,
           getPaymentDescription(payment),
-          payment.appointment?.barber?.displayName,
+          payment.appointment?.professional?.displayName,
           methodLabels[payment.method],
           statusLabels[payment.status],
         ]
@@ -488,8 +488,8 @@ export function PaymentsPage() {
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {typeLabels[payment.paymentType]}
-                            {payment.appointment?.barber?.displayName
-                              ? ` - ${payment.appointment.barber.displayName}`
+                            {payment.appointment?.professional?.displayName
+                              ? ` - ${payment.appointment.professional.displayName}`
                               : ""}
                           </p>
                         </div>

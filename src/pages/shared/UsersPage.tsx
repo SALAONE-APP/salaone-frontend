@@ -70,11 +70,11 @@ import {
   type UserProfile,
 } from "@/service/userService";
 import {
-  createBarber,
-  listBarbers,
-  updateBarber,
-  type Barber,
-} from "@/service/barberService";
+  createProfessional,
+  listProfessionals,
+  updateProfessional,
+  type Professional,
+} from "@/service/professionalService";
 import { listServices, type Service } from "@/service/serviceService";
 
 type UserRole = NonNullable<ListUsersParams["role"]>;
@@ -149,7 +149,7 @@ const emptyForm: UserFormState = {
   email: "",
   phone: "",
   cpf: "",
-  role: "barber",
+  role: "professional",
   password: "",
   resetPassword: false,
   photoUrl: null,
@@ -160,14 +160,14 @@ const emptyForm: UserFormState = {
 
 const roleLabels: Record<UserRole, string> = {
   admin: "Administrador",
-  barber: "Profissional",
+  professional: "Profissional",
   receptionist: "Recepcionista",
   client: "Cliente",
 };
 
 const roleClasses: Record<UserRole, string> = {
   admin: "bg-purple-500/10 text-purple-600 border-purple-500/20",
-  barber: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+  professional: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
   receptionist: "bg-amber-500/10 text-amber-600 border-amber-500/20",
   client: "bg-blue-500/10 text-blue-600 border-blue-500/20",
 };
@@ -281,7 +281,7 @@ function getApiMessage(error: unknown) {
 function roleFromUser(user: UserProfile): UserRole {
   if (
     user.role === "admin" ||
-    user.role === "barber" ||
+    user.role === "professional" ||
     user.role === "receptionist" ||
     user.role === "client"
   ) {
@@ -291,7 +291,7 @@ function roleFromUser(user: UserProfile): UserRole {
   return user.isAdmin ? "admin" : "client";
 }
 
-function userToForm(user: UserProfile, barber?: Barber | null): UserFormState {
+function userToForm(user: UserProfile, professional?: Professional | null): UserFormState {
   const role = roleFromUser(user);
 
   return {
@@ -299,13 +299,13 @@ function userToForm(user: UserProfile, barber?: Barber | null): UserFormState {
     email: user.email ?? "",
     phone: maskPhone(user.phone ?? ""),
     cpf: maskCpf(user.cpf ?? ""),
-    role: role === "client" ? "barber" : role,
+    role: role === "client" ? "professional" : role,
     password: "",
     resetPassword: false,
     photoUrl: user.photoUrl ?? null,
     salary: user.salary != null ? maskCurrency(String(Math.round(user.salary * 100))) : "",
-    commissionPercent: barber?.commissionPercent != null ? String(barber.commissionPercent) : "",
-    serviceIds: barber?.serviceIds ?? [],
+    commissionPercent: professional?.commissionPercent != null ? String(professional.commissionPercent) : "",
+    serviceIds: professional?.serviceIds ?? [],
   };
 }
 
@@ -331,7 +331,7 @@ export function UsersPage() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [services, setServices] = useState<Service[]>([]);
-  const [editingBarber, setEditingBarber] = useState<Barber | null>(null);
+  const [editingProfessional, setEditingProfessional] = useState<Professional | null>(null);
 
   const limit = 20;
 
@@ -367,10 +367,10 @@ export function UsersPage() {
 
   const stats = useMemo(() => {
     const admins = users.filter((user) => roleFromUser(user) === "admin").length;
-    const barbers = users.filter((user) => roleFromUser(user) === "barber").length;
+    const professionals = users.filter((user) => roleFromUser(user) === "professional").length;
     const receptionists = users.filter((user) => roleFromUser(user) === "receptionist").length;
 
-    return { admins, barbers, receptionists };
+    return { admins, professionals, receptionists };
   }, [users]);
 
 
@@ -386,7 +386,7 @@ export function UsersPage() {
 
   function openCreateDialog() {
     setEditingUser(null);
-    setEditingBarber(null);
+    setEditingProfessional(null);
     setForm({ ...emptyForm, password: "123456" });
     setDialogOpen(true);
     void listServices({ limit: 100 })
@@ -401,18 +401,18 @@ export function UsersPage() {
       .then((res) => setServices(res.items))
       .catch((err) => toast.error(getApiMessage(err)));
 
-    if (roleFromUser(user) === "barber") {
+    if (roleFromUser(user) === "professional") {
       try {
-        const res = await listBarbers({ limit: 200 });
-        const barber = res.items.find((b) => b.userId === user.id) ?? null;
-        setEditingBarber(barber);
-        setForm(userToForm(user, barber));
+        const res = await listProfessionals({ limit: 200 });
+        const professional = res.items.find((b) => b.userId === (user.platformUserId ?? user.id)) ?? null;
+        setEditingProfessional(professional);
+        setForm(userToForm(user, professional));
       } catch {
-        setEditingBarber(null);
+        setEditingProfessional(null);
         setForm(userToForm(user));
       }
     } else {
-      setEditingBarber(null);
+      setEditingProfessional(null);
       setForm(userToForm(user));
     }
   }
@@ -514,16 +514,16 @@ export function UsersPage() {
           newPassword: form.resetPassword ? form.password.trim() : undefined,
         });
 
-        if (form.role === "barber") {
-          const barberData = {
+        if (form.role === "professional") {
+          const professionalData = {
             displayName: form.name.trim(),
             commissionPercent: commissionValue,
             serviceIds: form.serviceIds,
           };
-          if (editingBarber) {
-            await updateBarber(editingBarber.id, barberData);
+          if (editingProfessional) {
+            await updateProfessional(editingProfessional.id, professionalData);
           } else {
-            await createBarber({ ...barberData, userId: editingUser.id });
+            await createProfessional({ ...professionalData, userId: editingUser.platformUserId ?? editingUser.id });
           }
         }
 
@@ -534,12 +534,12 @@ export function UsersPage() {
           password: form.password.trim(),
         });
 
-        if (form.role === "barber" && created?.id) {
-          await createBarber({
+        if (form.role === "professional" && created?.id) {
+          await createProfessional({
             displayName: form.name.trim(),
             commissionPercent: commissionValue,
             serviceIds: form.serviceIds,
-            userId: created.id,
+            userId: created.platformUserId ?? created.id,
           });
         }
 
@@ -605,7 +605,7 @@ export function UsersPage() {
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="mb-1 text-sm text-muted-foreground">Profissionais nesta pagina</p>
-          <h3 className="text-2xl font-semibold text-foreground">{stats.barbers}</h3>
+          <h3 className="text-2xl font-semibold text-foreground">{stats.professionals}</h3>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="mb-1 text-sm text-muted-foreground">Admins nesta pagina</p>
@@ -653,7 +653,7 @@ export function UsersPage() {
                 >
                   <DropdownMenuRadioItem value="all">Todos</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="admin">Administradores</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="barber">Profissionais</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="professional">Profissionais</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="receptionist">
                     Recepcionistas
                   </DropdownMenuRadioItem>
@@ -958,7 +958,7 @@ export function UsersPage() {
                         <UserCog size={14} />
                         Administrador
                       </SelectItem>
-                      <SelectItem value="barber">Profissional</SelectItem>
+                      <SelectItem value="professional">Profissional</SelectItem>
                       <SelectItem value="receptionist">Recepcionista</SelectItem>
                     </SelectContent>
                   </Select>
@@ -1025,7 +1025,7 @@ export function UsersPage() {
               </div>
 
               {/* Seção exclusiva para profissionais */}
-              {form.role === "barber" && (
+              {form.role === "professional" && (
                 <div className="space-y-4 rounded-xl border border-border bg-secondary/30 p-4">
                   <h4 className="text-sm font-semibold text-foreground">Configurações do profissional</h4>
 

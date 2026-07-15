@@ -34,10 +34,10 @@ interface RegForm {
   adminPhone: string;
   password: string;
   confirmPassword: string;
-  subscriptionBarberRule: SubscriptionBarberRule;
+  subscriptionProfessionalRule: SubscriptionProfessionalRule;
 }
 
-type SubscriptionBarberRule = "fixed" | "free_choice";
+type SubscriptionProfessionalRule = "fixed" | "free_choice";
 
 interface CardForm {
   number: string;
@@ -76,7 +76,7 @@ async function apiRegister(form: RegForm, planId: string): Promise<RegisterResul
     adminPhone: form.adminPhone || null,
     password: form.password,
     selectedPlan: planId,
-    subscriptionBarberRule: form.subscriptionBarberRule,
+    subscriptionProfessionalRule: form.subscriptionProfessionalRule,
   });
   localStorage.setItem("token", data.token);
   localStorage.setItem("refreshToken", data.refreshToken);
@@ -247,7 +247,7 @@ function RegisterModal({ plan, onClose, onRegistered }: {
     adminPhone: "",
     password: "",
     confirmPassword: "",
-    subscriptionBarberRule: "fixed",
+    subscriptionProfessionalRule: "fixed",
   };
   const [form, setForm] = useState<RegForm>(empty);
   const [formError, setFormError] = useState("");
@@ -340,14 +340,14 @@ function RegisterModal({ plan, onClose, onRegistered }: {
           <div>
             <h4 className="text-white font-semibold text-sm mb-3 pb-2 border-b border-neutral-800">Regra de Profissional para Assinantes</h4>
             <div className="grid gap-3 md:grid-cols-2">
-              <label className={`block cursor-pointer rounded-xl border p-4 transition-colors ${form.subscriptionBarberRule === "fixed" ? "border-primary bg-primary/10" : "border-neutral-800 bg-neutral-900/50 hover:border-neutral-700"}`}>
+              <label className={`block cursor-pointer rounded-xl border p-4 transition-colors ${form.subscriptionProfessionalRule === "fixed" ? "border-primary bg-primary/10" : "border-neutral-800 bg-neutral-900/50 hover:border-neutral-700"}`}>
                 <input
                   type="radio"
-                  name="subscriptionBarberRule"
+                  name="subscriptionProfessionalRule"
                   value="fixed"
                   className="sr-only"
-                  checked={form.subscriptionBarberRule === "fixed"}
-                  onChange={() => set("subscriptionBarberRule", "fixed")}
+                  checked={form.subscriptionProfessionalRule === "fixed"}
+                  onChange={() => set("subscriptionProfessionalRule", "fixed")}
                   disabled={submitting}
                 />
                 <span className="block text-sm font-semibold text-white">Profissional fixo</span>
@@ -355,14 +355,14 @@ function RegisterModal({ plan, onClose, onRegistered }: {
                   Cliente com plano fica vinculado ao profissional escolhido no primeiro agendamento e troca apenas na renovacao mensal ou apos 30 dias.
                 </span>
               </label>
-              <label className={`block cursor-pointer rounded-xl border p-4 transition-colors ${form.subscriptionBarberRule === "free_choice" ? "border-primary bg-primary/10" : "border-neutral-800 bg-neutral-900/50 hover:border-neutral-700"}`}>
+              <label className={`block cursor-pointer rounded-xl border p-4 transition-colors ${form.subscriptionProfessionalRule === "free_choice" ? "border-primary bg-primary/10" : "border-neutral-800 bg-neutral-900/50 hover:border-neutral-700"}`}>
                 <input
                   type="radio"
-                  name="subscriptionBarberRule"
+                  name="subscriptionProfessionalRule"
                   value="free_choice"
                   className="sr-only"
-                  checked={form.subscriptionBarberRule === "free_choice"}
-                  onChange={() => set("subscriptionBarberRule", "free_choice")}
+                  checked={form.subscriptionProfessionalRule === "free_choice"}
+                  onChange={() => set("subscriptionProfessionalRule", "free_choice")}
                   disabled={submitting}
                 />
                 <span className="block text-sm font-semibold text-white">Livre escolha</span>

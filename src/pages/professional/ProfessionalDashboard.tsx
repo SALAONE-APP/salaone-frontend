@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { StatCard } from "@/components/StatCard";
 import { Badge } from "@/components/ui/badge";
 import { listAppointments, type Appointment } from "@/service/appointmentService";
-import { useMyBarber } from "@/hooks/useMyBarber";
+import { useMyProfessional } from "@/hooks/useMyProfessional";
 import { useAuth } from "../../hooks/useAuth";
 
 function dateToDateString(date: Date): string {
@@ -80,21 +80,21 @@ const shortcuts = [
   },
 ];
 
-export function BarberDashboard() {
+export function ProfessionalDashboard() {
   const { user } = useAuth();
-  const { barber, loading: barberLoading } = useMyBarber();
+  const { professional, loading: professionalLoading } = useMyProfessional();
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
   const [weekAppointments, setWeekAppointments] = useState<Appointment[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
 
-  const loadData = useCallback(async (barberId: string) => {
+  const loadData = useCallback(async (professionalId: string) => {
     const today = dateToDateString(new Date());
     const week = getWeekRange();
     setDataLoading(true);
     try {
       const [todayResult, weekResult] = await Promise.all([
-        listAppointments({ barberId, dateFrom: today, dateTo: today, allAppointments: true, limit: 100 }),
-        listAppointments({ barberId, dateFrom: week.start, dateTo: week.end, allAppointments: true, limit: 100 }),
+        listAppointments({ professionalId, dateFrom: today, dateTo: today, allAppointments: true, limit: 100 }),
+        listAppointments({ professionalId, dateFrom: week.start, dateTo: week.end, allAppointments: true, limit: 100 }),
       ]);
       setTodayAppointments(todayResult.items);
       setWeekAppointments(weekResult.items);
@@ -106,10 +106,10 @@ export function BarberDashboard() {
   }, []);
 
   useEffect(() => {
-    if (barber?.id) {
-      void loadData(barber.id);
+    if (professional?.id) {
+      void loadData(professional.id);
     }
-  }, [barber, loadData]);
+  }, [professional, loadData]);
 
   const stats = useMemo(() => {
     const activeToday = todayAppointments.filter(
@@ -137,8 +137,8 @@ export function BarberDashboard() {
       .slice(0, 5);
   }, [todayAppointments]);
 
-  const isLoading = barberLoading || dataLoading;
-  const displayName = barber?.displayName || user?.name?.trim() || "Usuario";
+  const isLoading = professionalLoading || dataLoading;
+  const displayName = professional?.displayName || user?.name?.trim() || "Usuario";
 
   return (
     <div className="space-y-6">

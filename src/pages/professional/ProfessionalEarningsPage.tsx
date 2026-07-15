@@ -12,7 +12,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useMyBarber } from "@/hooks/useMyBarber";
+import { useMyProfessional } from "@/hooks/useMyProfessional";
 import { listAppointments, type Appointment } from "@/service/appointmentService";
 import {
   getMyPayrollSummary,
@@ -193,7 +193,7 @@ interface EarningsStats {
 
 /* ─── component ─── */
 
-export function BarberEarningsPage() {
+export function ProfessionalEarningsPage() {
   const [frequency, setFrequency] = useState<PaymentFrequency>("monthly");
   const [periodStart, setPeriodStart] = useState<Date>(() => {
     const now = new Date();
@@ -203,7 +203,7 @@ export function BarberEarningsPage() {
   const [row, setRow] = useState<EmployeePayrollRow | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const { barber, loading: barberLoading } = useMyBarber();
+  const { professional, loading: professionalLoading } = useMyProfessional();
 
   const periodEnd = getPeriodEnd(periodStart, frequency);
   const periodStartStr = dateToStr(periodStart);
@@ -212,7 +212,7 @@ export function BarberEarningsPage() {
   useEffect(() => {
     getHomeInfo()
       .then((homeInfo) => {
-        const freq = normalizeFrequency(homeInfo.barber_payment_frequency);
+        const freq = normalizeFrequency(homeInfo.professional_payment_frequency);
         setFrequency(freq);
         setPeriodStart(getInitialPeriodStart(freq));
       })
@@ -220,12 +220,12 @@ export function BarberEarningsPage() {
   }, []);
 
   const load = useCallback(async () => {
-    if (!barber) return;
+    if (!professional) return;
     setLoading(true);
     try {
       const [appointmentsRes, summaryRes] = await Promise.all([
         listAppointments({
-          barberId: barber.id,
+          professionalId: professional.id,
           dateFrom: periodStartStr,
           dateTo: periodEndStr,
           allAppointments: true,
@@ -240,7 +240,7 @@ export function BarberEarningsPage() {
     } finally {
       setLoading(false);
     }
-  }, [barber, periodStartStr, periodEndStr]);
+  }, [professional, periodStartStr, periodEndStr]);
 
   useEffect(() => {
     void load();
@@ -311,7 +311,7 @@ export function BarberEarningsPage() {
     const shopEarnings = roundMoney(
       row ? Number(row.salonShare || 0) : Math.max(earnedRevenue - earnedCommission, 0)
     );
-    const commissionPercent = barber?.commissionPercent ?? 50;
+    const commissionPercent = professional?.commissionPercent ?? 50;
     const hasSubscriptionPool = Number(row?.subscriptionPoolCommission || 0) > 0;
     const commissionLabel = hasSubscriptionPool
       ? `Seus Ganhos (${Number(row?.subscriptionParticipationPercent || 0).toFixed(2)}% do pote)`
@@ -341,7 +341,7 @@ export function BarberEarningsPage() {
       payrollPaymentsTotal,
       totalReceivedPayments,
     };
-  }, [appointments, row, barber]);
+  }, [appointments, row, professional]);
 
   const hasData =
     stats.appointmentsCount > 0 ||
@@ -349,7 +349,7 @@ export function BarberEarningsPage() {
     stats.extraPayments.length > 0 ||
     stats.payrollPayments.length > 0;
 
-  const isPageLoading = barberLoading || loading;
+  const isPageLoading = professionalLoading || loading;
 
   return (
     <div className="space-y-6">
@@ -431,10 +431,10 @@ export function BarberEarningsPage() {
           {/* Card de estatísticas do profissional */}
           <div className="overflow-hidden rounded-xl border border-border bg-card">
             <div className="flex items-center gap-4 border-b border-border px-5 py-4">
-              {barber?.photoUrl ? (
+              {professional?.photoUrl ? (
                 <img
-                  src={barber.photoUrl}
-                  alt={barber.displayName}
+                  src={professional.photoUrl}
+                  alt={professional.displayName}
                   className="h-12 w-12 rounded-full object-cover"
                 />
               ) : (
@@ -443,9 +443,9 @@ export function BarberEarningsPage() {
                 </div>
               )}
               <div>
-                <p className="font-semibold text-foreground">{barber?.displayName}</p>
+                <p className="font-semibold text-foreground">{professional?.displayName}</p>
                 <p className="text-sm text-muted-foreground">
-                  {barber?.specialty ?? "Profissional"}
+                  {professional?.specialty ?? "Profissional"}
                 </p>
               </div>
             </div>

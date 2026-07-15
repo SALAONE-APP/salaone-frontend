@@ -29,6 +29,20 @@
   h3 { @apply text-2xl font-semibold leading-snug; }
   h4 { @apply text-xl font-semibold leading-snug; }
   input, textarea, select { @apply rounded-lg; }
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='button']):not([type='submit']):not([type='reset']),
+  textarea,
+  select {
+    background-color: #fff !important;
+  }
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 1000px #fff inset !important;
+    -webkit-text-fill-color: hsl(var(--foreground)) !important;
+    caret-color: hsl(var(--foreground));
+  }
   input:focus-visible, textarea:focus-visible, select:focus-visible { box-shadow: 0 0 0 3px rgb(123 44 191 / 0.14); }
 }
 

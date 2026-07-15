@@ -356,8 +356,8 @@ export interface PlatformPlan {
   paymentMethods?: string[];
   payment_methods?: string[];
   features?: string[];
-  maxBarbers?: number | null;
-  max_barbers?: number | null;
+  maxProfessionals?: number | null;
+  max_professionals?: number | null;
   maxAdmins?: number | null;
   max_admins?: number | null;
   maxReceptionists?: number | null;
@@ -393,7 +393,7 @@ export async function createPlatformPlan(payload: {
   statementDescriptor?: string;
   paymentMethods?: string[];
   features?: string[];
-  maxBarbers?: number | null;
+  maxProfessionals?: number | null;
   maxAdmins?: number | null;
   maxReceptionists?: number | null;
   isPublic?: boolean;
@@ -415,7 +415,7 @@ export async function updatePlatformPlan(
     isPublic: boolean;
     isRecommended: boolean;
     sortOrder: number;
-    maxBarbers: number | null;
+    maxProfessionals: number | null;
     maxAdmins: number | null;
     maxReceptionists: number | null;
     statementDescriptor: string;

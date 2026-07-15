@@ -6,7 +6,7 @@ import type { SalonProfile } from "@/service/salonProfileService";
 export interface WhatsAppMessageData {
   clientName: string;
   salonName: string;
-  barberName: string;
+  professionalName: string;
   date: string;
   time: string;
   services: string[];
@@ -66,7 +66,7 @@ export function buildWhatsAppMessage(data: WhatsAppMessageData): string {
     `Seu agendamento foi confirmado com sucesso.`,
     ``,
     `*Salão:* ${data.salonName}`,
-    `*Profissional:* ${data.barberName}`,
+    `*Profissional:* ${data.professionalName}`,
     `*Data:* ${data.date}`,
     `*Horario:* ${data.time}`,
     `*Servicos:*`,
@@ -139,7 +139,7 @@ function buildConfirmationMessage(
     "Cliente";
   const { date, time } = formatDateTimeBR(appointment.startAt);
   const services = appointment.services.map((s) => s.serviceName).join(" e ");
-  const barberName = appointment.barber?.displayName ?? "Profissional";
+  const professionalName = appointment.professional?.displayName ?? "Profissional";
 
   return [
     `Ola ${clientName}!`,
@@ -149,7 +149,7 @@ function buildConfirmationMessage(
     ` Data: ${date}`,
     ` Horario: ${time}`,
     ` Servico: ${services}`,
-    ` Profissional: ${barberName}`,
+    ` Profissional: ${professionalName}`,
     ...(appointment.notes?.trim() ? [``, ` Observacao: ${appointment.notes.trim()}`] : []),
     ...(salon?.googleMapsUrl?.trim()
       ? [``, ` Localizacao: ${salon.googleMapsUrl.trim()}`]

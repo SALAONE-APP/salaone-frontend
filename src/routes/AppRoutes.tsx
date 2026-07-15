@@ -8,12 +8,12 @@ import type { UserRole } from "../config/profileConfig";
 import { useAuth } from "../hooks/useAuth";
 import { usePermissions } from "../hooks/usePermissions";
 import { AdminLayout } from "../layouts/AdminLayout";
-import { BarberLayout } from "../layouts/BarberLayout";
+import { ProfessionalLayout } from "../layouts/ProfessionalLayout";
 import { ClientLayout } from "../layouts/ClientLayout";
 import { ReceptionistLayout } from "../layouts/ReceptionistLayout";
 import { SuperAdminLayout } from "../layouts/SuperAdminLayout";
 import { adminRoutes } from "./admin.routes";
-import { barberRoutes } from "./barber.routes";
+import { professionalRoutes } from "./professional.routes";
 import { clientRoutes } from "./client.routes";
 import { LogoutRoute } from "./LogoutRoute";
 import { PrivateRoute } from "./PrivateRoute";
@@ -36,9 +36,9 @@ const routeGroups: Record<UserRole, RouteGroup> = {
     headerActionLabel: "Marcar horario",
     headerActionHref: "/bookings",
   },
-  barber: {
-    Layout: BarberLayout,
-    routes: barberRoutes,
+  professional: {
+    Layout: ProfessionalLayout,
+    routes: professionalRoutes,
     headerActionLabel: "Abrir agenda",
     headerActionHref: "/schedules",
   },

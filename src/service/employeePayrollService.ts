@@ -1,12 +1,12 @@
 import api from "./api";
 
 export type EmployeePaymentStatus = "pending" | "partial" | "paid" | "empty";
-export type CommissionRuleType = "FIXED_BARBER" | "FREE_BARBER";
+export type CommissionRuleType = "FIXED_PROFESSIONAL" | "FREE_PROFESSIONAL";
 
 export interface SubscriptionCommissionDistribution {
   employeeId: string;
-  barberId?: string | null;
-  barberName?: string | null;
+  professionalId?: string | null;
+  professionalName?: string | null;
   appointments: number;
   points: number;
   participationPercent: number;

@@ -2,15 +2,15 @@ import api from "./api";
 
 export type BookingPaymentMethod = "cartao" | "pix" | "local";
 export type PaymentFrequency = "weekly" | "biweekly" | "monthly";
-export type SubscriptionBarberRule = "fixed" | "free_choice";
-export type CommissionRuleType = "FIXED_BARBER" | "FREE_BARBER";
+export type SubscriptionProfessionalRule = "fixed" | "free_choice";
+export type CommissionRuleType = "FIXED_PROFESSIONAL" | "FREE_PROFESSIONAL";
 
 export interface Settings {
   pixKey: string;
   termsDocumentUrl: string;
   termsDocumentName: string;
   hiddenBookingPaymentMethods: BookingPaymentMethod[];
-  subscriptionBarberRule: SubscriptionBarberRule;
+  subscriptionProfessionalRule: SubscriptionProfessionalRule;
   commissionRuleType: CommissionRuleType;
   commission_rule_type?: CommissionRuleType;
   commissionPoolPercent?: number;
@@ -22,19 +22,19 @@ export interface UpdateSettingsPayload {
   termsDocumentUrl?: string;
   termsDocumentName?: string;
   hiddenBookingPaymentMethods: BookingPaymentMethod[];
-  subscriptionBarberRule?: SubscriptionBarberRule;
+  subscriptionProfessionalRule?: SubscriptionProfessionalRule;
   commissionPoolPercent?: number;
 }
 
 interface HomeInfoSettingsResponse {
-  barber_payment_frequency?: PaymentFrequency | null;
+  professional_payment_frequency?: PaymentFrequency | null;
   employee_payment_frequency?: PaymentFrequency | null;
-  barberPaymentFrequency?: PaymentFrequency | null;
+  professionalPaymentFrequency?: PaymentFrequency | null;
   employeePaymentFrequency?: PaymentFrequency | null;
 }
 
 export interface PaymentFrequencySettings {
-  barberPaymentFrequency: PaymentFrequency;
+  professionalPaymentFrequency: PaymentFrequency;
   employeePaymentFrequency: PaymentFrequency;
 }
 
@@ -49,7 +49,7 @@ export async function updateSettings(data: UpdateSettingsPayload) {
     termsDocumentUrl: data.termsDocumentUrl ?? "",
     termsDocumentName: data.termsDocumentName ?? "",
     hiddenBookingPaymentMethods: data.hiddenBookingPaymentMethods,
-    subscriptionBarberRule: data.subscriptionBarberRule ?? "fixed",
+    subscriptionProfessionalRule: data.subscriptionProfessionalRule ?? "fixed",
     commissionPoolPercent: data.commissionPoolPercent,
   });
 
@@ -64,8 +64,8 @@ function mapPaymentFrequencySettings(
   data: HomeInfoSettingsResponse
 ): PaymentFrequencySettings {
   return {
-    barberPaymentFrequency: normalizePaymentFrequency(
-      data.barberPaymentFrequency ?? data.barber_payment_frequency
+    professionalPaymentFrequency: normalizePaymentFrequency(
+      data.professionalPaymentFrequency ?? data.professional_payment_frequency
     ),
     employeePaymentFrequency: normalizePaymentFrequency(
       data.employeePaymentFrequency ?? data.employee_payment_frequency
@@ -82,7 +82,7 @@ export async function updatePaymentFrequencySettings(
   data: PaymentFrequencySettings
 ) {
   const response = await api.put<HomeInfoSettingsResponse>("/home-info", {
-    barberPaymentFrequency: data.barberPaymentFrequency,
+    professionalPaymentFrequency: data.professionalPaymentFrequency,
     employeePaymentFrequency: data.employeePaymentFrequency,
   });
 

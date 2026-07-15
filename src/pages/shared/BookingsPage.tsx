@@ -60,7 +60,7 @@ import {
   type Appointment,
   type AppointmentStatus,
 } from "@/service/appointmentService";
-import { listBarbers, type Barber } from "@/service/barberService";
+import { listProfessionals, type Professional } from "@/service/professionalService";
 import { listBlockedDates, type BlockedDate } from "@/service/blockedDateService";
 import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
 import { listServices, type Service } from "@/service/serviceService";
@@ -73,7 +73,7 @@ type StatusFilter = "all" | "active" | AppointmentStatus;
 
 interface BookingFormState {
   clientId: string;
-  barberId: string;
+  professionalId: string;
   date: string;
   time: string;
   serviceIds: string[];
@@ -83,7 +83,7 @@ interface BookingFormState {
 
 const emptyForm: BookingFormState = {
   clientId: "",
-  barberId: "",
+  professionalId: "",
   date: dateToDateString(new Date()),
   time: "",
   serviceIds: [],
@@ -205,13 +205,13 @@ export function BookingsPage() {
   const [selectedClientName, setSelectedClientName] = useState("");
   const [bookForSelf, setBookForSelf] = useState(false);
   const [form, setForm] = useState<BookingFormState>(emptyForm);
-  const [barbers, setBarbers] = useState<Barber[]>([]);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [appointmentToTransfer, setAppointmentToTransfer] = useState<Appointment | null>(null);
-  const [transferBarberId, setTransferBarberId] = useState("");
+  const [transferProfessionalId, setTransferProfessionalId] = useState("");
   const [transferSaving, setTransferSaving] = useState(false);
   const [blockedDateWarning, setBlockedDateWarning] = useState<BlockedDate | null>(null);
   const [salonProfile, setSalonProfile] = useState<SalonProfile | null>(null);
@@ -264,12 +264,12 @@ export function BookingsPage() {
 
     async function loadFormOptions() {
       try {
-        const [barbersResult, servicesResult] = await Promise.all([
-          listBarbers({ page: 1, limit: 100 }),
+        const [professionalsResult, servicesResult] = await Promise.all([
+          listProfessionals({ page: 1, limit: 100 }),
           listServices({ includeInactive: false, page: 1, limit: 100 }),
         ]);
 
-        setBarbers(barbersResult.items);
+        setProfessionals(professionalsResult.items);
         setServices(servicesResult.items.filter((service) => service.active));
       } catch (err) {
         toast.error(getApiMessage(err));
@@ -281,8 +281,8 @@ export function BookingsPage() {
 
   useEffect(() => {
     if (!transferDialogOpen) return;
-    listBarbers({ page: 1, limit: 100 })
-      .then((result) => setBarbers(result.items))
+    listProfessionals({ page: 1, limit: 100 })
+      .then((result) => setProfessionals(result.items))
       .catch((err) => toast.error(getApiMessage(err)));
   }, [transferDialogOpen]);
 
@@ -297,7 +297,7 @@ export function BookingsPage() {
   );
 
   useEffect(() => {
-    if (!dialogOpen || !form.barberId || !form.date || totalDuration <= 0 || form.allowOutsideBusinessHours) {
+    if (!dialogOpen || !form.professionalId || !form.date || totalDuration <= 0 || form.allowOutsideBusinessHours) {
       setSlots([]);
       return;
     }
@@ -306,7 +306,7 @@ export function BookingsPage() {
     setSlotsLoading(true);
 
     getAvailableSlots({
-      barberId: form.barberId,
+      professionalId: form.professionalId,
       date: form.date,
       duration: totalDuration,
     })
@@ -323,26 +323,26 @@ export function BookingsPage() {
     return () => {
       active = false;
     };
-  }, [dialogOpen, form.allowOutsideBusinessHours, form.barberId, form.date, totalDuration]);
+  }, [dialogOpen, form.allowOutsideBusinessHours, form.professionalId, form.date, totalDuration]);
 
   // Verifica se a data/profissional selecionado tem bloqueio
   useEffect(() => {
-    if (!dialogOpen || !form.date || !form.barberId) {
+    if (!dialogOpen || !form.date || !form.professionalId) {
       setBlockedDateWarning(null);
       return;
     }
 
-    listBlockedDates({ dateFrom: form.date, dateTo: form.date, barberId: form.barberId })
+    listBlockedDates({ dateFrom: form.date, dateTo: form.date, professionalId: form.professionalId })
       .then((items) => {
         const block = items.find((b) => {
-          if (!b.barberId && !form.barberId) return true;
-          if (!b.barberId) return true; // salão inteira
-          return b.barberId === form.barberId;
+          if (!b.professionalId && !form.professionalId) return true;
+          if (!b.professionalId) return true; // salão inteira
+          return b.professionalId === form.professionalId;
         });
         setBlockedDateWarning(block ?? null);
       })
       .catch(() => setBlockedDateWarning(null));
-  }, [dialogOpen, form.date, form.barberId]);
+  }, [dialogOpen, form.date, form.professionalId]);
 
   const filteredAppointments = useMemo(() => {
     const term = normalizeText(search.trim());
@@ -356,7 +356,7 @@ export function BookingsPage() {
       const haystack = normalizeText(
         [
           appointment.client?.name,
-          appointment.barber?.displayName,
+          appointment.professional?.displayName,
           serviceNames,
           appointment.notes,
         ]
@@ -415,7 +415,7 @@ export function BookingsPage() {
 
   function validateForm() {
     if (!form.clientId) return "Selecione o cliente.";
-    if (!form.barberId) return "Selecione o profissional.";
+    if (!form.professionalId) return "Selecione o profissional.";
     if (!form.date) return "Selecione a data.";
     if (!form.time) return "Selecione ou informe o horario.";
     if (form.serviceIds.length === 0) return "Selecione pelo menos um servico.";
@@ -438,7 +438,7 @@ export function BookingsPage() {
     try {
       await createAppointment({
         clientId: form.clientId,
-        barberId: form.barberId,
+        professionalId: form.professionalId,
         date: form.date,
         time: form.time,
         notes: form.notes.trim() || null,
@@ -527,21 +527,21 @@ export function BookingsPage() {
 
   function openTransferDialog(appointment: Appointment) {
     setAppointmentToTransfer(appointment);
-    setTransferBarberId(appointment.barber?.id ?? "");
+    setTransferProfessionalId(appointment.professional?.id ?? "");
     setTransferDialogOpen(true);
   }
 
   async function handleTransfer() {
-    if (!appointmentToTransfer || !transferBarberId) return;
-    if (transferBarberId === appointmentToTransfer.barber?.id) {
+    if (!appointmentToTransfer || !transferProfessionalId) return;
+    if (transferProfessionalId === appointmentToTransfer.professional?.id) {
       toast.error("Selecione um profissional diferente do atual.");
       return;
     }
     setTransferSaving(true);
     try {
-      await updateAppointment(appointmentToTransfer.id, { barberId: transferBarberId });
-      const newBarberName = barbers.find((b) => b.id === transferBarberId)?.displayName ?? "novo profissional";
-      toast.success(`Agendamento transferido para ${newBarberName}!`);
+      await updateAppointment(appointmentToTransfer.id, { professionalId: transferProfessionalId });
+      const newProfessionalName = professionals.find((b) => b.id === transferProfessionalId)?.displayName ?? "novo profissional";
+      toast.success(`Agendamento transferido para ${newProfessionalName}!`);
       setTransferDialogOpen(false);
       await loadAppointments();
     } catch (err) {
@@ -706,7 +706,7 @@ export function BookingsPage() {
                       appointment.services.map((service) => service.serviceName).join(", ") ||
                       "Sem servico";
                     const clientName = appointment.dependent?.name || appointment.client?.name || "Cliente";
-                    const barberName = appointment.barber?.displayName || "Sem profissional";
+                    const professionalName = appointment.professional?.displayName || "Sem profissional";
 
                     return (
                       <tr
@@ -759,7 +759,7 @@ export function BookingsPage() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2 text-sm text-foreground">
                             <User size={14} className="text-muted-foreground" />
-                            {barberName}
+                            {professionalName}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-foreground">
@@ -897,21 +897,21 @@ export function BookingsPage() {
               <p className="text-sm text-muted-foreground">
                 Profissional atual:{" "}
                 <span className="font-medium text-foreground">
-                  {appointmentToTransfer?.barber?.displayName || "—"}
+                  {appointmentToTransfer?.professional?.displayName || "—"}
                 </span>
               </p>
             </div>
 
             <div className="space-y-2">
               <Label>Novo profissional</Label>
-              <Select value={transferBarberId} onValueChange={setTransferBarberId}>
+              <Select value={transferProfessionalId} onValueChange={setTransferProfessionalId}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecionar profissional" />
                 </SelectTrigger>
                 <SelectContent>
-                  {barbers.map((barber) => (
-                    <SelectItem key={barber.id} value={barber.id}>
-                      {barber.displayName}
+                  {professionals.map((professional) => (
+                    <SelectItem key={professional.id} value={professional.id}>
+                      {professional.displayName}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -933,8 +933,8 @@ export function BookingsPage() {
               onClick={handleTransfer}
               disabled={
                 transferSaving ||
-                !transferBarberId ||
-                transferBarberId === appointmentToTransfer?.barber?.id
+                !transferProfessionalId ||
+                transferProfessionalId === appointmentToTransfer?.professional?.id
               }
             >
               {transferSaving ? (
@@ -1007,9 +1007,9 @@ export function BookingsPage() {
               <div className="space-y-2">
                 <Label>Profissional</Label>
                 <Select
-                  value={form.barberId}
+                  value={form.professionalId}
                   onValueChange={(value) => {
-                    setField("barberId", value);
+                    setField("professionalId", value);
                     setField("time", "");
                   }}
                 >
@@ -1017,9 +1017,9 @@ export function BookingsPage() {
                     <SelectValue placeholder="Selecionar profissional" />
                   </SelectTrigger>
                   <SelectContent>
-                    {barbers.map((barber) => (
-                      <SelectItem key={barber.id} value={barber.id}>
-                        {barber.displayName}
+                    {professionals.map((professional) => (
+                      <SelectItem key={professional.id} value={professional.id}>
+                        {professional.displayName}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1053,7 +1053,7 @@ export function BookingsPage() {
                   <Select
                     value={form.time}
                     onValueChange={(value) => setField("time", value)}
-                    disabled={!form.barberId || !form.date || totalDuration <= 0 || slotsLoading}
+                    disabled={!form.professionalId || !form.date || totalDuration <= 0 || slotsLoading}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue
@@ -1118,8 +1118,8 @@ export function BookingsPage() {
                 <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive md:col-span-2">
                   <strong>Data bloqueada:</strong>{" "}
                   {blockedDateWarning.startTime && blockedDateWarning.endTime
-                    ? `${blockedDateWarning.barberId ? "Profissional bloqueado" : "Salão bloqueada"} das ${blockedDateWarning.startTime} às ${blockedDateWarning.endTime}`
-                    : blockedDateWarning.barberId
+                    ? `${blockedDateWarning.professionalId ? "Profissional bloqueado" : "Salão bloqueada"} das ${blockedDateWarning.startTime} às ${blockedDateWarning.endTime}`
+                    : blockedDateWarning.professionalId
                       ? "O profissional está indisponível neste dia"
                       : "A salão está fechada neste dia"}
                   {blockedDateWarning.reason ? ` — ${blockedDateWarning.reason}` : ""}

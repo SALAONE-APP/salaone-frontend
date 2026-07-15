@@ -119,7 +119,7 @@ export function SuperAdminUsersPage() {
           <option value="">Todos os papeis</option>
           <option value="super_admin">Super Admin</option>
           <option value="admin">Admin</option>
-          <option value="barber">Profissional</option>
+          <option value="professional">Profissional</option>
           <option value="receptionist">Recepcionista</option>
           <option value="client">Cliente</option>
         </select>

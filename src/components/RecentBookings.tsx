@@ -87,7 +87,7 @@ export function RecentBookings({ appointments }: Props) {
                     <td className="px-4 py-3 text-sm text-muted-foreground">
                       {formatDateTime(booking.startAt)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-foreground">{booking.barberName}</td>
+                    <td className="px-4 py-3 text-sm text-foreground">{booking.professionalName}</td>
                     <td className="px-4 py-3">
                       <Badge
                         variant="outline"

@@ -53,7 +53,7 @@ import {
 import { downloadCsvReport, downloadPdfReport, type ReportColumn } from "@/utils/reportExport";
 
 type StatusFilter = "all" | EmployeePaymentStatus;
-type RoleFilter = "all" | "admin" | "barber" | "receptionist";
+type RoleFilter = "all" | "admin" | "professional" | "receptionist";
 
 const statusLabels: Record<EmployeePaymentStatus, string> = {
   pending: "Pendente",
@@ -72,7 +72,7 @@ const statusStyles: Record<EmployeePaymentStatus, string> = {
 const roleLabels: Record<RoleFilter, string> = {
   all: "Todas funcoes",
   admin: "Administradores",
-  barber: "Profissionais",
+  professional: "Profissionais",
   receptionist: "Recepcionistas",
 };
 
@@ -213,7 +213,7 @@ export function EmployeePayrollPage() {
     observacao: "",
   });
   const [paymentFrequency, setPaymentFrequency] = useState<PaymentFrequencySettings>({
-    barberPaymentFrequency: "monthly",
+    professionalPaymentFrequency: "monthly",
     employeePaymentFrequency: "monthly",
   });
 
@@ -407,8 +407,8 @@ export function EmployeePayrollPage() {
 
     setSaving(true);
 
-    const freq = selectedRow.role === "barber"
-      ? paymentFrequency.barberPaymentFrequency
+    const freq = selectedRow.role === "professional"
+      ? paymentFrequency.professionalPaymentFrequency
       : paymentFrequency.employeePaymentFrequency;
 
     try {
@@ -468,7 +468,7 @@ export function EmployeePayrollPage() {
           <div>
             <h3 className="text-base font-medium text-foreground">Pagamento Funcionário</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Profissionais: {frequencyLabels[paymentFrequency.barberPaymentFrequency]}
+              Profissionais: {frequencyLabels[paymentFrequency.professionalPaymentFrequency]}
               {" · "}
               Outros: {frequencyLabels[paymentFrequency.employeePaymentFrequency]}
               {" · "}
@@ -530,7 +530,7 @@ export function EmployeePayrollPage() {
                   onValueChange={(value) => setRoleFilter(value as RoleFilter)}
                 >
                   <DropdownMenuRadioItem value="all">{roleLabels.all}</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="barber">{roleLabels.barber}</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="professional">{roleLabels.professional}</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="receptionist">
                     {roleLabels.receptionist}
                   </DropdownMenuRadioItem>

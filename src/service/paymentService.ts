@@ -20,7 +20,7 @@ export interface PaymentRecord {
     startAt: string;
     endAt: string;
     status: string;
-    barber?: {
+    professional?: {
       id: string;
       displayName: string;
     } | null;

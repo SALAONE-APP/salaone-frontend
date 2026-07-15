@@ -5,10 +5,10 @@ export interface BlockedDate {
   salonId: string;
   date: string;
   reason?: string | null;
-  barberId?: string | null;
+  professionalId?: string | null;
   startTime?: string | null;
   endTime?: string | null;
-  barber?: {
+  professional?: {
     id: string;
     displayName: string;
   } | null;
@@ -19,7 +19,7 @@ export interface BlockedDate {
 export interface BlockedDatePayload {
   date: string;
   reason?: string | null;
-  barberId?: string | null;
+  professionalId?: string | null;
   startTime?: string | null;
   endTime?: string | null;
 }
@@ -27,7 +27,7 @@ export interface BlockedDatePayload {
 export async function listBlockedDates(params: {
   dateFrom?: string;
   dateTo?: string;
-  barberId?: string;
+  professionalId?: string;
 } = {}) {
   const response = await api.get<BlockedDate[]>("/blocked-dates", { params });
   return response.data;

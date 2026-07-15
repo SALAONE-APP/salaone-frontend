@@ -59,7 +59,7 @@ function getStoredSlug(): string {
   }
 }
 
-export function BarberSettingsPage() {
+export function ProfessionalSettingsPage() {
   const { user, updateUser: updateAuthUser } = useAuth();
 
   // Foto de perfil

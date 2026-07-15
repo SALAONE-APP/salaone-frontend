@@ -11,7 +11,7 @@ export interface Plan {
   color?: string | null;
   cutsPerMonth: number;
   paymentMethod: PlanPaymentMethod;
-  maxBarbers?: number | null;
+  maxProfessionals?: number | null;
   maxReceptionists?: number | null;
   maxAdmins?: number | null;
   active: boolean;
@@ -34,7 +34,7 @@ export interface PlanPayload {
   color?: string | null;
   cutsPerMonth: number;
   paymentMethod: PlanPaymentMethod;
-  maxBarbers?: number | null;
+  maxProfessionals?: number | null;
   maxReceptionists?: number | null;
   maxAdmins?: number | null;
   active?: boolean;

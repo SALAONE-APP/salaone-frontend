@@ -9,14 +9,14 @@ export type AppointmentStatus =
 
 export interface Appointment {
   id: string;
-  barberId: string;
+  professionalId: string;
   clientId: string;
   dependentId?: string | null;
   startAt: string;
   endAt: string;
   status: AppointmentStatus;
   notes?: string | null;
-  barber?: {
+  professional?: {
     id: string;
     displayName: string;
     photoUrl?: string | null;
@@ -72,7 +72,7 @@ export interface Appointment {
 }
 
 export interface ListAppointmentsParams {
-  barberId?: string;
+  professionalId?: string;
   clientId?: string;
   status?: AppointmentStatus | "active";
   dateFrom?: string;
@@ -90,7 +90,7 @@ export interface ListAppointmentsResponse {
 }
 
 export interface CreateAppointmentPayload {
-  barberId: string;
+  professionalId: string;
   clientId: string;
   dependentId?: string | null;
   date: string;
@@ -134,7 +134,7 @@ export async function createAppointment(data: CreateAppointmentPayload) {
 
 export async function updateAppointment(
   appointmentId: string,
-  data: { status?: AppointmentStatus; notes?: string | null; barberId?: string },
+  data: { status?: AppointmentStatus; notes?: string | null; professionalId?: string },
 ) {
   const response = await api.patch<Appointment>(`/appointments/${appointmentId}`, data);
 
@@ -148,7 +148,7 @@ export async function cancelAppointment(appointmentId: string) {
 }
 
 export async function getAvailableSlots(params: {
-  barberId: string;
+  professionalId: string;
   date: string;
   duration: number;
 }) {

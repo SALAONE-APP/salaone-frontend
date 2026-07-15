@@ -34,6 +34,8 @@ export async function getSalonProfile(_salonId?: string): Promise<SalonProfile> 
       phone?: string | null;
       document?: string | null;
       logo_url?: string | null;
+      pagarme_recipient_id?: string | null;
+      pagarme_recipient_status?: string | null;
       slug: string;
       created_at?: string;
     };
@@ -49,12 +51,14 @@ export async function getSalonProfile(_salonId?: string): Promise<SalonProfile> 
     logoUrl: salon.logo_url ?? "",
     slug: salon.slug,
     createdAt: salon.created_at ?? null,
+    pagarmeRecipientId: salon.pagarme_recipient_id ?? null,
+    pagarmeRecipientStatus: salon.pagarme_recipient_status ?? null,
   };
 }
 
 export async function updateSalonProfile(
-  _data: UpdateSalonProfilePayload
+  data: UpdateSalonProfilePayload
 ): Promise<SalonProfile> {
-  void _data;
-  throw new Error("O backend atual ainda não oferece atualização de salão.");
+  const response = await api.put<SalonProfile>("/salons/me", data);
+  return response.data;
 }

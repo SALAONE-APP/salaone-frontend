@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 export type PaymentChoice = "cartao" | "pix" | "local" | "subscription";
 
 export interface AppointmentSummary {
-  barberName: string;
+  professionalName: string;
   date: string;
   time: string;
   serviceName: string;
@@ -89,7 +89,7 @@ export function PaymentChoiceModal({
         {/* Resumo do agendamento */}
         <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-1 text-sm">
           <p className="text-muted-foreground">
-            Profissional: <span className="font-medium text-foreground">{summary.barberName}</span>
+            Profissional: <span className="font-medium text-foreground">{summary.professionalName}</span>
           </p>
           <p className="text-muted-foreground">
             Data: <span className="font-medium text-foreground">{summary.date}</span>
