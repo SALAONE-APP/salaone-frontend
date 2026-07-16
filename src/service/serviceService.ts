@@ -46,10 +46,59 @@ export interface ServicePayload {
   active?: boolean;
 }
 
-export async function listServices(params: ListServicesParams = {}) {
-  const response = await api.get<ListServicesResponse>("/services", { params });
+interface BackendService {
+  id: string;
+  name: string;
+  price?: number | string;
+  basePrice?: number;
+  duration_minutes?: number;
+  durationMinutes?: number;
+  commission_value?: number | string | null;
+  commissionPercent?: number | null;
+  active?: boolean;
+  created_at?: string;
+  createdAt?: string;
+  updated_at?: string;
+  updatedAt?: string;
+  salon_id?: string;
+  salonId?: string;
+}
 
-  return response.data;
+function normalizeService(service: BackendService): Service {
+  return {
+    id: service.id,
+    name: service.name,
+    basePrice: Number(service.basePrice ?? service.price ?? 0),
+    durationMinutes: Number(service.durationMinutes ?? service.duration_minutes ?? 0),
+    commissionPercent:
+      service.commissionPercent != null
+        ? Number(service.commissionPercent)
+        : service.commission_value != null
+          ? Number(service.commission_value)
+          : null,
+    active: service.active ?? true,
+    createdAt: service.createdAt ?? service.created_at,
+    updatedAt: service.updatedAt ?? service.updated_at,
+    salonId: service.salonId ?? service.salon_id,
+  };
+}
+
+export async function listServices(params: ListServicesParams = {}) {
+  const response = await api.get<
+    ListServicesResponse | { services?: BackendService[] }
+  >("/services", { params });
+  const data = response.data;
+  const rawItems = "items" in data ? data.items : data.services;
+  const items = Array.isArray(rawItems)
+    ? rawItems.map((service) => normalizeService(service as BackendService))
+    : [];
+
+  return {
+    page: "page" in data ? data.page : 1,
+    limit: "limit" in data ? data.limit : items.length,
+    total: "total" in data ? data.total : items.length,
+    items,
+  };
 }
 
 export async function createService(data: ServicePayload) {
