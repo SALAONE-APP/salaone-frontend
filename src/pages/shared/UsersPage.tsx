@@ -390,16 +390,22 @@ export function UsersPage() {
     setForm({ ...emptyForm, password: "123456" });
     setDialogOpen(true);
     void listServices({ limit: 100 })
-      .then((res) => setServices(res.items))
-      .catch((err) => toast.error(getApiMessage(err)));
+      .then((res) => setServices(Array.isArray(res.items) ? res.items : []))
+      .catch((err) => {
+        setServices([]);
+        toast.error(getApiMessage(err));
+      });
   }
 
   async function openEditDialog(user: UserProfile) {
     setEditingUser(user);
     setDialogOpen(true);
     void listServices({ limit: 100 })
-      .then((res) => setServices(res.items))
-      .catch((err) => toast.error(getApiMessage(err)));
+      .then((res) => setServices(Array.isArray(res.items) ? res.items : []))
+      .catch((err) => {
+        setServices([]);
+        toast.error(getApiMessage(err));
+      });
 
     if (roleFromUser(user) === "professional") {
       try {
