@@ -202,7 +202,7 @@ export function PaymentsPage() {
       const visibleItems = result.items.filter(shouldShowInPaymentsPage);
 
       setPayments(visibleItems);
-      setTotal(visibleItems.length);
+      setTotal(result.total);
       if (result.summary) setSummary(result.summary);
     } catch (err) {
       setError(getApiMessage(err));

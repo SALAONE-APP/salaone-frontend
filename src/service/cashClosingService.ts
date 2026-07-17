@@ -26,6 +26,15 @@ export interface CashClosingSummary {
   paymentCount: number;
   totalsByMethod: Record<string, number>;
   payments: CashClosingPayment[];
+  cashRegisterId?: string | null;
+  openedAt?: string | null;
+  openedBy?: string | null;
+  openedByName?: string | null;
+}
+
+export async function openCashRegister() {
+  const response = await api.post<CashClosingSummary>("/cashClosings/open");
+  return response.data;
 }
 
 export interface CashClosing extends CashClosingSummary {

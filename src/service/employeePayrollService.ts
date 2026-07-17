@@ -188,6 +188,32 @@ export interface ExtraEmployeePayment {
   createdAt: string;
 }
 
+export interface PayrollEmployeeOption {
+  id: string;
+  name: string;
+  jobTitle?: string | null;
+  isActive: boolean;
+}
+
+interface BackendEmployeeOption {
+  id: string;
+  name: string;
+  job_title?: string | null;
+  is_active?: boolean;
+}
+
+export async function listPayrollEmployees(): Promise<PayrollEmployeeOption[]> {
+  const response = await api.get<{ employees: BackendEmployeeOption[] }>("/employees");
+  return response.data.employees
+    .filter((employee) => employee.is_active !== false)
+    .map((employee) => ({
+      id: employee.id,
+      name: employee.name,
+      jobTitle: employee.job_title ?? null,
+      isActive: employee.is_active !== false,
+    }));
+}
+
 export async function listExtraEmployeePayments(): Promise<ExtraEmployeePayment[]> {
   const response = await api.get<ExtraEmployeePayment[]>("/employeePayments/extra");
   return response.data;

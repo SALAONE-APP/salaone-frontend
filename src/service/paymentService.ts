@@ -142,8 +142,7 @@ export async function updatePayment(
   payment: Pick<PaymentRecord, "id" | "appointmentId">,
   data: { status?: PaymentStatus; method?: PaymentMethod; paidAt?: string; noShow?: boolean },
 ) {
-  const endpoint = payment.appointmentId ? "/appointmentPayments" : "/payments";
-  const response = await api.patch<PaymentRecord>(`${endpoint}/${payment.id}`, data);
+  const response = await api.patch<PaymentRecord>(`/payments/${payment.id}`, data);
 
   return response.data;
 }
