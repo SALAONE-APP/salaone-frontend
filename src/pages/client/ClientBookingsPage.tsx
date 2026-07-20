@@ -694,9 +694,6 @@ export function ClientBookingsPage() {
           <p className="text-sm font-medium text-red-600">
             Sua assinatura expirou. Renove seu plano para continuar agendando.
           </p>
-          <a href="/plans" className="mt-1 block text-xs text-red-500 underline underline-offset-2">
-            Ver planos disponíveis
-          </a>
         </div>
       )}
 
