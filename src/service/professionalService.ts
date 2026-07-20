@@ -55,10 +55,8 @@ export async function listProfessionals(
 }
 
 export async function getMyProfessional(): Promise<Professional> {
-  const response = await listProfessionals();
-  const professional = response.items[0];
-  if (!professional) throw new Error("Profissional não encontrado.");
-  return professional;
+  const response = await api.get<{ employee: BackendEmployee }>("/employees/me");
+  return normalizeProfessional(response.data.employee);
 }
 
 export interface CreateProfessionalPayload {
