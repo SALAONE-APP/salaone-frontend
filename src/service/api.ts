@@ -20,6 +20,18 @@ api.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
+  const salonJson = localStorage.getItem("salon");
+  if (salonJson) {
+    try {
+      const salon = JSON.parse(salonJson);
+      if (salon?.id) {
+        config.headers["x-salon-id"] = salon.id;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   return config;
 });
 
