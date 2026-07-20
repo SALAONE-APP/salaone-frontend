@@ -13,8 +13,8 @@ export function ProfessionalSidebar() {
   ];
 
   const serviceItems: SidebarItem[] = [
-    { icon: UserCheck, label: "Clientes", href: "/customers" },
-    { icon: Scissors, label: "Servicos", href: "/services" },
+    { icon: UserCheck, label: "Clientes", href: "/customers", requiredPermission: "manageCustomers" },
+    { icon: Scissors, label: "Servicos", href: "/services", requiredPermission: "manageServices" },
   ];
 
   const financialItems: SidebarItem[] = [
