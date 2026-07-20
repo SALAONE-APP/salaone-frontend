@@ -113,7 +113,7 @@ export async function listServices(params: ListServicesParams = {}) {
 export async function createService(data: ServicePayload) {
   const response = await api.post<{ service: BackendService }>("/services", {
     name: data.name, price: data.basePrice, durationMinutes: data.durationMinutes,
-    servicePoints: data.servicePoints, commissionValue: data.commissionPercent,
+    servicePoints: data.servicePoints, commissionType: "percentage", commissionValue: data.commissionPercent,
     promotionalPrice: data.promotionalPrice, coveredByPlan: data.covered_by_plan,
     imageUrl: data.imageUrl, active: data.active,
   });
@@ -126,7 +126,9 @@ export async function updateService(serviceId: string, data: Partial<ServicePayl
     ...(data.basePrice !== undefined ? { price: data.basePrice } : {}),
     ...(data.durationMinutes !== undefined ? { durationMinutes: data.durationMinutes } : {}),
     ...(data.servicePoints !== undefined ? { servicePoints: data.servicePoints } : {}),
-    ...(data.commissionPercent !== undefined ? { commissionValue: data.commissionPercent } : {}),
+    ...(data.commissionPercent !== undefined
+      ? { commissionType: "percentage", commissionValue: data.commissionPercent }
+      : {}),
     ...(data.promotionalPrice !== undefined ? { promotionalPrice: data.promotionalPrice } : {}),
     ...(data.covered_by_plan !== undefined ? { coveredByPlan: data.covered_by_plan } : {}),
     ...(data.imageUrl !== undefined ? { imageUrl: data.imageUrl } : {}),
