@@ -86,6 +86,11 @@ export async function listUsers(params: ListUsersParams = {}) {
   return response.data;
 }
 
+export async function listClientOptions(params: Pick<ListUsersParams, "q" | "page" | "limit"> = {}) {
+  const response = await api.get<ListUsersResponse>("/users/client-options", { params });
+  return response.data;
+}
+
 export async function createUser(data: CreateUserPayload) {
   const response = await api.post<UserProfile>("/users", data);
 
