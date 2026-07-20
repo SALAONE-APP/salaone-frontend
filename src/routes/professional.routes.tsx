@@ -33,12 +33,14 @@ export const professionalRoutes: AppRoute[] = [
     title: "Clientes",
     breadcrumbs: ["Profissional", "Clientes"],
     Component: CustomersPage,
+    requiredPermission: "manageCustomers",
   },
   {
     path: "/services",
     title: "Servicos",
     breadcrumbs: ["Profissional", "Servicos"],
     Component: ServicesPage,
+    requiredPermission: "manageServices",
   },
   {
     path: "/payments",
