@@ -1135,37 +1135,40 @@ export function UsersPage() {
           if (!open) setPermissionsUser(null);
         }}
       >
-        <DialogContent className="sm:max-w-3xl">
-          <form onSubmit={handlePermissionsSubmit} className="space-y-5">
-            <DialogHeader>
-              <DialogTitle>Permissoes do funcionario</DialogTitle>
-              <DialogDescription>
-                {permissionsUser
-                  ? `Defina os acessos de ${permissionsUser.name}.`
-                  : "Defina os acessos deste funcionario."}
-              </DialogDescription>
-            </DialogHeader>
+        <DialogContent className="flex max-h-[calc(100dvh-1rem)] flex-col gap-0 overflow-hidden p-0 sm:max-h-[90dvh] sm:max-w-3xl">
+          <form onSubmit={handlePermissionsSubmit} className="flex min-h-0 flex-1 flex-col">
+            <div className="shrink-0 border-b border-border px-4 py-4 pr-12 sm:px-6 sm:py-5 sm:pr-12">
+              <DialogHeader>
+                <DialogTitle>Permissoes do funcionario</DialogTitle>
+                <DialogDescription className="break-words">
+                  {permissionsUser
+                    ? `Defina os acessos de ${permissionsUser.name}.`
+                    : "Defina os acessos deste funcionario."}
+                </DialogDescription>
+              </DialogHeader>
+            </div>
 
-            {permissionsUser && roleFromUser(permissionsUser) === "admin" ? (
-              <div className="rounded-md border border-border bg-secondary/50 p-4 text-sm text-muted-foreground">
-                Administradores possuem acesso total automaticamente.
-              </div>
-            ) : (
-              <>
-                <div className="flex justify-end gap-2">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
+              {permissionsUser && roleFromUser(permissionsUser) === "admin" ? (
+                <div className="rounded-md border border-border bg-secondary/50 p-4 text-sm text-muted-foreground">
+                  Administradores possuem acesso total automaticamente.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap justify-stretch gap-2 sm:justify-end">
                   <Button type="button" variant="outline" size="sm" onClick={() => setAllPermissions(true)}>
                     Marcar todas
                   </Button>
                   <Button type="button" variant="outline" size="sm" onClick={() => setAllPermissions(false)}>
                     Limpar
                   </Button>
-                </div>
+                  </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   {permissionOptions.map((permission) => (
                     <div
                       key={permission.key}
-                      className="flex items-start justify-between gap-3 rounded-md border border-border p-3"
+                      className="flex min-w-0 items-start justify-between gap-3 rounded-md border border-border p-3"
                     >
                       <div className="min-w-0">
                         <Label
@@ -1179,17 +1182,19 @@ export function UsersPage() {
                         </p>
                       </div>
                       <Switch
+                        className="shrink-0"
                         id={`permission-dialog-${permission.key}`}
                         checked={permissionsForm[permission.key]}
                         onCheckedChange={(checked) => setPermission(permission.key, checked)}
                       />
                     </div>
                   ))}
+                  </div>
                 </div>
-              </>
-            )}
+              )}
+            </div>
 
-            <DialogFooter>
+            <DialogFooter className="shrink-0 border-t border-border bg-background px-4 py-4 sm:px-6">
               <Button
                 type="button"
                 variant="outline"
