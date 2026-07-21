@@ -30,6 +30,7 @@ export interface UserProfile {
   isAdmin?: boolean;
   permissions?: Record<string, boolean> | null;
   photoUrl?: string | null;
+  photoPublicId?: string | null;
   salary?: number | null;
   createdAt?: string;
   updatedAt?: string;
@@ -64,6 +65,7 @@ export interface CreateUserPayload {
   isAdmin?: boolean;
   permissions?: Record<string, boolean>;
   photoUrl?: string | null;
+  photoPublicId?: string | null;
 }
 
 export interface UpdateUserPayload {
@@ -75,6 +77,7 @@ export interface UpdateUserPayload {
   role?: "admin" | "professional" | "receptionist" | "client";
   isAdmin?: boolean;
   photoUrl?: string | null;
+  photoPublicId?: string | null;
   salary?: number | null;
   resetPassword?: boolean;
   newPassword?: string;
@@ -120,9 +123,10 @@ export async function deleteUser(userId: string) {
   return response.data;
 }
 
-export async function updateProfilePhoto(userId: string, photoUrl: string | null) {
+export async function updateProfilePhoto(userId: string, photoUrl: string | null, photoPublicId: string | null) {
   const response = await api.patch<UserProfile>(`/users/${userId}`, {
     photoUrl,
+    photoPublicId,
   });
 
   return response.data;

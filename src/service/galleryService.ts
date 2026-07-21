@@ -4,6 +4,7 @@ export interface GalleryImage {
   id: string;
   salonId?: string;
   url: string;
+  publicId?: string | null;
   alt?: string | null;
   sortOrder: number;
   createdAt?: string;
@@ -11,6 +12,7 @@ export interface GalleryImage {
 
 export interface GalleryImagePayload {
   url: string;
+  publicId?: string | null;
   alt?: string | null;
   sortOrder?: number;
 }

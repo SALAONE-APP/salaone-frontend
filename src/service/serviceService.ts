@@ -13,6 +13,8 @@ export interface Service {
   promotionalPrice?: number | null;
   covered_by_plan?: boolean;
   imageUrl?: string | null;
+  imagePublicId?: string | null;
+  image_public_id?: string | null;
   active: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -43,6 +45,7 @@ export interface ServicePayload {
   promotionalPrice?: number;
   covered_by_plan?: boolean;
   imageUrl?: string | null;
+  imagePublicId?: string | null;
   active?: boolean;
 }
 
@@ -65,6 +68,7 @@ interface BackendService {
   service_points?: number;
   promotional_price?: number | string | null;
   image_url?: string | null;
+  image_public_id?: string | null;
   covered_by_plan?: boolean;
 }
 
@@ -88,6 +92,8 @@ function normalizeService(service: BackendService): Service {
     service_points: service.service_points ?? 1,
     promotionalPrice: service.promotional_price == null ? null : Number(service.promotional_price),
     imageUrl: service.image_url ?? null,
+    imagePublicId: service.image_public_id ?? null,
+    image_public_id: service.image_public_id ?? null,
     covered_by_plan: service.covered_by_plan ?? false,
   };
 }
@@ -115,7 +121,7 @@ export async function createService(data: ServicePayload) {
     name: data.name, price: data.basePrice, durationMinutes: data.durationMinutes,
     servicePoints: data.servicePoints, commissionType: "percentage", commissionValue: data.commissionPercent,
     promotionalPrice: data.promotionalPrice, coveredByPlan: data.covered_by_plan,
-    imageUrl: data.imageUrl, active: data.active,
+    imageUrl: data.imageUrl, imagePublicId: data.imagePublicId, active: data.active,
   });
   return normalizeService(response.data.service);
 }
@@ -132,6 +138,7 @@ export async function updateService(serviceId: string, data: Partial<ServicePayl
     ...(data.promotionalPrice !== undefined ? { promotionalPrice: data.promotionalPrice } : {}),
     ...(data.covered_by_plan !== undefined ? { coveredByPlan: data.covered_by_plan } : {}),
     ...(data.imageUrl !== undefined ? { imageUrl: data.imageUrl } : {}),
+    ...(data.imagePublicId !== undefined ? { imagePublicId: data.imagePublicId } : {}),
     ...(data.active !== undefined ? { active: data.active } : {}),
   });
   return normalizeService(response.data.service);

@@ -104,8 +104,8 @@ export function ProfessionalSettingsPage() {
     if (!user?.id) return;
     setIsUploadingPhoto(true);
     try {
-      const secureUrl = await uploadProfilePhoto(file);
-      const updated = await updateProfilePhoto(user.id, secureUrl);
+      const image = await uploadProfilePhoto(file);
+      const updated = await updateProfilePhoto(user.id, image.secure_url, image.public_id);
       updateAuthUser({ ...user, ...updated, photoUrl: updated.photoUrl ?? '' });
       setProfilePhotoUrl(updated.photoUrl ?? '');
       toast.success('Foto de perfil atualizada.');
@@ -126,7 +126,7 @@ export function ProfessionalSettingsPage() {
     if (!user?.id || isUploadingPhoto) return;
     setIsUploadingPhoto(true);
     try {
-      const updated = await updateProfilePhoto(user.id, null);
+      const updated = await updateProfilePhoto(user.id, null, null);
       updateAuthUser({ ...user, ...updated, photoUrl: '' });
       setProfilePhotoUrl('');
       toast.success('Foto removida.');

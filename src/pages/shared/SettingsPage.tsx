@@ -178,6 +178,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   });
   const [businessSlug, setBusinessSlug] = useState('');
   const [businessLogoUrl, setBusinessLogoUrl] = useState('');
+  const [businessLogoPublicId, setBusinessLogoPublicId] = useState<string | null>(null);
   const [isUploadingBusinessLogo, setIsUploadingBusinessLogo] = useState(false);
   const businessLogoFileInputRef = useRef<HTMLInputElement | null>(null);
   const [homeInfo, setHomeInfo] = useState<HomeInfo | null>(null);
@@ -185,6 +186,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     hero_title: '',
     hero_subtitle: '',
     hero_images: [] as string[],
+    hero_image_public_ids: [] as string[],
   });
   const [heroImageUrl, setHeroImageUrl] = useState('');
   const [isUploadingHeroImage, setIsUploadingHeroImage] = useState(false);
@@ -294,6 +296,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         });
         setBusinessSlug(profile.slug ?? '');
         setBusinessLogoUrl(profile.logoUrl ?? '');
+        setBusinessLogoPublicId(profile.logoPublicId ?? null);
         setPagarmeRecipientId(profile.pagarmeRecipientId ?? null);
         setPagarmeRecipientStatus(profile.pagarmeRecipientStatus ?? null);
 
@@ -420,6 +423,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
           hero_title: data.hero_title ?? '',
           hero_subtitle: data.hero_subtitle ?? '',
           hero_images: getHeroImages(data),
+          hero_image_public_ids: data.hero_image_public_ids ?? [],
         });
         setHeroImageUrl('');
         setWorkingHoursForm({
@@ -592,6 +596,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         phone: businessForm.phone.trim(),
         cnpj: businessForm.cnpj.replace(/\D/g, ''),
         logoUrl: businessLogoUrl,
+        logoPublicId: businessLogoPublicId,
         googleMapsUrl: businessForm.googleMapsUrl.trim(),
       });
 
@@ -675,6 +680,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     setHeroForm((current) => ({
       ...current,
       hero_images: [...current.hero_images, trimmedUrl],
+      hero_image_public_ids: [...current.hero_image_public_ids, ''],
     }));
     setHeroImageUrl('');
   }
@@ -693,16 +699,17 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     setIsUploadingHeroImage(true);
 
     try {
-      const secureUrl = await uploadHeroImage(file);
+      const image = await uploadHeroImage(file);
 
       setHeroForm((current) => {
-        if (current.hero_images.includes(secureUrl)) {
+        if (current.hero_images.includes(image.secure_url)) {
           return current;
         }
 
         return {
           ...current,
-          hero_images: [...current.hero_images, secureUrl].slice(0, MAX_HERO_IMAGES),
+          hero_images: [...current.hero_images, image.secure_url].slice(0, MAX_HERO_IMAGES),
+          hero_image_public_ids: [...current.hero_image_public_ids, image.public_id].slice(0, MAX_HERO_IMAGES),
         };
       });
 
@@ -728,13 +735,14 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     void uploadHeroImageFile(file);
   }
 
-  async function saveBusinessLogo(logoUrl: string, successMessage: string) {
+  async function saveBusinessLogo(logoUrl: string, logoPublicId: string | null, successMessage: string) {
     const profile = await updateSalonProfile({
       name: businessForm.name,
       email: businessForm.email,
       phone: businessForm.phone,
       cnpj: businessForm.cnpj,
       logoUrl,
+      logoPublicId,
       googleMapsUrl: businessForm.googleMapsUrl,
     });
 
@@ -747,6 +755,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     });
     setBusinessSlug(profile.slug ?? '');
     setBusinessLogoUrl(profile.logoUrl ?? '');
+    setBusinessLogoPublicId(profile.logoPublicId ?? null);
     persistStoredSalon(profile);
     toast.success(successMessage);
   }
@@ -765,8 +774,8 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     setIsUploadingBusinessLogo(true);
 
     try {
-      const secureUrl = await uploadBusinessLogo(file);
-      await saveBusinessLogo(secureUrl, 'Logo atualizada com sucesso.');
+      const image = await uploadBusinessLogo(file);
+      await saveBusinessLogo(image.secure_url, image.public_id, 'Logo atualizada com sucesso.');
     } catch (error) {
       const message = getApiErrorMessage(error);
       toast.error(message || 'Erro ao atualizar logo da salão.');
@@ -796,7 +805,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     setIsUploadingBusinessLogo(true);
 
     try {
-      await saveBusinessLogo('', 'Logo removida com sucesso.');
+      await saveBusinessLogo('', null, 'Logo removida com sucesso.');
     } catch (error) {
       const message = getApiErrorMessage(error);
       toast.error(message || 'Erro ao remover logo da salão.');
@@ -805,13 +814,13 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     }
   }
 
-  async function saveProfilePhoto(photoUrl: string | null, successMessage: string) {
+  async function saveProfilePhoto(photoUrl: string | null, photoPublicId: string | null, successMessage: string) {
     if (!user?.id) {
       toast.error('Usuario autenticado nao encontrado.');
       return;
     }
 
-    const updatedUser = await updateProfilePhoto(user.id, photoUrl);
+    const updatedUser = await updateProfilePhoto(user.id, photoUrl, photoPublicId);
 
     updateUser({
       ...user,
@@ -831,8 +840,8 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     setIsUploadingProfilePhoto(true);
 
     try {
-      const secureUrl = await uploadProfilePhoto(file);
-      await saveProfilePhoto(secureUrl, 'Foto de perfil atualizada com sucesso.');
+      const image = await uploadProfilePhoto(file);
+      await saveProfilePhoto(image.secure_url, image.public_id, 'Foto de perfil atualizada com sucesso.');
     } catch (error) {
       const message = getApiErrorMessage(error);
       toast.error(message || 'Erro ao atualizar foto de perfil.');
@@ -862,7 +871,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     setIsUploadingProfilePhoto(true);
 
     try {
-      await saveProfilePhoto(null, 'Foto de perfil removida com sucesso.');
+      await saveProfilePhoto(null, null, 'Foto de perfil removida com sucesso.');
     } catch (error) {
       const message = getApiErrorMessage(error);
       toast.error(message || 'Erro ao remover foto de perfil.');
@@ -875,6 +884,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     setHeroForm((current) => ({
       ...current,
       hero_images: current.hero_images.filter((image) => image !== imageUrl),
+      hero_image_public_ids: current.hero_image_public_ids.filter((_, index) => current.hero_images[index] !== imageUrl),
     }));
   }
 
@@ -1059,6 +1069,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       hero_subtitle: heroForm.hero_subtitle.trim(),
       hero_image: trimmedHeroImages[0] ?? '',
       hero_images: trimmedHeroImages,
+      hero_image_public_ids: heroForm.hero_image_public_ids,
     };
     const trimmedAboutForm = {
       about_title: aboutForm.about_title.trim(),
@@ -1107,6 +1118,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
           phone: businessForm.phone,
           cnpj: businessForm.cnpj,
           logoUrl: businessLogoUrl,
+          logoPublicId: businessLogoPublicId,
           googleMapsUrl: businessForm.googleMapsUrl,
         }),
         updateHomeInfo({
@@ -1133,6 +1145,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         hero_title: updatedHomeInfo.hero_title ?? '',
         hero_subtitle: updatedHomeInfo.hero_subtitle ?? '',
         hero_images: getHeroImages(updatedHomeInfo),
+        hero_image_public_ids: updatedHomeInfo.hero_image_public_ids ?? [],
       });
       setHeroImageUrl('');
       setWorkingHoursForm({
@@ -1172,6 +1185,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       hero_subtitle: heroForm.hero_subtitle.trim(),
       hero_image: trimmedHeroImages[0] ?? '',
       hero_images: trimmedHeroImages,
+      hero_image_public_ids: heroForm.hero_image_public_ids,
     };
 
     setIsSavingGeneralSettings(true);
@@ -1184,6 +1198,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
           phone: businessForm.phone,
           cnpj: businessForm.cnpj,
           logoUrl: businessLogoUrl,
+          logoPublicId: businessLogoPublicId,
           googleMapsUrl: businessForm.googleMapsUrl,
         }),
         updateHomeInfo({
@@ -1207,6 +1222,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         hero_title: updatedHomeInfo.hero_title ?? '',
         hero_subtitle: updatedHomeInfo.hero_subtitle ?? '',
         hero_images: getHeroImages(updatedHomeInfo),
+        hero_image_public_ids: updatedHomeInfo.hero_image_public_ids ?? [],
       });
       setHeroImageUrl('');
       toast.success('Aparencia salva com sucesso.');
