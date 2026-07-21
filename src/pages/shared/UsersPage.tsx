@@ -139,6 +139,7 @@ interface UserFormState {
   password: string;
   resetPassword: boolean;
   photoUrl: string | null;
+  photoPublicId: string | null;
   salary: string;
   commissionPercent: string;
   serviceIds: string[];
@@ -153,6 +154,7 @@ const emptyForm: UserFormState = {
   password: "",
   resetPassword: false,
   photoUrl: null,
+  photoPublicId: null,
   salary: "",
   commissionPercent: "",
   serviceIds: [],
@@ -303,6 +305,7 @@ function userToForm(user: UserProfile, professional?: Professional | null): User
     password: "",
     resetPassword: false,
     photoUrl: user.photoUrl ?? null,
+    photoPublicId: user.photoPublicId ?? null,
     salary: user.salary != null ? maskCurrency(String(Math.round(user.salary * 100))) : "",
     commissionPercent: professional?.commissionPercent != null ? String(professional.commissionPercent) : "",
     serviceIds: professional?.serviceIds ?? [],
@@ -435,8 +438,8 @@ export function UsersPage() {
 
     setUploadingPhoto(true);
     try {
-      const url = await uploadProfilePhoto(file);
-      setField("photoUrl", url);
+      const image = await uploadProfilePhoto(file);
+      setForm((current) => ({ ...current, photoUrl: image.secure_url, photoPublicId: image.public_id }));
     } catch (err) {
       toast.error(getApiMessage(err));
     } finally {
@@ -503,6 +506,7 @@ export function UsersPage() {
       role: form.role,
       isAdmin: form.role === "admin",
       photoUrl: form.photoUrl,
+      photoPublicId: form.photoPublicId,
       salary: form.salary !== "" ? parseCurrency(form.salary) : null,
     };
 
@@ -921,7 +925,7 @@ export function UsersPage() {
                       variant="ghost"
                       size="sm"
                       className="text-muted-foreground"
-                      onClick={() => setField("photoUrl", null)}
+                      onClick={() => setForm((current) => ({ ...current, photoUrl: null, photoPublicId: null }))}
                       disabled={uploadingPhoto}
                     >
                       Remover

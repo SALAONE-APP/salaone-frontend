@@ -1,66 +1,32 @@
-import axios from 'axios';
+import api from './api';
 
-interface CloudinaryUploadResponse {
-  secure_url?: string;
+export type ImageCategory = 'profiles' | 'products' | 'services' | 'gallery' | 'logos';
+
+export interface UploadedImage {
+  secure_url: string;
+  public_id: string;
+  width: number;
+  height: number;
+  format: string;
+  bytes: number;
 }
 
-function getCloudinaryConfig() {
-  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+export async function uploadImage(file: File, category: ImageCategory): Promise<UploadedImage> {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  if (!allowedTypes.includes(file.type)) throw new Error('Selecione uma imagem JPEG, PNG, WEBP ou GIF.');
+  if (file.size > 5 * 1024 * 1024) throw new Error('A imagem deve ter no maximo 5MB.');
 
-  if (!cloudName || !uploadPreset) {
-    throw new Error('Configuracao do Cloudinary nao encontrada.');
-  }
-
-  return { cloudName, uploadPreset };
-}
-
-async function uploadCloudinaryFile(file: File, resourceType: 'image' | 'raw') {
-  const { cloudName, uploadPreset } = getCloudinaryConfig();
   const formData = new FormData();
   formData.append('file', file);
-  formData.append('upload_preset', uploadPreset);
-
-  const response = await axios.post<CloudinaryUploadResponse>(
-    `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
-    formData
-  );
-
-  if (!response.data.secure_url) {
-    throw new Error('Cloudinary nao retornou a URL segura da imagem.');
-  }
-
-  return response.data.secure_url;
+  formData.append('category', category);
+  const response = await api.post<UploadedImage>('/uploads/images', formData);
+  return response.data;
 }
 
-export async function uploadImage(file: File) {
-  if (!file.type.startsWith('image/')) {
-    throw new Error('Selecione apenas arquivos de imagem.');
-  }
+export async function uploadHeroImage(file: File) { return uploadImage(file, 'gallery'); }
+export async function uploadBusinessLogo(file: File) { return uploadImage(file, 'logos'); }
+export async function uploadProfilePhoto(file: File) { return uploadImage(file, 'profiles'); }
 
-  return uploadCloudinaryFile(file, 'image');
-}
-
-export async function uploadPdf(file: File) {
-  const isPdf =
-    file.type === 'application/pdf' ||
-    file.name.toLowerCase().endsWith('.pdf');
-
-  if (!isPdf) {
-    throw new Error('Selecione apenas arquivos PDF.');
-  }
-
-  return uploadCloudinaryFile(file, 'raw');
-}
-
-export async function uploadHeroImage(file: File) {
-  return uploadImage(file);
-}
-
-export async function uploadBusinessLogo(file: File) {
-  return uploadImage(file);
-}
-
-export async function uploadProfilePhoto(file: File) {
-  return uploadImage(file);
+export async function uploadPdf(_file: File): Promise<string> {
+  throw new Error('Upload de PDF nao faz parte do gerenciamento de imagens. Configure um endpoint de documentos no backend.');
 }

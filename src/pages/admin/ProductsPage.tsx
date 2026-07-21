@@ -80,6 +80,7 @@ interface ProductFormState {
   stock: string;
   subscriberDiscount: string;
   imageUrl: string;
+  imagePublicId: string | null;
   active: boolean;
 }
 
@@ -91,6 +92,7 @@ const emptyForm: ProductFormState = {
   stock: "0",
   subscriberDiscount: "0",
   imageUrl: "",
+  imagePublicId: null,
   active: true,
 };
 
@@ -153,6 +155,7 @@ function productToForm(product: Product): ProductFormState {
     stock: String(product.stock ?? 0),
     subscriberDiscount: String(product.subscriberDiscount ?? product.subscriber_discount ?? 0),
     imageUrl: product.imageUrl ?? product.image_url ?? "",
+    imagePublicId: product.imagePublicId ?? product.image_public_id ?? null,
     active: product.active !== false,
   };
 }
@@ -258,8 +261,8 @@ export function ProductsPage() {
     setUploadingImage(true);
 
     try {
-      const imageUrl = await uploadImage(file);
-      setField("imageUrl", imageUrl);
+      const image = await uploadImage(file, "products");
+      setForm((current) => ({ ...current, imageUrl: image.secure_url, imagePublicId: image.public_id }));
       toast.success("Imagem do produto enviada.");
     } catch (err) {
       toast.error(getApiMessage(err));
@@ -270,7 +273,7 @@ export function ProductsPage() {
   }
 
   function removeProductImage() {
-    setField("imageUrl", "");
+    setForm((current) => ({ ...current, imageUrl: "", imagePublicId: null }));
     if (imageInputRef.current) imageInputRef.current.value = "";
   }
 
@@ -310,6 +313,7 @@ export function ProductsPage() {
       stock: Number(form.stock),
       subscriberDiscount: Number(form.subscriberDiscount),
       imageUrl: form.imageUrl || null,
+      imagePublicId: form.imagePublicId,
       active: form.active,
     };
 

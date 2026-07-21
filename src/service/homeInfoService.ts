@@ -7,6 +7,7 @@ export interface HomeInfo {
   hero_subtitle?: string | null;
   hero_image?: string | null;
   hero_images?: string[];
+  hero_image_public_ids?: string[];
   about_title?: string | null;
   about_text1?: string | null;
   about_text2?: string | null;

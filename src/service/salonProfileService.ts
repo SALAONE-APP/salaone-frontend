@@ -7,6 +7,7 @@ export interface SalonProfile {
   phone: string;
   cnpj: string;
   logoUrl: string;
+  logoPublicId?: string | null;
   slug: string;
   googleMapsUrl?: string | null;
   pagarmeRecipientId?: string | null;
@@ -21,6 +22,7 @@ export interface UpdateSalonProfilePayload {
   phone: string;
   cnpj: string;
   logoUrl?: string;
+  logoPublicId?: string | null;
   googleMapsUrl?: string;
 }
 
@@ -34,6 +36,7 @@ export async function getSalonProfile(_salonId?: string): Promise<SalonProfile> 
       phone?: string | null;
       document?: string | null;
       logo_url?: string | null;
+      logo_public_id?: string | null;
       pagarme_recipient_id?: string | null;
       pagarme_recipient_status?: string | null;
       slug: string;
@@ -49,6 +52,7 @@ export async function getSalonProfile(_salonId?: string): Promise<SalonProfile> 
     phone: salon.phone ?? "",
     cnpj: salon.document ?? "",
     logoUrl: salon.logo_url ?? "",
+    logoPublicId: salon.logo_public_id ?? null,
     slug: salon.slug,
     createdAt: salon.created_at ?? null,
     pagarmeRecipientId: salon.pagarme_recipient_id ?? null,

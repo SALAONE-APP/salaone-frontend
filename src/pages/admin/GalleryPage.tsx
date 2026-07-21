@@ -58,12 +58,14 @@ import { uploadImage } from "@/service/uploadService";
 
 interface GalleryFormState {
   url: string;
+  publicId: string | null;
   alt: string;
   sortOrder: string;
 }
 
 const emptyForm: GalleryFormState = {
   url: "",
+  publicId: null,
   alt: "",
   sortOrder: "0",
 };
@@ -87,6 +89,7 @@ function getApiMessage(error: unknown) {
 function imageToForm(image: GalleryImage): GalleryFormState {
   return {
     url: image.url,
+    publicId: image.publicId ?? null,
     alt: image.alt ?? "",
     sortOrder: String(image.sortOrder ?? 0),
   };
@@ -167,8 +170,8 @@ export function GalleryPage() {
     setUploading(true);
 
     try {
-      const url = await uploadImage(file);
-      setField("url", url);
+      const image = await uploadImage(file, "gallery");
+      setForm((current) => ({ ...current, url: image.secure_url, publicId: image.public_id }));
       toast.success("Foto enviada.");
     } catch (err) {
       toast.error(getApiMessage(err));
@@ -179,7 +182,7 @@ export function GalleryPage() {
   }
 
   function removeSelectedImage() {
-    setField("url", "");
+    setForm((current) => ({ ...current, url: "", publicId: null }));
     resetFileInput();
   }
 
@@ -203,6 +206,7 @@ export function GalleryPage() {
 
     const payload = {
       url: form.url,
+      publicId: form.publicId,
       alt: form.alt.trim() || null,
       sortOrder: Number(form.sortOrder),
     };
