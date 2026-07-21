@@ -140,7 +140,6 @@ function getPaymentDescription(payment: PaymentWithType) {
 }
 
 function shouldShowInPaymentsPage(payment: ApiPaymentWithType): payment is PaymentWithType {
-  if (!payment.user?.id) return false;
   if (payment.paymentType === "appointment") return Boolean(payment.appointmentId);
   if (payment.paymentType === "subscription") return Boolean(payment.subscriptionId);
   return false;
