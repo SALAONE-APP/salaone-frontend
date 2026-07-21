@@ -161,6 +161,8 @@ export function ProductsPage() {
   const { user } = useAuth();
   const { can } = usePermissions();
   const isAdmin = user?.isAdmin === true || user?.role === "admin";
+  const canCreate = isAdmin || can("addProducts");
+  const canEdit = isAdmin || can("editProducts");
   const canManage = isAdmin || can("manageProducts");
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -414,7 +416,7 @@ export function ProductsPage() {
                 </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>
-            {canManage ? (
+            {canCreate ? (
               <Button size="sm" className="gap-2" onClick={openCreateDialog}>
                 <Plus size={14} />
                 Adicionar Produto
@@ -525,7 +527,7 @@ export function ProductsPage() {
                             {statusLabels[status]}
                           </Badge>
                         </td>
-                        {canManage ? (
+                        {canEdit || canManage ? (
                           <td className="px-4 py-3">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -534,12 +536,14 @@ export function ProductsPage() {
                                 </button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => openEditDialog(product)}>
-                                  <Edit size={14} />
-                                  Editar
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                {product.active ? (
+                                {canEdit ? (
+                                  <DropdownMenuItem onClick={() => openEditDialog(product)}>
+                                    <Edit size={14} />
+                                    Editar
+                                  </DropdownMenuItem>
+                                ) : null}
+                                {canEdit && canManage ? <DropdownMenuSeparator /> : null}
+                                {canManage && product.active ? (
                                   <DropdownMenuItem
                                     variant="destructive"
                                     onClick={() => setProductToDeactivate(product)}
@@ -547,12 +551,12 @@ export function ProductsPage() {
                                     <Trash2 size={14} />
                                     Desativar
                                   </DropdownMenuItem>
-                                ) : (
+                                ) : canManage ? (
                                   <DropdownMenuItem onClick={() => setProductToReactivate(product)}>
                                     <RotateCcw size={14} />
                                     Reativar
                                   </DropdownMenuItem>
-                                )}
+                                ) : null}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </td>
