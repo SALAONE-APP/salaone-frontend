@@ -3,6 +3,7 @@ import api from "./api";
 export interface SalonProfile {
   id: string;
   name: string;
+  businessType: BusinessType;
   email: string;
   phone: string;
   cnpj: string;
@@ -16,8 +17,11 @@ export interface SalonProfile {
   platformSubscriptionStatus?: string | null;
 }
 
+export type BusinessType = 'beauty_salon' | 'aesthetics' | 'manicure_pedicure' | 'spa' | 'other';
+
 export interface UpdateSalonProfilePayload {
   name: string;
+  businessType: BusinessType;
   email: string;
   phone: string;
   cnpj: string;
@@ -32,6 +36,7 @@ export async function getSalonProfile(_salonId?: string): Promise<SalonProfile> 
     salon: {
       id: string;
       name: string;
+      business_type?: BusinessType | null;
       email?: string | null;
       phone?: string | null;
       document?: string | null;
@@ -48,6 +53,7 @@ export async function getSalonProfile(_salonId?: string): Promise<SalonProfile> 
   return {
     id: salon.id,
     name: salon.name,
+    businessType: salon.business_type ?? 'beauty_salon',
     email: salon.email ?? "",
     phone: salon.phone ?? "",
     cnpj: salon.document ?? "",

@@ -171,6 +171,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   const profilePhotoFileInputRef = useRef<HTMLInputElement | null>(null);
   const [businessForm, setBusinessForm] = useState({
     name: '',
+    businessType: 'beauty_salon' as import('../../service/salonProfileService').BusinessType,
     email: '',
     phone: '',
     cnpj: '',
@@ -289,6 +290,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
 
         setBusinessForm({
           name: profile.name ?? '',
+          businessType: profile.businessType ?? 'beauty_salon',
           email: profile.email ?? '',
           phone: profile.phone ? formatPhone(profile.phone) : '',
           cnpj: profile.cnpj ? formatCNPJ(profile.cnpj) : '',
@@ -592,6 +594,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     try {
       const profile = await updateSalonProfile({
         name: businessForm.name.trim(),
+        businessType: businessForm.businessType,
         email: businessForm.email.trim(),
         phone: businessForm.phone.trim(),
         cnpj: businessForm.cnpj.replace(/\D/g, ''),
@@ -602,6 +605,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
 
       setBusinessForm({
         name: profile.name ?? '',
+        businessType: profile.businessType ?? 'beauty_salon',
         email: profile.email ?? '',
         phone: profile.phone ?? '',
         cnpj: profile.cnpj ? formatCNPJ(profile.cnpj) : '',
@@ -738,6 +742,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   async function saveBusinessLogo(logoUrl: string, logoPublicId: string | null, successMessage: string) {
     const profile = await updateSalonProfile({
       name: businessForm.name,
+      businessType: businessForm.businessType,
       email: businessForm.email,
       phone: businessForm.phone,
       cnpj: businessForm.cnpj,
@@ -748,6 +753,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
 
     setBusinessForm({
       name: profile.name ?? '',
+      businessType: profile.businessType ?? 'beauty_salon',
       email: profile.email ?? '',
       phone: profile.phone ?? '',
       cnpj: profile.cnpj ?? '',
@@ -1114,6 +1120,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       const [profile, updatedHomeInfo] = await Promise.all([
         updateSalonProfile({
           name: businessForm.name,
+          businessType: businessForm.businessType,
           email: businessForm.email,
           phone: businessForm.phone,
           cnpj: businessForm.cnpj,
@@ -1132,6 +1139,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
 
       setBusinessForm({
         name: profile.name ?? '',
+        businessType: profile.businessType ?? 'beauty_salon',
         email: profile.email ?? '',
         phone: profile.phone ?? '',
         cnpj: profile.cnpj ?? '',
@@ -1194,6 +1202,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       const [profile, updatedHomeInfo] = await Promise.all([
         updateSalonProfile({
           name: businessForm.name,
+          businessType: businessForm.businessType,
           email: businessForm.email,
           phone: businessForm.phone,
           cnpj: businessForm.cnpj,
@@ -1209,6 +1218,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
 
       setBusinessForm({
         name: profile.name ?? '',
+        businessType: profile.businessType ?? 'beauty_salon',
         email: profile.email ?? '',
         phone: profile.phone ?? '',
         cnpj: profile.cnpj ?? '',
@@ -1527,6 +1537,21 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
                   disabled={isLoadingBusinessProfile}
                   className="w-full bg-secondary text-sm text-foreground rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-1 focus:ring-primary"
                 />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Tipo de empresa</label>
+                <select
+                  value={businessForm.businessType}
+                  onChange={(event) => updateBusinessField('businessType', event.target.value as typeof businessForm.businessType)}
+                  disabled={isLoadingBusinessProfile}
+                  className="w-full bg-secondary text-sm text-foreground rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="beauty_salon">Salão de beleza</option>
+                  <option value="aesthetics">Clínica de estética / Esteticista</option>
+                  <option value="manicure_pedicure">Manicure e pedicure</option>
+                  <option value="spa">Spa</option>
+                  <option value="other">Outro</option>
+                </select>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Email</label>

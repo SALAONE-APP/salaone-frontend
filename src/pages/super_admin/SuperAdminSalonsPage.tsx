@@ -35,6 +35,17 @@ function statusLabel(status: string) {
   return map[String(status || "").toLowerCase()] || String(status || "-");
 }
 
+function businessTypeLabel(type?: string | null) {
+  const labels: Record<string, string> = {
+    beauty_salon: "Salão de beleza",
+    aesthetics: "Clínica de estética",
+    manicure_pedicure: "Manicure e pedicure",
+    spa: "Spa",
+    other: "Outro",
+  };
+  return labels[type ?? ""] ?? "Não informado";
+}
+
 function StatusBadge({ status }: { status: string }) {
   const cls: Record<string, string> = {
     active: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20",
@@ -256,6 +267,7 @@ export function SuperAdminSalonsPage() {
                 <tr key={shop.id} className="border-b border-border last:border-0 hover:bg-secondary/30">
                   <td className="px-5 py-3">
                     <strong className="block text-foreground">{shop.name}</strong>
+                    <small className="block text-primary">{businessTypeLabel(shop.businessType)}</small>
                     <small className="text-muted-foreground">{shop.email ?? "-"} | {shop.phone ?? "-"}</small>
                   </td>
                   <td className="px-5 py-3">
@@ -312,6 +324,7 @@ export function SuperAdminSalonsPage() {
                   <div className="space-y-2 text-sm">
                     <h4 className="font-semibold text-foreground">Dados principais</h4>
                     <p><strong className="text-muted-foreground">Slug:</strong> <span className="text-foreground">{selectedSalon.slug}</span></p>
+                    <p><strong className="text-muted-foreground">Tipo de empresa:</strong> <span className="text-foreground">{businessTypeLabel(selectedSalon.businessType)}</span></p>
                     <p><strong className="text-muted-foreground">Email:</strong> <span className="text-foreground">{selectedSalon.email ?? "-"}</span></p>
                     <p><strong className="text-muted-foreground">Telefone:</strong> <span className="text-foreground">{selectedSalon.phone ?? "-"}</span></p>
                     <p><strong className="text-muted-foreground">CNPJ:</strong> <span className="text-foreground">{selectedSalon.cnpj ?? "-"}</span></p>

@@ -37,6 +37,7 @@ export interface SuperAdminPlatformSubscription {
 export interface SuperAdminSalon {
   id: string;
   name: string;
+  businessType: string;
   slug: string;
   cnpj?: string | null;
   email?: string | null;
@@ -151,6 +152,7 @@ export interface PaginatedResponse<T> {
 interface BackendSalon {
   id: string;
   name: string;
+  business_type?: string | null;
   slug: string;
   document?: string | null;
   email?: string | null;
@@ -183,6 +185,7 @@ function mapBackendSalon(salon: BackendSalon): SuperAdminSalon {
   return {
     id: salon.id,
     name: salon.name,
+    businessType: salon.business_type ?? "beauty_salon",
     slug: salon.slug,
     cnpj: salon.document ?? null,
     email: salon.email ?? null,
