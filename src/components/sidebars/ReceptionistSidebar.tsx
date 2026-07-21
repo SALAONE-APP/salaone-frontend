@@ -51,7 +51,6 @@ const sections: SidebarSection[] = [
         children: [
           { icon: Scissors, label: "Servicos", href: "/services" },
           { icon: Package, label: "Produtos", href: "/products" },
-          { icon: LayoutList, label: "Planos", href: "/plans" },
         ],
       },
     ],
