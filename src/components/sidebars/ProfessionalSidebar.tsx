@@ -1,10 +1,10 @@
-import { Calendar, Home, Scissors, Settings, UserCheck, Wallet } from "lucide-react";
+import { Calendar, ClipboardPlus, Home, Scissors, Settings, UserCheck, Wallet } from "lucide-react";
 
 import { usePermissions } from "../../hooks/usePermissions";
 import { ProfileSidebar } from "../shared/ProfileSidebar";
 import type { SidebarItem, SidebarSection } from "../shared/ProfileSidebar";
 
-export function BarberSidebar() {
+export function ProfessionalSidebar() {
   const { can } = usePermissions();
 
   const operationItems: SidebarItem[] = [
@@ -13,8 +13,9 @@ export function BarberSidebar() {
   ];
 
   const serviceItems: SidebarItem[] = [
-    { icon: UserCheck, label: "Clientes", href: "/customers" },
-    { icon: Scissors, label: "Servicos", href: "/services" },
+    { icon: UserCheck, label: "Clientes", href: "/customers", requiredPermission: "manageCustomers" },
+    { icon: ClipboardPlus, label: "Prontuário", href: "/client-records" },
+    { icon: Scissors, label: "Servicos", href: "/services", requiredPermission: "manageServices" },
   ];
 
   const financialItems: SidebarItem[] = [

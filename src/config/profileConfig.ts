@@ -1,4 +1,4 @@
-export type UserRole = "client" | "barber" | "admin" | "super_admin" | "receptionist";
+export type UserRole = "client" | "professional" | "admin" | "super_admin" | "receptionist";
 
 export interface ProfileConfig {
   role: UserRole;
@@ -7,11 +7,11 @@ export interface ProfileConfig {
   defaultRoute: string;
 }
 
-const roles: UserRole[] = ["client", "barber", "admin", "super_admin", "receptionist"];
+const roles: UserRole[] = ["client", "professional", "admin", "super_admin", "receptionist"];
 
 export function normalizeRole(role?: string | null): UserRole {
   const rawRole = String(role || "").trim().toLowerCase();
-  const normalized = rawRole === "professional" ? "barber" : rawRole;
+  const normalized = rawRole === "professional" ? "professional" : rawRole;
 
   return roles.includes(normalized as UserRole) ? (normalized as UserRole) : "client";
 }
@@ -23,8 +23,8 @@ export const profileConfigs: Record<UserRole, ProfileConfig> = {
     panelTitle: "Area do Cliente",
     defaultRoute: "/home",
   },
-  barber: {
-    role: "barber",
+  professional: {
+    role: "professional",
     label: "Profissional",
     panelTitle: "Painel do Profissional",
     defaultRoute: "/home",

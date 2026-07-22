@@ -28,7 +28,7 @@ import {
   type Appointment,
   type AppointmentStatus,
 } from "@/service/appointmentService";
-import { useMyBarber } from "@/hooks/useMyBarber";
+import { useMyProfessional } from "@/hooks/useMyProfessional";
 import { usePermissions } from "@/hooks/usePermissions";
 
 /* ─── helpers ─── */
@@ -122,8 +122,8 @@ const statusStyles: Record<AppointmentStatus, string> = {
 
 /* ─── component ─── */
 
-export function BarberSchedulePage() {
-  const { barber, loading: barberLoading } = useMyBarber();
+export function ProfessionalSchedulePage() {
+  const { professional, loading: professionalLoading } = useMyProfessional();
   const { can } = usePermissions();
   const canManage = can("manageAgendamentos");
 
@@ -141,11 +141,11 @@ export function BarberSchedulePage() {
   const selectedDateStr = dateToDateString(selectedDate);
   const todayStr = dateToDateString(new Date());
 
-  const loadSchedule = useCallback(async (dateStr: string, barberId: string) => {
+  const loadSchedule = useCallback(async (dateStr: string, professionalId: string) => {
     setLoadingSchedule(true);
     try {
       const result = await listAppointments({
-        barberId,
+        professionalId,
         dateFrom: dateStr,
         dateTo: dateStr,
         allAppointments: true,
@@ -160,16 +160,16 @@ export function BarberSchedulePage() {
   }, []);
 
   useEffect(() => {
-    if (barber?.id) {
-      void loadSchedule(selectedDateStr, barber.id);
+    if (professional?.id) {
+      void loadSchedule(selectedDateStr, professional.id);
     }
-  }, [loadSchedule, selectedDateStr, barber]);
+  }, [loadSchedule, selectedDateStr, professional]);
 
   async function changeStatus(appointment: Appointment, status: AppointmentStatus) {
     try {
       await updateAppointment(appointment.id, { status });
       toast.success("Agendamento atualizado.");
-      if (barber?.id) await loadSchedule(selectedDateStr, barber.id);
+      if (professional?.id) await loadSchedule(selectedDateStr, professional.id);
     } catch (err) {
       toast.error(getApiMessage(err));
     }
@@ -181,7 +181,7 @@ export function BarberSchedulePage() {
     try {
       await cancelAppointment(appointment.id);
       toast.success("Agendamento cancelado.");
-      if (barber?.id) await loadSchedule(selectedDateStr, barber.id);
+      if (professional?.id) await loadSchedule(selectedDateStr, professional.id);
     } catch (err) {
       toast.error(getApiMessage(err));
     }
@@ -210,7 +210,7 @@ export function BarberSchedulePage() {
     [appointments],
   );
 
-  if (barberLoading) {
+  if (professionalLoading) {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 size={24} className="animate-spin text-muted-foreground" />
@@ -218,7 +218,7 @@ export function BarberSchedulePage() {
     );
   }
 
-  if (!barber) {
+  if (!professional) {
     return (
       <div className="rounded-xl border border-border bg-card p-8 text-center">
         <p className="text-muted-foreground">

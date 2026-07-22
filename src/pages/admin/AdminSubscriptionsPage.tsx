@@ -46,7 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { listBarbers, type Barber } from "@/service/barberService";
+import { listProfessionals, type Professional } from "@/service/professionalService";
 import { listPlans, type Plan } from "@/service/planService";
 
 import {
@@ -122,11 +122,11 @@ export function AdminSubscriptionsPage() {
   const [searchValue, setSearchValue] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [checkingOverdue, setCheckingOverdue] = useState(false);
-  const [barbers, setBarbers] = useState<Barber[]>([]);
-  const [barbersLoading, setBarbersLoading] = useState(false);
-  const [barberDialogSubscription, setBarberDialogSubscription] = useState<Subscription | null>(null);
-  const [selectedBarberId, setSelectedBarberId] = useState("");
-  const [savingBarber, setSavingBarber] = useState(false);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [professionalsLoading, setProfessionalsLoading] = useState(false);
+  const [professionalDialogSubscription, setProfessionalDialogSubscription] = useState<Subscription | null>(null);
+  const [selectedProfessionalId, setSelectedProfessionalId] = useState("");
+  const [savingProfessional, setSavingProfessional] = useState(false);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [plansLoading, setPlansLoading] = useState(false);
   const [planDialogSubscription, setPlanDialogSubscription] = useState<Subscription | null>(null);
@@ -175,11 +175,11 @@ export function AdminSubscriptionsPage() {
   }, [loadSubscriptions, searchValue]);
 
   useEffect(() => {
-    setBarbersLoading(true);
-    listBarbers({ page: 1, limit: 200 })
-      .then((result) => setBarbers(result.items))
-      .catch(() => setBarbers([]))
-      .finally(() => setBarbersLoading(false));
+    setProfessionalsLoading(true);
+    listProfessionals({ page: 1, limit: 200 })
+      .then((result) => setProfessionals(result.items))
+      .catch(() => setProfessionals([]))
+      .finally(() => setProfessionalsLoading(false));
   }, []);
 
   useEffect(() => {
@@ -225,9 +225,9 @@ export function AdminSubscriptionsPage() {
     }
   }
 
-  function openBarberDialog(subscription: Subscription) {
-    setBarberDialogSubscription(subscription);
-    setSelectedBarberId(subscription.monthlyBarberId ?? "");
+  function openProfessionalDialog(subscription: Subscription) {
+    setProfessionalDialogSubscription(subscription);
+    setSelectedProfessionalId(subscription.monthlyProfessionalId ?? "");
   }
 
   function openPlanDialog(subscription: Subscription) {
@@ -259,21 +259,21 @@ export function AdminSubscriptionsPage() {
     }
   }
 
-  async function handleSaveMonthlyBarber() {
-    if (!barberDialogSubscription) return;
-    setSavingBarber(true);
+  async function handleSaveMonthlyProfessional() {
+    if (!professionalDialogSubscription) return;
+    setSavingProfessional(true);
     try {
-      await updateSubscription(barberDialogSubscription.id, {
-        monthlyBarberId: selectedBarberId || null,
+      await updateSubscription(professionalDialogSubscription.id, {
+        monthlyProfessionalId: selectedProfessionalId || null,
       });
-      toast.success(selectedBarberId ? "Profissional do cliente atualizado." : "Profissional fixo removido.");
-      setBarberDialogSubscription(null);
-      setSelectedBarberId("");
+      toast.success(selectedProfessionalId ? "Profissional do cliente atualizado." : "Profissional fixo removido.");
+      setProfessionalDialogSubscription(null);
+      setSelectedProfessionalId("");
       await loadSubscriptions();
     } catch (err) {
       toast.error(getApiMessage(err));
     } finally {
-      setSavingBarber(false);
+      setSavingProfessional(false);
     }
   }
 
@@ -508,7 +508,7 @@ export function AdminSubscriptionsPage() {
                         <div className="flex items-center gap-2 text-sm text-foreground">
                           <Scissors size={14} className="text-muted-foreground" />
                           <span className="max-w-40 truncate">
-                            {subscription.monthlyBarber?.displayName ?? "Sem profissional fixo"}
+                            {subscription.monthlyProfessional?.displayName ?? "Sem profissional fixo"}
                           </span>
                         </div>
                       </td>
@@ -581,7 +581,7 @@ export function AdminSubscriptionsPage() {
                               Alternar recorrencia
                             </DropdownMenuItem>
                             {subscription.status === "active" && (
-                              <DropdownMenuItem onClick={() => openBarberDialog(subscription)}>
+                              <DropdownMenuItem onClick={() => openProfessionalDialog(subscription)}>
                                 <Scissors size={14} />
                                 Trocar profissional
                               </DropdownMenuItem>
@@ -620,11 +620,11 @@ export function AdminSubscriptionsPage() {
       </div>
 
       <Dialog
-        open={Boolean(barberDialogSubscription)}
+        open={Boolean(professionalDialogSubscription)}
         onOpenChange={(open) => {
-          if (!open && !savingBarber) {
-            setBarberDialogSubscription(null);
-            setSelectedBarberId("");
+          if (!open && !savingProfessional) {
+            setProfessionalDialogSubscription(null);
+            setSelectedProfessionalId("");
           }
         }}
       >
@@ -632,30 +632,30 @@ export function AdminSubscriptionsPage() {
           <DialogHeader>
             <DialogTitle>Trocar profissional do cliente</DialogTitle>
             <DialogDescription>
-              Altere o profissional fixo da assinatura de {barberDialogSubscription?.user?.name ?? "este cliente"}.
+              Altere o profissional fixo da assinatura de {professionalDialogSubscription?.user?.name ?? "este cliente"}.
               Esta acao pode ser feita pelo admin a qualquer momento.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">
             <div className="rounded-md border border-border bg-secondary/30 p-3 text-sm">
-              <p className="font-medium text-foreground">{barberDialogSubscription?.plan?.name ?? "Plano"}</p>
+              <p className="font-medium text-foreground">{professionalDialogSubscription?.plan?.name ?? "Plano"}</p>
               <p className="text-xs text-muted-foreground">
-                Atual: {barberDialogSubscription?.monthlyBarber?.displayName ?? "Sem profissional fixo"}
+                Atual: {professionalDialogSubscription?.monthlyProfessional?.displayName ?? "Sem profissional fixo"}
               </p>
             </div>
 
             <div className="space-y-2">
               <Label>Novo profissional fixo</Label>
-              <Select value={selectedBarberId || "none"} onValueChange={(value) => setSelectedBarberId(value === "none" ? "" : value)}>
+              <Select value={selectedProfessionalId || "none"} onValueChange={(value) => setSelectedProfessionalId(value === "none" ? "" : value)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder={barbersLoading ? "Carregando profissionais..." : "Selecionar profissional"} />
+                  <SelectValue placeholder={professionalsLoading ? "Carregando profissionais..." : "Selecionar profissional"} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sem profissional fixo</SelectItem>
-                  {barbers.map((barber) => (
-                    <SelectItem key={barber.id} value={barber.id}>
-                      {barber.displayName}
+                  {professionals.map((professional) => (
+                    <SelectItem key={professional.id} value={professional.id}>
+                      {professional.displayName}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -667,16 +667,16 @@ export function AdminSubscriptionsPage() {
             <Button
               type="button"
               variant="outline"
-              disabled={savingBarber}
+              disabled={savingProfessional}
               onClick={() => {
-                setBarberDialogSubscription(null);
-                setSelectedBarberId("");
+                setProfessionalDialogSubscription(null);
+                setSelectedProfessionalId("");
               }}
             >
               Cancelar
             </Button>
-            <Button type="button" disabled={savingBarber || barbersLoading} onClick={() => void handleSaveMonthlyBarber()}>
-              {savingBarber && <Loader2 size={14} className="animate-spin" />}
+            <Button type="button" disabled={savingProfessional || professionalsLoading} onClick={() => void handleSaveMonthlyProfessional()}>
+              {savingProfessional && <Loader2 size={14} className="animate-spin" />}
               Salvar profissional
             </Button>
           </DialogFooter>

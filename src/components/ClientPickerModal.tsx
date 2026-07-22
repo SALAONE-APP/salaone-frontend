@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { listUsers, type UserProfile } from "@/service/userService";
+import { listClientOptions, type UserProfile } from "@/service/userService";
 
 interface ClientPickerModalProps {
   open: boolean;
@@ -40,8 +40,7 @@ export function ClientPickerModal({ open, onClose, onSelect }: ClientPickerModal
   useEffect(() => {
     if (!open) return;
     setLoading(true);
-    listUsers({
-      role: "client",
+    listClientOptions({
       q: debouncedSearch || undefined,
       page,
       limit: PAGE_SIZE,

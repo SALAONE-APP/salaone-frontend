@@ -37,9 +37,9 @@ export interface Subscription {
   isRecurring?: boolean;
   autoRenewal?: boolean;
   daysOverdue?: number;
-  monthlyBarberId?: string | null;
-  monthlyBarber?: { id: string; displayName: string; photoUrl?: string | null } | null;
-  monthlyBarberSetAt?: string | null;
+  monthlyProfessionalId?: string | null;
+  monthlyProfessional?: { id: string; displayName: string; photoUrl?: string | null } | null;
+  monthlyProfessionalSetAt?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
   currentCycle?: {
@@ -80,15 +80,15 @@ export async function updateSubscription(
     autoRenewal?: boolean;
     isRecurring?: boolean;
     paymentMethod?: string;
-    monthlyBarberId?: string | null;
+    monthlyProfessionalId?: string | null;
   },
 ) {
   const response = await api.patch<Subscription>(`/subscriptions/${id}`, data);
   return response.data;
 }
 
-export async function changeSubscriptionMonthlyBarber(id: string, monthlyBarberId: string) {
-  const response = await api.patch<Subscription>(`/subscriptions/${id}`, { monthlyBarberId });
+export async function changeSubscriptionMonthlyProfessional(id: string, monthlyProfessionalId: string) {
+  const response = await api.patch<Subscription>(`/subscriptions/${id}`, { monthlyProfessionalId });
   return response.data;
 }
 

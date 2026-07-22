@@ -3,9 +3,9 @@ import { ReceptionistSettingsPage } from "../pages/receptionist/ReceptionistSett
 import { BookingsPage } from "../pages/shared/BookingsPage";
 import { CashClosingPage } from "../pages/shared/CashClosingPage";
 import { CustomersPage } from "../pages/shared/CustomersPage";
+import { ClientRecordsPage } from "../pages/shared/ClientRecordsPage";
 import { FitAppointmentPage } from "../pages/shared/FitAppointmentPage";
 import { PaymentsPage } from "../pages/shared/PaymentsPage";
-import { PlansPage } from "../pages/admin/PlansPage";
 import { ProductsPage } from "../pages/admin/ProductsPage";
 import { SchedulesPage } from "../pages/shared/SchedulesPage";
 import { ServicesPage } from "../pages/shared/ServicesPage";
@@ -58,6 +58,13 @@ export const receptionistRoutes: AppRoute[] = [
     Component: CustomersPage,
     requiredPermission: "manageCustomers",
   },
+  {
+    path: "/client-records",
+    title: "Prontuário",
+    breadcrumbs: ["Atendimento", "Prontuário"],
+    Component: ClientRecordsPage,
+    requiredPermission: "manageCustomers",
+  },
   /* Visualização sem permissão — ações de edição são bloqueadas dentro das páginas */
   {
     path: "/services",
@@ -70,12 +77,6 @@ export const receptionistRoutes: AppRoute[] = [
     title: "Produtos",
     breadcrumbs: ["Catalogo", "Produtos"],
     Component: ProductsPage,
-  },
-  {
-    path: "/plans",
-    title: "Planos",
-    breadcrumbs: ["Catalogo", "Planos"],
-    Component: PlansPage,
   },
   {
     path: "/settings",

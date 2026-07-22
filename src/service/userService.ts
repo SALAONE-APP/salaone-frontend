@@ -6,10 +6,10 @@ export interface ChangePasswordPayload {
 }
 
 export async function changePassword(
-  userId: string,
+  _userId: string,
   data: ChangePasswordPayload
 ) {
-  const response = await api.patch(`/users/${userId}`, {
+  const response = await api.patch("/users/me/password", {
     currentPassword: data.currentPassword,
     newPassword: data.newPassword,
   });
@@ -19,6 +19,7 @@ export async function changePassword(
 
 export interface UserProfile {
   id: string;
+  platformUserId?: string;
   name: string;
   email: string;
   phone?: string | null;
@@ -29,6 +30,7 @@ export interface UserProfile {
   isAdmin?: boolean;
   permissions?: Record<string, boolean> | null;
   photoUrl?: string | null;
+  photoPublicId?: string | null;
   salary?: number | null;
   createdAt?: string;
   updatedAt?: string;
@@ -38,8 +40,8 @@ export interface UserProfile {
 }
 
 export interface ListUsersParams {
-  role?: "admin" | "barber" | "receptionist" | "client";
-  excludeRole?: "admin" | "barber" | "receptionist" | "client";
+  role?: "admin" | "professional" | "receptionist" | "client";
+  excludeRole?: "admin" | "professional" | "receptionist" | "client";
   q?: string;
   page?: number;
   limit?: number;
@@ -59,10 +61,11 @@ export interface CreateUserPayload {
   cpf?: string | null;
   birthDate?: string | null;
   password: string;
-  role: "admin" | "barber" | "receptionist" | "client";
+  role: "admin" | "professional" | "receptionist" | "client";
   isAdmin?: boolean;
   permissions?: Record<string, boolean>;
   photoUrl?: string | null;
+  photoPublicId?: string | null;
 }
 
 export interface UpdateUserPayload {
@@ -71,9 +74,10 @@ export interface UpdateUserPayload {
   phone?: string | null;
   cpf?: string | null;
   birthDate?: string | null;
-  role?: "admin" | "barber" | "receptionist" | "client";
+  role?: "admin" | "professional" | "receptionist" | "client";
   isAdmin?: boolean;
   photoUrl?: string | null;
+  photoPublicId?: string | null;
   salary?: number | null;
   resetPassword?: boolean;
   newPassword?: string;
@@ -82,6 +86,11 @@ export interface UpdateUserPayload {
 export async function listUsers(params: ListUsersParams = {}) {
   const response = await api.get<ListUsersResponse>("/users", { params });
 
+  return response.data;
+}
+
+export async function listClientOptions(params: Pick<ListUsersParams, "q" | "page" | "limit"> = {}) {
+  const response = await api.get<ListUsersResponse>("/users/client-options", { params });
   return response.data;
 }
 
@@ -114,9 +123,10 @@ export async function deleteUser(userId: string) {
   return response.data;
 }
 
-export async function updateProfilePhoto(userId: string, photoUrl: string | null) {
+export async function updateProfilePhoto(userId: string, photoUrl: string | null, photoPublicId: string | null) {
   const response = await api.patch<UserProfile>(`/users/${userId}`, {
     photoUrl,
+    photoPublicId,
   });
 
   return response.data;

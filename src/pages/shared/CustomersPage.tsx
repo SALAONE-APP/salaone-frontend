@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Calendar,
   Cake,
-  CreditCard,
   Download,
   Edit,
   Filter,
@@ -10,9 +9,7 @@ import {
   Mail,
   MoreHorizontal,
   Phone,
-  Play,
   Plus,
-  PowerOff,
   Search,
   Trash2,
 } from "lucide-react";
@@ -62,21 +59,14 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 
-import {
-  createUser,
-  deleteUser,
-  listUsers,
-  updateUser,
-  type UserProfile,
-} from "@/service/userService";
+import type { UserProfile } from "@/service/userService";
+import { createAdminClient, deleteAdminClient, listAdminClients, updateAdminClient } from "@/service/adminClientService";
 import {
   createSubscription,
-  listSubscriptions,
-  updateSubscription,
   type Subscription,
 } from "@/service/subscriptionService";
-import { listPlans, type Plan } from "@/service/planService";
-import { getSettings, type BookingPaymentMethod } from "@/service/settingsService";
+import type { Plan } from "@/service/planService";
+import type { BookingPaymentMethod } from "@/service/settingsService";
 import { downloadCsvReport, downloadPdfReport, type ReportColumn } from "@/utils/reportExport";
 
 type CustomerStatus = "active" | "inactive" | "new";
@@ -250,6 +240,7 @@ function isBirthdaySoon(birthDate?: string | null, withinDays = 7) {
 }
 
 function getCustomerStatus(customer: UserProfile): CustomerStatus {
+  if (customer.lastAppointmentStatus === "inactive") return "inactive";
   const visits = customer.visits ?? 0;
 
   if (visits === 0) return "new";
@@ -299,22 +290,11 @@ function getApiMessage(error: unknown) {
   return "Nao foi possivel concluir a operacao.";
 }
 
-function buildPasswordForm(): CustomerFormState {
-  return {
-    name: "",
-    email: "",
-    phone: "",
-    cpf: "",
-    birthDate: "",
-    password: "",
-  };
-}
-
 export function CustomersPage() {
   const { user } = useAuth();
   const { can, isAdmin } = usePermissions();
   // Profissional vê somente leitura por padrão; apenas admins e profissionais com manageCustomers podem editar
-  const canEdit = isAdmin || user?.role !== "barber" || can("manageCustomers");
+  const canEdit = isAdmin || user?.role !== "professional" || can("manageCustomers");
 
   const [customers, setCustomers] = useState<UserProfile[]>([]);
   const [total, setTotal] = useState(0);
@@ -329,11 +309,10 @@ export function CustomersPage() {
   const [form, setForm] = useState<CustomerFormState>(emptyForm);
   const [customerToDelete, setCustomerToDelete] = useState<UserProfile | null>(null);
   const [subscriptionMap, setSubscriptionMap] = useState<Map<string, Subscription>>(new Map());
-  const [togglingSubId, setTogglingSubId] = useState<string | null>(null);
   const [subDialogCustomer, setSubDialogCustomer] = useState<UserProfile | null>(null);
-  const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
+  const [availablePlans] = useState<Plan[]>([]);
   const [subForm, setSubForm] = useState({ planId: "", paymentMethod: "credito", amount: "" });
-  const [hiddenPaymentMethods, setHiddenPaymentMethods] = useState<BookingPaymentMethod[]>([]);
+  const [hiddenPaymentMethods] = useState<BookingPaymentMethod[]>([]);
   const [savingSub, setSavingSub] = useState(false);
 
   const limit = 20;
@@ -345,8 +324,7 @@ export function CustomersPage() {
       setError(null);
 
       try {
-        const result = await listUsers({
-          role: "client",
+        const result = await listAdminClients({
           q: search.trim() || undefined,
           page,
           limit,
@@ -372,62 +350,6 @@ export function CustomersPage() {
       window.clearTimeout(timeout);
     };
   }, [page, search]);
-
-  useEffect(() => {
-    async function loadAllSubscriptions() {
-      const map = new Map<string, Subscription>();
-      let page = 1;
-      const pageLimit = 100;
-      while (true) {
-        const res = await listSubscriptions({ limit: pageLimit, page });
-        for (const sub of res.items) map.set(sub.userId, sub);
-        if (res.items.length < pageLimit) break;
-        page++;
-      }
-      setSubscriptionMap(new Map(map));
-    }
-    loadAllSubscriptions().catch(() => {});
-  }, []);
-
-  async function toggleCustomerSubscription(customer: UserProfile) {
-    const sub = subscriptionMap.get(customer.id);
-    if (!sub) return;
-    setTogglingSubId(sub.id);
-    try {
-      const newStatus = sub.status === "active" ? "cancelled" : "active";
-      await updateSubscription(sub.id, { status: newStatus });
-      toast.success(sub.status === "active" ? "Plano cancelado." : "Plano ativado.");
-      setSubscriptionMap((prev) => {
-        const next = new Map(prev);
-        next.set(customer.id, { ...sub, status: newStatus });
-        return next;
-      });
-    } catch (err) {
-      toast.error(getApiMessage(err));
-    } finally {
-      setTogglingSubId(null);
-    }
-  }
-
-  function openSubscriptionDialog(customer: UserProfile) {
-    setSubDialogCustomer(customer);
-    setSubForm({ planId: "", paymentMethod: "credito", amount: "" });
-    listPlans({ activeOnly: true } as any)
-      .then(setAvailablePlans)
-      .catch(() => setAvailablePlans([]));
-    getSettings()
-      .then((settings) => {
-        const hidden = settings.hiddenBookingPaymentMethods ?? [];
-        setHiddenPaymentMethods(hidden);
-        const firstMethod =
-          !hidden.includes("pix") ? "pix" :
-          !hidden.includes("local") ? "dinheiro" :
-          !hidden.includes("cartao") ? "debito" :
-          "";
-        setSubForm((current) => ({ ...current, paymentMethod: firstMethod }));
-      })
-      .catch(() => setHiddenPaymentMethods([]));
-  }
 
   async function handleCreateSubscription(e: FormEvent) {
     e.preventDefault();
@@ -566,13 +488,20 @@ export function CustomersPage() {
 
   function openCreateDialog() {
     setEditingCustomer(null);
-    setForm({ ...emptyForm, password: "123456" });
+    setForm(emptyForm);
     setDialogOpen(true);
   }
 
   function openEditDialog(customer: UserProfile) {
     setEditingCustomer(customer);
-    setForm(buildPasswordForm());
+    setForm({
+      name: customer.name,
+      email: customer.email ?? "",
+      phone: maskPhone(customer.phone ?? ""),
+      cpf: customer.cpf ? maskCpf(customer.cpf) : "",
+      birthDate: String(customer.birthDate ?? customer.birth_date ?? "").slice(0, 10),
+      password: "",
+    });
     setDialogOpen(true);
   }
 
@@ -581,19 +510,11 @@ export function CustomersPage() {
   }
 
   function validateForm() {
-    if (editingCustomer) {
-      if (form.password.trim().length < 4) {
-        return "Informe uma nova senha com no minimo 4 caracteres.";
-      }
-
-      return null;
-    }
-
     if (!form.name.trim()) return "Informe o nome do cliente.";
-    if (!form.email.trim()) return "Informe o e-mail do cliente.";
+    if (form.email.trim() && !/^\S+@\S+\.\S+$/.test(form.email.trim())) return "Informe um e-mail valido.";
 
     const phone = onlyDigits(form.phone);
-    if (phone && (phone.length < 10 || phone.length > 15)) {
+    if (!phone || phone.length < 10 || phone.length > 15) {
       return "O telefone deve ter entre 10 e 15 digitos.";
     }
 
@@ -602,16 +523,11 @@ export function CustomersPage() {
       return "O CPF deve ter 11 digitos.";
     }
 
-    if (!editingCustomer && form.password.trim().length < 4) {
-      return "A senha inicial deve ter no minimo 4 caracteres.";
-    }
-
     return null;
   }
 
   async function reloadCurrentPage() {
-    const result = await listUsers({
-      role: "client",
+    const result = await listAdminClients({
       q: search.trim() || undefined,
       page,
       limit,
@@ -633,7 +549,7 @@ export function CustomersPage() {
     const payload = {
       name: form.name.trim(),
       email: form.email.trim().toLowerCase(),
-      phone: onlyDigits(form.phone) || null,
+      phone: onlyDigits(form.phone),
       cpf: onlyDigits(form.cpf) || null,
       birthDate: form.birthDate || null,
       photoUrl: null,
@@ -643,18 +559,10 @@ export function CustomersPage() {
 
     try {
       if (editingCustomer) {
-        await updateUser(editingCustomer.id, {
-          resetPassword: true,
-          newPassword: form.password.trim(),
-        });
-        toast.success("Senha do cliente atualizada.");
+        await updateAdminClient(editingCustomer.id, payload);
+        toast.success("Cliente atualizado.");
       } else {
-        await createUser({
-          ...payload,
-          password: form.password.trim(),
-          role: "client",
-          isAdmin: false,
-        });
+        await createAdminClient(payload);
         toast.success("Cliente cadastrado.");
       }
 
@@ -671,8 +579,8 @@ export function CustomersPage() {
     if (!customerToDelete) return;
 
     try {
-      await deleteUser(customerToDelete.id);
-      toast.success("Cliente removido.");
+      await deleteAdminClient(customerToDelete.id);
+      toast.success("Cliente desativado.");
       setCustomerToDelete(null);
       await reloadCurrentPage();
     } catch (err) {
@@ -977,43 +885,8 @@ export function CustomersPage() {
                               )}
                               <DropdownMenuItem onClick={() => openEditDialog(customer)}>
                                 <Edit size={14} />
-                                Reset de senha
+                                Editar cliente
                               </DropdownMenuItem>
-                              {(() => {
-                                const sub = subscriptionMap.get(customer.id);
-                                if (!sub || sub.status === "expired") {
-                                  return (
-                                    <>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem onClick={() => openSubscriptionDialog(customer)}>
-                                        <CreditCard size={14} />
-                                        Criar plano
-                                      </DropdownMenuItem>
-                                    </>
-                                  );
-                                }
-                                return (
-                                  <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      disabled={togglingSubId === sub.id}
-                                      onClick={() => toggleCustomerSubscription(customer)}
-                                    >
-                                      {sub.status === "active" ? (
-                                        <>
-                                          <PowerOff size={14} />
-                                          Cancelar plano
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Play size={14} />
-                                          Ativar plano
-                                        </>
-                                      )}
-                                    </DropdownMenuItem>
-                                  </>
-                                );
-                              })()}
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 variant="destructive"
@@ -1069,14 +942,13 @@ export function CustomersPage() {
               </DialogTitle>
               <DialogDescription>
                 {editingCustomer
-                  ? "Altere apenas a senha de acesso do cliente."
+                  ? "Atualize os dados cadastrais do cliente."
                   : "Cadastre um cliente para esta salão."}
               </DialogDescription>
             </DialogHeader>
 
             <div className="grid gap-4 md:grid-cols-2">
-              {!editingCustomer ? (
-                <>
+              <>
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="customer-name">Nome</Label>
                     <Input
@@ -1093,7 +965,6 @@ export function CustomersPage() {
                       type="email"
                       value={form.email}
                       onChange={(event) => setField("email", event.target.value)}
-                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -1104,6 +975,7 @@ export function CustomersPage() {
                       onChange={(event) => setField("phone", maskPhone(event.target.value))}
                       placeholder="(11) 99999-9999"
                       inputMode="numeric"
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -1127,25 +999,7 @@ export function CustomersPage() {
                       className="h-9 rounded-md"
                     />
                   </div>
-                </>
-              ) : null}
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="customer-password">
-                  {editingCustomer ? "Nova senha" : "Senha inicial"}
-                </Label>
-                <Input
-                  id="customer-password"
-                  type="password"
-                  value={form.password}
-                  onChange={(event) => setField("password", event.target.value)}
-                  placeholder={
-                    editingCustomer
-                      ? "Preencha apenas se quiser redefinir"
-                      : "Minimo 4 caracteres"
-                  }
-                  required
-                />
-              </div>
+              </>
             </div>
 
             <DialogFooter>

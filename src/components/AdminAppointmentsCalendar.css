@@ -62,42 +62,42 @@
   background: hsl(var(--card));
 }
 
-.calendar-grid-barber-header {
+.calendar-grid-professional-header {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 5px;
   padding: 10px 8px 8px;
   border-right: 1px solid hsl(var(--border));
-  border-top: 3px solid var(--barber-accent, hsl(var(--primary)));
+  border-top: 3px solid var(--professional-accent, hsl(var(--primary)));
   background: hsl(var(--card));
   min-width: 180px;
   transition: background 0.15s;
 }
 
-.calendar-barber-photo {
+.calendar-professional-photo {
   width: 34px;
   height: 34px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid var(--barber-accent, hsl(var(--border)));
+  border: 2px solid var(--professional-accent, hsl(var(--border)));
 }
 
-.calendar-barber-photo-fallback {
+.calendar-professional-photo-fallback {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: var(--barber-tint, hsl(var(--muted)));
-  border: 2px solid var(--barber-accent, hsl(var(--border)));
+  background: var(--professional-tint, hsl(var(--muted)));
+  border: 2px solid var(--professional-accent, hsl(var(--border)));
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 13px;
   font-weight: 700;
-  color: var(--barber-accent, hsl(var(--foreground)));
+  color: var(--professional-accent, hsl(var(--foreground)));
 }
 
-.calendar-barber-name {
+.calendar-professional-name {
   font-size: 11px;
   font-weight: 600;
   color: hsl(var(--foreground));
@@ -195,7 +195,7 @@
   min-width: 180px;
   box-sizing: border-box;
   border-right: 1px solid hsl(var(--border) / 0.25);
-  background: var(--barber-tint, transparent);
+  background: var(--professional-tint, transparent);
 }
 
 /* ── Appointments overlay ── */

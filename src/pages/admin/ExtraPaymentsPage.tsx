@@ -25,9 +25,10 @@ import {
 import {
   createExtraEmployeePayment,
   listExtraEmployeePayments,
+  listPayrollEmployees,
   type ExtraEmployeePayment,
+  type PayrollEmployeeOption,
 } from "@/service/employeePayrollService";
-import { listUsers, type UserProfile } from "@/service/userService";
 import { downloadCsvReport, downloadPdfReport, type ReportColumn } from "@/utils/reportExport";
 
 function formatCurrency(value: number) {
@@ -112,7 +113,7 @@ const emptyForm: ExtraPaymentForm = {
 
 export function ExtraPaymentsPage() {
   const [payments, setPayments] = useState<ExtraEmployeePayment[]>([]);
-  const [employees, setEmployees] = useState<UserProfile[]>([]);
+  const [employees, setEmployees] = useState<PayrollEmployeeOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -133,9 +134,9 @@ export function ExtraPaymentsPage() {
 
   useEffect(() => {
     void loadPayments();
-    listUsers({ excludeRole: "client", limit: 200 })
-      .then((res) => setEmployees(res.items))
-      .catch(() => {});
+    listPayrollEmployees()
+      .then(setEmployees)
+      .catch((err) => toast.error(`Nao foi possivel carregar os funcionarios. ${getApiMessage(err)}`));
   }, [loadPayments]);
 
   const filteredPayments = useMemo(() => {
@@ -392,7 +393,7 @@ export function ExtraPaymentsPage() {
                   <SelectContent>
                     {employees.map((emp) => (
                       <SelectItem key={emp.id} value={emp.id}>
-                        {emp.name} ({emp.role})
+                        {emp.name}{emp.jobTitle ? ` (${emp.jobTitle})` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>

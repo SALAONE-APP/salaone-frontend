@@ -20,6 +20,7 @@ import {
   getCashClosingPreview,
   getCashClosingReport,
   listCashClosings,
+  openCashRegister,
   type CashClosing,
   type CashClosingPayment,
   type CashClosingSummary,
@@ -38,8 +39,6 @@ type OpenCashSession = {
   openedBy: string;
   openedByName: string;
 };
-
-const openCashSessionKey = "cashClosing:openSession";
 
 const methodLabels: Record<PaymentMethod, string> = {
   credito: "Credito",
@@ -165,19 +164,6 @@ function normalizeText(value: string) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
-}
-
-function getStoredOpenCashSession() {
-  const storedSession = localStorage.getItem(openCashSessionKey);
-
-  if (!storedSession) return null;
-
-  try {
-    return JSON.parse(storedSession) as OpenCashSession;
-  } catch {
-    localStorage.removeItem(openCashSessionKey);
-    return null;
-  }
 }
 
 function getCashPaymentDescription(payment: CashClosingPayment) {
@@ -455,9 +441,7 @@ export function CashClosingPage() {
   const [exportingCsv, setExportingCsv] = useState(false);
   const [cashPreview, setCashPreview] = useState<CashClosingSummary | null>(null);
   const [cashClosings, setCashClosings] = useState<CashClosing[]>([]);
-  const [openCashSession, setOpenCashSession] = useState<OpenCashSession | null>(() =>
-    getStoredOpenCashSession(),
-  );
+  const [openCashSession, setOpenCashSession] = useState<OpenCashSession | null>(null);
   const [loading, setLoading] = useState(true);
   const initialReportRange = currentMonthRange();
   const [reportStartDate, setReportStartDate] = useState(initialReportRange.start);
@@ -492,6 +476,11 @@ export function CashClosingPage() {
     try {
       const preview = await getCashClosingPreview();
       setCashPreview(preview);
+      setOpenCashSession(preview.openedAt ? {
+        openedAt: preview.openedAt,
+        openedBy: preview.openedBy || "",
+        openedByName: preview.openedByName || "Usuario nao identificado",
+      } : null);
     } catch (err) {
       setCashPreview(null);
       toast.error(getApiMessage(err));
@@ -573,23 +562,28 @@ export function CashClosingPage() {
 
   const cashIsOpen = Boolean(openCashSession);
 
-  function handleOpenCash() {
-    const session = {
-      openedAt: new Date().toISOString(),
-      openedBy: user?.id || "",
-      openedByName: user?.name || "Usuario nao identificado",
-    };
-
-    localStorage.setItem(openCashSessionKey, JSON.stringify(session));
-    setOpenCashSession(session);
-    toast.success("Caixa aberto com sucesso.");
+  async function handleOpenCash() {
+    setClosingCash(true);
+    try {
+      const preview = await openCashRegister();
+      setCashPreview(preview);
+      setOpenCashSession(preview.openedAt ? {
+        openedAt: preview.openedAt,
+        openedBy: preview.openedBy || user?.id || "",
+        openedByName: preview.openedByName || user?.name || "Usuario nao identificado",
+      } : null);
+      toast.success("Caixa aberto com sucesso.");
+    } catch (err) {
+      toast.error(getApiMessage(err));
+    } finally {
+      setClosingCash(false);
+    }
   }
 
   async function handleCloseCash() {
     setClosingCash(true);
     try {
       await createCashClosing();
-      localStorage.removeItem(openCashSessionKey);
       setOpenCashSession(null);
       toast.success("Caixa fechado com sucesso.");
       await loadCashClosings();
@@ -602,7 +596,7 @@ export function CashClosingPage() {
 
   async function handleCashAction() {
     if (!cashIsOpen) {
-      handleOpenCash();
+      await handleOpenCash();
       return;
     }
 

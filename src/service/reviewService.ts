@@ -4,14 +4,14 @@ export interface CustomerReview {
   id: string;
   salonId: string;
   appointmentId?: string | null;
-  barberId: string;
+  professionalId: string;
   clientId: string;
   rating: number;
   comment?: string | null;
   createdAt: string;
   updatedAt?: string;
   clientName?: string | null;
-  barberName?: string | null;
+  professionalName?: string | null;
   appointmentStartAt?: string | null;
   services?: string[];
 }

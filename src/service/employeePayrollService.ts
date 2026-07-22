@@ -1,12 +1,12 @@
 import api from "./api";
 
 export type EmployeePaymentStatus = "pending" | "partial" | "paid" | "empty";
-export type CommissionRuleType = "FIXED_BARBER" | "FREE_BARBER";
+export type CommissionRuleType = "FIXED_PROFESSIONAL" | "FREE_PROFESSIONAL";
 
 export interface SubscriptionCommissionDistribution {
   employeeId: string;
-  barberId?: string | null;
-  barberName?: string | null;
+  professionalId?: string | null;
+  professionalName?: string | null;
   appointments: number;
   points: number;
   participationPercent: number;
@@ -186,6 +186,32 @@ export interface ExtraEmployeePayment {
   liquido: number;
   paidByName?: string | null;
   createdAt: string;
+}
+
+export interface PayrollEmployeeOption {
+  id: string;
+  name: string;
+  jobTitle?: string | null;
+  isActive: boolean;
+}
+
+interface BackendEmployeeOption {
+  id: string;
+  name: string;
+  job_title?: string | null;
+  is_active?: boolean;
+}
+
+export async function listPayrollEmployees(): Promise<PayrollEmployeeOption[]> {
+  const response = await api.get<{ employees: BackendEmployeeOption[] }>("/employees");
+  return response.data.employees
+    .filter((employee) => employee.is_active !== false)
+    .map((employee) => ({
+      id: employee.id,
+      name: employee.name,
+      jobTitle: employee.job_title ?? null,
+      isActive: employee.is_active !== false,
+    }));
 }
 
 export async function listExtraEmployeePayments(): Promise<ExtraEmployeePayment[]> {

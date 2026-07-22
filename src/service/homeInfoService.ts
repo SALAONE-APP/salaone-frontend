@@ -7,6 +7,7 @@ export interface HomeInfo {
   hero_subtitle?: string | null;
   hero_image?: string | null;
   hero_images?: string[];
+  hero_image_public_ids?: string[];
   about_title?: string | null;
   about_text1?: string | null;
   about_text2?: string | null;
@@ -19,7 +20,7 @@ export interface HomeInfo {
   location_title?: string | null;
   location_address?: string | null;
   location_city?: string | null;
-  barber_payment_frequency?: string | null;
+  professional_payment_frequency?: string | null;
   employee_payment_frequency?: string | null;
 }
 

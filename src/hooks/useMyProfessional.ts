@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 
-import { getMyBarber, type Barber } from "@/service/barberService";
+import { getMyProfessional, type Professional } from "@/service/professionalService";
 
-export function useMyBarber() {
-  const [barber, setBarber] = useState<Barber | null>(null);
+export function useMyProfessional() {
+  const [professional, setProfessional] = useState<Professional | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getMyBarber()
-      .then(setBarber)
+    getMyProfessional()
+      .then(setProfessional)
       .catch((err: unknown) => {
         const msg =
           (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
@@ -19,5 +19,5 @@ export function useMyBarber() {
       .finally(() => setLoading(false));
   }, []);
 
-  return { barber, loading, error };
+  return { professional, loading, error };
 }

@@ -80,6 +80,7 @@ interface ProductFormState {
   stock: string;
   subscriberDiscount: string;
   imageUrl: string;
+  imagePublicId: string | null;
   active: boolean;
 }
 
@@ -91,6 +92,7 @@ const emptyForm: ProductFormState = {
   stock: "0",
   subscriberDiscount: "0",
   imageUrl: "",
+  imagePublicId: null,
   active: true,
 };
 
@@ -153,6 +155,7 @@ function productToForm(product: Product): ProductFormState {
     stock: String(product.stock ?? 0),
     subscriberDiscount: String(product.subscriberDiscount ?? product.subscriber_discount ?? 0),
     imageUrl: product.imageUrl ?? product.image_url ?? "",
+    imagePublicId: product.imagePublicId ?? product.image_public_id ?? null,
     active: product.active !== false,
   };
 }
@@ -161,6 +164,8 @@ export function ProductsPage() {
   const { user } = useAuth();
   const { can } = usePermissions();
   const isAdmin = user?.isAdmin === true || user?.role === "admin";
+  const canCreate = isAdmin || can("addProducts");
+  const canEdit = isAdmin || can("editProducts");
   const canManage = isAdmin || can("manageProducts");
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -256,8 +261,8 @@ export function ProductsPage() {
     setUploadingImage(true);
 
     try {
-      const imageUrl = await uploadImage(file);
-      setField("imageUrl", imageUrl);
+      const image = await uploadImage(file, "products");
+      setForm((current) => ({ ...current, imageUrl: image.secure_url, imagePublicId: image.public_id }));
       toast.success("Imagem do produto enviada.");
     } catch (err) {
       toast.error(getApiMessage(err));
@@ -268,7 +273,7 @@ export function ProductsPage() {
   }
 
   function removeProductImage() {
-    setField("imageUrl", "");
+    setForm((current) => ({ ...current, imageUrl: "", imagePublicId: null }));
     if (imageInputRef.current) imageInputRef.current.value = "";
   }
 
@@ -308,6 +313,7 @@ export function ProductsPage() {
       stock: Number(form.stock),
       subscriberDiscount: Number(form.subscriberDiscount),
       imageUrl: form.imageUrl || null,
+      imagePublicId: form.imagePublicId,
       active: form.active,
     };
 
@@ -414,7 +420,7 @@ export function ProductsPage() {
                 </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>
-            {canManage ? (
+            {canCreate ? (
               <Button size="sm" className="gap-2" onClick={openCreateDialog}>
                 <Plus size={14} />
                 Adicionar Produto
@@ -525,7 +531,7 @@ export function ProductsPage() {
                             {statusLabels[status]}
                           </Badge>
                         </td>
-                        {canManage ? (
+                        {canEdit || canManage ? (
                           <td className="px-4 py-3">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -534,12 +540,14 @@ export function ProductsPage() {
                                 </button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => openEditDialog(product)}>
-                                  <Edit size={14} />
-                                  Editar
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                {product.active ? (
+                                {canEdit ? (
+                                  <DropdownMenuItem onClick={() => openEditDialog(product)}>
+                                    <Edit size={14} />
+                                    Editar
+                                  </DropdownMenuItem>
+                                ) : null}
+                                {canEdit && canManage ? <DropdownMenuSeparator /> : null}
+                                {canManage && product.active ? (
                                   <DropdownMenuItem
                                     variant="destructive"
                                     onClick={() => setProductToDeactivate(product)}
@@ -547,12 +555,12 @@ export function ProductsPage() {
                                     <Trash2 size={14} />
                                     Desativar
                                   </DropdownMenuItem>
-                                ) : (
+                                ) : canManage ? (
                                   <DropdownMenuItem onClick={() => setProductToReactivate(product)}>
                                     <RotateCcw size={14} />
                                     Reativar
                                   </DropdownMenuItem>
-                                )}
+                                ) : null}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </td>

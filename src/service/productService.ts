@@ -10,6 +10,8 @@ export interface Product {
   subscriber_discount?: number;
   imageUrl?: string | null;
   image_url?: string | null;
+  imagePublicId?: string | null;
+  image_public_id?: string | null;
   stock: number;
   active: boolean;
   createdAt?: string;
@@ -30,6 +32,7 @@ export interface ProductPayload {
   price: number;
   subscriberDiscount?: number;
   imageUrl?: string | null;
+  imagePublicId?: string | null;
   stock?: number;
   active?: boolean;
 }

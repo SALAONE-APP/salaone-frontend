@@ -4,7 +4,6 @@ import { toast } from "sonner";
 
 import {
   listSuperAdminSalons,
-  getSuperAdminDashboard,
   type SuperAdminSalon,
   type SuperAdminDashboard,
 } from "@/service/superAdminService";
@@ -39,17 +38,12 @@ function StatusBadge({ status }: { status: string }) {
 
 export function SuperAdminDashboardPage() {
   const [loading, setLoading] = useState(true);
-  const [dashboard, setDashboard] = useState<SuperAdminDashboard | null>(null);
   const [salons, setSalons] = useState<SuperAdminSalon[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [dash, shops] = await Promise.all([
-        getSuperAdminDashboard(),
-        listSuperAdminSalons({ limit: 100, sortBy: "createdAt", sortOrder: "desc" }),
-      ]);
-      setDashboard(dash);
+      const shops = await listSuperAdminSalons({ limit: 100, sortBy: "createdAt", sortOrder: "desc" });
       setSalons(Array.isArray(shops?.items) ? shops.items : []);
     } catch {
       toast.error("Nao foi possivel carregar o dashboard.");
@@ -59,6 +53,28 @@ export function SuperAdminDashboardPage() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  // O backend atual ainda nao expoe /super-admin/dashboard. Os indicadores
+  // disponiveis sao calculados a partir da listagem global de saloes.
+  const dashboard = useMemo<SuperAdminDashboard>(() => {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    return {
+      totalSalons: salons.length,
+      activeSalons: salons.filter((salon) => salon.status === "active").length,
+      inactiveSalons: salons.filter((salon) => salon.status === "inactive").length,
+      blockedSalons: salons.filter((salon) => salon.status === "blocked").length,
+      pendingSalons: salons.filter((salon) => salon.status === "pending").length,
+      activeSubscriptions: salons.filter(
+        (salon) => salon.subscription?.status === "active" || salon.platformSubscription?.status === "active"
+      ).length,
+      newSalonsThisMonth: salons.filter(
+        (salon) => new Date(salon.createdAt).getTime() >= startOfMonth.getTime()
+      ).length,
+    };
+  }, [salons]);
 
   const subscriptionRows = useMemo(() =>
     salons.map((shop) => ({

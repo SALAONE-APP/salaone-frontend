@@ -1,4 +1,4 @@
-export const FIT_MARKER = "[barberone:fit]";
+export const FIT_MARKER = "[professionalone:fit]";
 
 export function isFitAppointment(notes: string | null | undefined): boolean {
   return typeof notes === "string" && notes.includes(FIT_MARKER);

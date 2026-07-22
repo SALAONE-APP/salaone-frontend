@@ -37,6 +37,7 @@ export interface SuperAdminPlatformSubscription {
 export interface SuperAdminSalon {
   id: string;
   name: string;
+  businessType: string;
   slug: string;
   cnpj?: string | null;
   email?: string | null;
@@ -148,6 +149,62 @@ export interface PaginatedResponse<T> {
   totalPages: number;
 }
 
+interface BackendSalon {
+  id: string;
+  name: string;
+  business_type?: string | null;
+  slug: string;
+  document?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  status: SalonStatus;
+  created_at: string;
+  updated_at?: string;
+  selected_plan_id?: string | null;
+  logo_url?: string | null;
+  blocked_reason?: string | null;
+  blocked_at?: string | null;
+  deactivated_at?: string | null;
+}
+
+interface BackendSalonUser {
+  id: string;
+  role: string;
+  status?: string;
+  created_at: string;
+  updated_at: string;
+  platform_users: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+}
+
+function mapBackendSalon(salon: BackendSalon): SuperAdminSalon {
+  return {
+    id: salon.id,
+    name: salon.name,
+    businessType: salon.business_type ?? "beauty_salon",
+    slug: salon.slug,
+    cnpj: salon.document ?? null,
+    email: salon.email ?? null,
+    phone: salon.phone ?? null,
+    status: salon.status,
+    createdAt: salon.created_at,
+    blockedReason: salon.blocked_reason ?? null,
+    blockedAt: salon.blocked_at ?? null,
+    deactivatedAt: salon.deactivated_at ?? null,
+    metrics: {
+      appointmentsCount: 0,
+      servicesCount: 0,
+      productsCount: 0,
+      clientsCount: 0,
+      employeesCount: 0,
+    },
+  };
+}
+
 /* ─── dashboard ─── */
 
 export async function getSuperAdminDashboard(): Promise<SuperAdminDashboard> {
@@ -160,29 +217,68 @@ export async function getSuperAdminDashboard(): Promise<SuperAdminDashboard> {
 export async function listSuperAdminSalons(
   params: ListSalonsParams = {}
 ): Promise<PaginatedResponse<SuperAdminSalon>> {
-  const response = await api.get<PaginatedResponse<SuperAdminSalon>>(
-    "/super-admin/salons",
-    { params }
-  );
-  return response.data;
+  const response = await api.get<{ salons: BackendSalon[] }>("/salons");
+  let items = (response.data.salons ?? []).map(mapBackendSalon);
+
+  const query = params.q?.trim().toLocaleLowerCase("pt-BR");
+  if (query) {
+    items = items.filter((salon) =>
+      [salon.name, salon.slug, salon.cnpj, salon.email, salon.phone]
+        .filter(Boolean)
+        .some((value) => String(value).toLocaleLowerCase("pt-BR").includes(query))
+    );
+  }
+  if (params.status) items = items.filter((salon) => salon.status === params.status);
+  if (params.createdFrom) {
+    const from = new Date(`${params.createdFrom}T00:00:00`).getTime();
+    items = items.filter((salon) => new Date(salon.createdAt).getTime() >= from);
+  }
+  if (params.createdTo) {
+    const to = new Date(`${params.createdTo}T23:59:59.999`).getTime();
+    items = items.filter((salon) => new Date(salon.createdAt).getTime() <= to);
+  }
+
+  const direction = params.sortOrder === "asc" ? 1 : -1;
+  items.sort((a, b) => {
+    if (params.sortBy === "name") return a.name.localeCompare(b.name, "pt-BR") * direction;
+    if (params.sortBy === "status") return a.status.localeCompare(b.status) * direction;
+    return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * direction;
+  });
+
+  const total = items.length;
+  const limit = Math.max(1, params.limit ?? 15);
+  const page = Math.max(1, params.page ?? 1);
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const start = (page - 1) * limit;
+
+  return { items: items.slice(start, start + limit), total, page, limit, totalPages };
 }
 
 export async function getSuperAdminSalonById(
   id: string
 ): Promise<SuperAdminSalonDetail> {
-  const response = await api.get<SuperAdminSalonDetail>(
-    `/super-admin/salons/${id}`
-  );
-  return response.data;
+  const response = await api.get<{ salon: BackendSalon }>(`/salons/${id}`);
+  const salon = response.data.salon;
+  return { ...mapBackendSalon(salon), updated_at: salon.updated_at };
 }
 
 export async function listSuperAdminSalonUsers(
   salonId: string
 ): Promise<{ items: SuperAdminSalonUser[]; total: number }> {
-  const response = await api.get<{ items: SuperAdminSalonUser[]; total: number }>(
-    `/super-admin/salons/${salonId}/users`
-  );
-  return response.data;
+  const response = await api.get<{ users: BackendSalonUser[] }>("/users", {
+    headers: { "x-salon-id": salonId },
+  });
+  const items = (response.data.users ?? []).map((membership) => ({
+    id: membership.platform_users.id,
+    name: membership.platform_users.name,
+    email: membership.platform_users.email,
+    role: membership.role,
+    is_admin: membership.role === "admin",
+    current_salon_id: salonId,
+    created_at: membership.created_at,
+    updated_at: membership.updated_at,
+  }));
+  return { items, total: items.length };
 }
 
 export async function updateSuperAdminSalonStatus(
@@ -263,8 +359,8 @@ export interface PlatformPlan {
   paymentMethods?: string[];
   payment_methods?: string[];
   features?: string[];
-  maxBarbers?: number | null;
-  max_barbers?: number | null;
+  maxProfessionals?: number | null;
+  max_professionals?: number | null;
   maxAdmins?: number | null;
   max_admins?: number | null;
   maxReceptionists?: number | null;
@@ -300,7 +396,7 @@ export async function createPlatformPlan(payload: {
   statementDescriptor?: string;
   paymentMethods?: string[];
   features?: string[];
-  maxBarbers?: number | null;
+  maxProfessionals?: number | null;
   maxAdmins?: number | null;
   maxReceptionists?: number | null;
   isPublic?: boolean;
@@ -322,7 +418,7 @@ export async function updatePlatformPlan(
     isPublic: boolean;
     isRecommended: boolean;
     sortOrder: number;
-    maxBarbers: number | null;
+    maxProfessionals: number | null;
     maxAdmins: number | null;
     maxReceptionists: number | null;
     statementDescriptor: string;

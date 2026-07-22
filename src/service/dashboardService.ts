@@ -19,7 +19,7 @@ export interface DashboardAppointment {
   startAt: string;
   status: string;
   clientName: string;
-  barberName: string;
+  professionalName: string;
   serviceLabel: string;
   serviceCount: number;
 }

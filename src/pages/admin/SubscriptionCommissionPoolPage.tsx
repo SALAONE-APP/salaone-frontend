@@ -10,7 +10,7 @@ import {
   getEmployeePayrollSummary,
   type SubscriptionCommissionPool,
 } from "@/service/employeePayrollService";
-import { getSettings, type SubscriptionBarberRule } from "@/service/settingsService";
+import { getSettings, type SubscriptionProfessionalRule } from "@/service/settingsService";
 
 function monthRange() {
   const now = new Date();
@@ -63,15 +63,15 @@ export function SubscriptionCommissionPoolPage() {
   const initialRange = useMemo(monthRange, []);
   const [periodStart, setPeriodStart] = useState(initialRange.start);
   const [periodEnd, setPeriodEnd] = useState(initialRange.end);
-  const [subscriptionBarberRule, setSubscriptionBarberRule] =
-    useState<SubscriptionBarberRule>("fixed");
+  const [subscriptionProfessionalRule, setSubscriptionProfessionalRule] =
+    useState<SubscriptionProfessionalRule>("fixed");
   const [pool, setPool] = useState<SubscriptionCommissionPool | null>(null);
   const [loading, setLoading] = useState(true);
   const [customPercentInput, setCustomPercentInput] = useState("50");
 
   const periodStartDate = dateStringToDate(periodStart);
   const periodEndDate = dateStringToDate(periodEnd);
-  const isFreeChoice = subscriptionBarberRule === "free_choice";
+  const isFreeChoice = subscriptionProfessionalRule === "free_choice";
 
   function handlePeriodRangeChange(range?: DateRange) {
     if (range?.from) setPeriodStart(toDateInput(range.from));
@@ -86,11 +86,11 @@ export function SubscriptionCommissionPoolPage() {
         getEmployeePayrollSummary({
           periodStart,
           periodEnd,
-          role: "barber",
+          role: "professional",
         }),
       ]);
 
-      setSubscriptionBarberRule(settings.subscriptionBarberRule ?? "fixed");
+      setSubscriptionProfessionalRule(settings.subscriptionProfessionalRule ?? "fixed");
       setPool(summary.subscriptionCommissionPool ?? null);
     } catch (error) {
       toast.error(getApiMessage(error));
@@ -263,7 +263,7 @@ export function SubscriptionCommissionPoolPage() {
             <tbody>
               ${distributions.map(item => `
                 <tr>
-                  <td class="font-semibold">${item.barberName ?? "Profissional"}</td>
+                  <td class="font-semibold">${item.professionalName ?? "Profissional"}</td>
                   <td class="text-right">${formatCurrency(item.revenue)}</td>
                   <td class="text-right">${item.appointments}</td>
                   <td class="text-right">${item.points}</td>
@@ -429,7 +429,7 @@ export function SubscriptionCommissionPoolPage() {
                     distributions.map((item) => (
                       <tr key={item.employeeId} className="border-b border-border last:border-b-0">
                         <td className="px-4 py-3 font-medium text-foreground">
-                          {item.barberName ?? "Profissional"}
+                          {item.professionalName ?? "Profissional"}
                         </td>
                         <td className="px-4 py-3 text-right text-muted-foreground">
                           {formatCurrency(item.revenue)}

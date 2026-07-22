@@ -1,31 +1,32 @@
-import { BarberBookingsPage } from "../pages/barber/BarberBookingsPage";
-import { BarberDashboard } from "../pages/barber/BarberDashboard";
-import { BarberEarningsPage } from "../pages/barber/BarberEarningsPage";
-import { BarberSchedulePage } from "../pages/barber/BarberSchedulePage";
-import { BarberSettingsPage } from "../pages/barber/BarberSettingsPage";
+import { ProfessionalBookingsPage } from "../pages/professional/ProfessionalBookingsPage";
+import { ProfessionalDashboard } from "../pages/professional/ProfessionalDashboard";
+import { ProfessionalEarningsPage } from "../pages/professional/ProfessionalEarningsPage";
+import { ProfessionalSchedulePage } from "../pages/professional/ProfessionalSchedulePage";
+import { ProfessionalSettingsPage } from "../pages/professional/ProfessionalSettingsPage";
 import { CustomersPage } from "../pages/shared/CustomersPage";
+import { ClientRecordsPage } from "../pages/shared/ClientRecordsPage";
 import { HelpCenterPage } from "../pages/shared/HelpCenterPage";
 import { ServicesPage } from "../pages/shared/ServicesPage";
 import type { AppRoute } from "./types";
 
-export const barberRoutes: AppRoute[] = [
+export const professionalRoutes: AppRoute[] = [
   {
     path: "/home",
     title: "Home",
     breadcrumbs: ["Profissional", "Home"],
-    Component: BarberDashboard,
+    Component: ProfessionalDashboard,
   },
   {
     path: "/schedules",
     title: "Agenda do dia",
     breadcrumbs: ["Profissional", "Agenda"],
-    Component: BarberSchedulePage,
+    Component: ProfessionalSchedulePage,
   },
   {
     path: "/bookings",
     title: "Agendamentos",
     breadcrumbs: ["Profissional", "Agendamentos"],
-    Component: BarberBookingsPage,
+    Component: ProfessionalBookingsPage,
     // sempre visível — permissões controlam as ações dentro da página
   },
   {
@@ -33,25 +34,33 @@ export const barberRoutes: AppRoute[] = [
     title: "Clientes",
     breadcrumbs: ["Profissional", "Clientes"],
     Component: CustomersPage,
+    requiredPermission: "manageCustomers",
+  },
+  {
+    path: "/client-records",
+    title: "Prontuário",
+    breadcrumbs: ["Profissional", "Prontuário"],
+    Component: ClientRecordsPage,
   },
   {
     path: "/services",
     title: "Servicos",
     breadcrumbs: ["Profissional", "Servicos"],
     Component: ServicesPage,
+    requiredPermission: "manageServices",
   },
   {
     path: "/payments",
     title: "Ganhos",
     breadcrumbs: ["Profissional", "Ganhos"],
-    Component: BarberEarningsPage,
+    Component: ProfessionalEarningsPage,
     // sempre visível — é direito do profissional ver os próprios ganhos
   },
   {
     path: "/settings",
     title: "Configuracoes",
     breadcrumbs: ["Profissional", "Configuracoes"],
-    Component: BarberSettingsPage,
+    Component: ProfessionalSettingsPage,
   },
   {
     path: "/help",

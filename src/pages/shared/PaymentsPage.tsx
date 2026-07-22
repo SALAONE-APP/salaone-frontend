@@ -140,7 +140,6 @@ function getPaymentDescription(payment: PaymentWithType) {
 }
 
 function shouldShowInPaymentsPage(payment: ApiPaymentWithType): payment is PaymentWithType {
-  if (!payment.user?.id) return false;
   if (payment.paymentType === "appointment") return Boolean(payment.appointmentId);
   if (payment.paymentType === "subscription") return Boolean(payment.subscriptionId);
   return false;
@@ -202,7 +201,7 @@ export function PaymentsPage() {
       const visibleItems = result.items.filter(shouldShowInPaymentsPage);
 
       setPayments(visibleItems);
-      setTotal(visibleItems.length);
+      setTotal(result.total);
       if (result.summary) setSummary(result.summary);
     } catch (err) {
       setError(getApiMessage(err));
@@ -228,7 +227,7 @@ export function PaymentsPage() {
           payment.user?.name,
           payment.user?.email,
           getPaymentDescription(payment),
-          payment.appointment?.barber?.displayName,
+          payment.appointment?.professional?.displayName,
           methodLabels[payment.method],
           statusLabels[payment.status],
         ]
@@ -488,8 +487,8 @@ export function PaymentsPage() {
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {typeLabels[payment.paymentType]}
-                            {payment.appointment?.barber?.displayName
-                              ? ` - ${payment.appointment.barber.displayName}`
+                            {payment.appointment?.professional?.displayName
+                              ? ` - ${payment.appointment.professional.displayName}`
                               : ""}
                           </p>
                         </div>

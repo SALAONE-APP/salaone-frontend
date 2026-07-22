@@ -196,7 +196,7 @@ export function ClientReviewsPage() {
               const review = reviewsByAppointment.get(appointment.id);
               const start = formatDateTime(appointment.startAt);
               const serviceText = appointment.services.map((service) => service.serviceName).join(", ") || "Sem servico";
-              const barberName = appointment.barber?.displayName || "Sem profissional";
+              const professionalName = appointment.professional?.displayName || "Sem profissional";
 
               return (
                 <div key={appointment.id} className="grid gap-4 p-4 md:grid-cols-[1fr_auto] md:items-center">
@@ -204,11 +204,11 @@ export function ClientReviewsPage() {
                     <div className="flex min-w-0 items-center gap-3">
                       <Avatar className="h-9 w-9">
                         <AvatarFallback className="bg-primary/10 text-xs text-primary">
-                          {getInitials(barberName)}
+                          {getInitials(professionalName)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">{barberName}</p>
+                        <p className="truncate text-sm font-medium text-foreground">{professionalName}</p>
                         <p className="truncate text-xs text-muted-foreground">{serviceText}</p>
                       </div>
                     </div>

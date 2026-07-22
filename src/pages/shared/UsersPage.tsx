@@ -70,11 +70,11 @@ import {
   type UserProfile,
 } from "@/service/userService";
 import {
-  createBarber,
-  listBarbers,
-  updateBarber,
-  type Barber,
-} from "@/service/barberService";
+  createProfessional,
+  listProfessionals,
+  updateProfessional,
+  type Professional,
+} from "@/service/professionalService";
 import { listServices, type Service } from "@/service/serviceService";
 
 type UserRole = NonNullable<ListUsersParams["role"]>;
@@ -139,6 +139,7 @@ interface UserFormState {
   password: string;
   resetPassword: boolean;
   photoUrl: string | null;
+  photoPublicId: string | null;
   salary: string;
   commissionPercent: string;
   serviceIds: string[];
@@ -149,10 +150,11 @@ const emptyForm: UserFormState = {
   email: "",
   phone: "",
   cpf: "",
-  role: "barber",
+  role: "professional",
   password: "",
   resetPassword: false,
   photoUrl: null,
+  photoPublicId: null,
   salary: "",
   commissionPercent: "",
   serviceIds: [],
@@ -160,14 +162,14 @@ const emptyForm: UserFormState = {
 
 const roleLabels: Record<UserRole, string> = {
   admin: "Administrador",
-  barber: "Profissional",
+  professional: "Profissional",
   receptionist: "Recepcionista",
   client: "Cliente",
 };
 
 const roleClasses: Record<UserRole, string> = {
   admin: "bg-purple-500/10 text-purple-600 border-purple-500/20",
-  barber: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+  professional: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
   receptionist: "bg-amber-500/10 text-amber-600 border-amber-500/20",
   client: "bg-blue-500/10 text-blue-600 border-blue-500/20",
 };
@@ -281,7 +283,7 @@ function getApiMessage(error: unknown) {
 function roleFromUser(user: UserProfile): UserRole {
   if (
     user.role === "admin" ||
-    user.role === "barber" ||
+    user.role === "professional" ||
     user.role === "receptionist" ||
     user.role === "client"
   ) {
@@ -291,7 +293,7 @@ function roleFromUser(user: UserProfile): UserRole {
   return user.isAdmin ? "admin" : "client";
 }
 
-function userToForm(user: UserProfile, barber?: Barber | null): UserFormState {
+function userToForm(user: UserProfile, professional?: Professional | null): UserFormState {
   const role = roleFromUser(user);
 
   return {
@@ -299,13 +301,14 @@ function userToForm(user: UserProfile, barber?: Barber | null): UserFormState {
     email: user.email ?? "",
     phone: maskPhone(user.phone ?? ""),
     cpf: maskCpf(user.cpf ?? ""),
-    role: role === "client" ? "barber" : role,
+    role: role === "client" ? "professional" : role,
     password: "",
     resetPassword: false,
     photoUrl: user.photoUrl ?? null,
+    photoPublicId: user.photoPublicId ?? null,
     salary: user.salary != null ? maskCurrency(String(Math.round(user.salary * 100))) : "",
-    commissionPercent: barber?.commissionPercent != null ? String(barber.commissionPercent) : "",
-    serviceIds: barber?.serviceIds ?? [],
+    commissionPercent: professional?.commissionPercent != null ? String(professional.commissionPercent) : "",
+    serviceIds: professional?.serviceIds ?? [],
   };
 }
 
@@ -331,7 +334,7 @@ export function UsersPage() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [services, setServices] = useState<Service[]>([]);
-  const [editingBarber, setEditingBarber] = useState<Barber | null>(null);
+  const [editingProfessional, setEditingProfessional] = useState<Professional | null>(null);
 
   const limit = 20;
 
@@ -367,10 +370,10 @@ export function UsersPage() {
 
   const stats = useMemo(() => {
     const admins = users.filter((user) => roleFromUser(user) === "admin").length;
-    const barbers = users.filter((user) => roleFromUser(user) === "barber").length;
+    const professionals = users.filter((user) => roleFromUser(user) === "professional").length;
     const receptionists = users.filter((user) => roleFromUser(user) === "receptionist").length;
 
-    return { admins, barbers, receptionists };
+    return { admins, professionals, receptionists };
   }, [users]);
 
 
@@ -386,33 +389,39 @@ export function UsersPage() {
 
   function openCreateDialog() {
     setEditingUser(null);
-    setEditingBarber(null);
+    setEditingProfessional(null);
     setForm({ ...emptyForm, password: "123456" });
     setDialogOpen(true);
     void listServices({ limit: 100 })
-      .then((res) => setServices(res.items))
-      .catch((err) => toast.error(getApiMessage(err)));
+      .then((res) => setServices(Array.isArray(res.items) ? res.items : []))
+      .catch((err) => {
+        setServices([]);
+        toast.error(getApiMessage(err));
+      });
   }
 
   async function openEditDialog(user: UserProfile) {
     setEditingUser(user);
     setDialogOpen(true);
     void listServices({ limit: 100 })
-      .then((res) => setServices(res.items))
-      .catch((err) => toast.error(getApiMessage(err)));
+      .then((res) => setServices(Array.isArray(res.items) ? res.items : []))
+      .catch((err) => {
+        setServices([]);
+        toast.error(getApiMessage(err));
+      });
 
-    if (roleFromUser(user) === "barber") {
+    if (roleFromUser(user) === "professional") {
       try {
-        const res = await listBarbers({ limit: 200 });
-        const barber = res.items.find((b) => b.userId === user.id) ?? null;
-        setEditingBarber(barber);
-        setForm(userToForm(user, barber));
+        const res = await listProfessionals({ limit: 200 });
+        const professional = res.items.find((b) => b.userId === (user.platformUserId ?? user.id)) ?? null;
+        setEditingProfessional(professional);
+        setForm(userToForm(user, professional));
       } catch {
-        setEditingBarber(null);
+        setEditingProfessional(null);
         setForm(userToForm(user));
       }
     } else {
-      setEditingBarber(null);
+      setEditingProfessional(null);
       setForm(userToForm(user));
     }
   }
@@ -429,8 +438,8 @@ export function UsersPage() {
 
     setUploadingPhoto(true);
     try {
-      const url = await uploadProfilePhoto(file);
-      setField("photoUrl", url);
+      const image = await uploadProfilePhoto(file);
+      setForm((current) => ({ ...current, photoUrl: image.secure_url, photoPublicId: image.public_id }));
     } catch (err) {
       toast.error(getApiMessage(err));
     } finally {
@@ -497,6 +506,7 @@ export function UsersPage() {
       role: form.role,
       isAdmin: form.role === "admin",
       photoUrl: form.photoUrl,
+      photoPublicId: form.photoPublicId,
       salary: form.salary !== "" ? parseCurrency(form.salary) : null,
     };
 
@@ -514,16 +524,16 @@ export function UsersPage() {
           newPassword: form.resetPassword ? form.password.trim() : undefined,
         });
 
-        if (form.role === "barber") {
-          const barberData = {
+        if (form.role === "professional") {
+          const professionalData = {
             displayName: form.name.trim(),
             commissionPercent: commissionValue,
             serviceIds: form.serviceIds,
           };
-          if (editingBarber) {
-            await updateBarber(editingBarber.id, barberData);
+          if (editingProfessional) {
+            await updateProfessional(editingProfessional.id, professionalData);
           } else {
-            await createBarber({ ...barberData, userId: editingUser.id });
+            await createProfessional({ ...professionalData, userId: editingUser.platformUserId ?? editingUser.id });
           }
         }
 
@@ -534,12 +544,12 @@ export function UsersPage() {
           password: form.password.trim(),
         });
 
-        if (form.role === "barber" && created?.id) {
-          await createBarber({
+        if (form.role === "professional" && created?.id) {
+          await createProfessional({
             displayName: form.name.trim(),
             commissionPercent: commissionValue,
             serviceIds: form.serviceIds,
-            userId: created.id,
+            userId: created.platformUserId ?? created.id,
           });
         }
 
@@ -605,7 +615,7 @@ export function UsersPage() {
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="mb-1 text-sm text-muted-foreground">Profissionais nesta pagina</p>
-          <h3 className="text-2xl font-semibold text-foreground">{stats.barbers}</h3>
+          <h3 className="text-2xl font-semibold text-foreground">{stats.professionals}</h3>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="mb-1 text-sm text-muted-foreground">Admins nesta pagina</p>
@@ -653,7 +663,7 @@ export function UsersPage() {
                 >
                   <DropdownMenuRadioItem value="all">Todos</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="admin">Administradores</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="barber">Profissionais</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="professional">Profissionais</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="receptionist">
                     Recepcionistas
                   </DropdownMenuRadioItem>
@@ -915,7 +925,7 @@ export function UsersPage() {
                       variant="ghost"
                       size="sm"
                       className="text-muted-foreground"
-                      onClick={() => setField("photoUrl", null)}
+                      onClick={() => setForm((current) => ({ ...current, photoUrl: null, photoPublicId: null }))}
                       disabled={uploadingPhoto}
                     >
                       Remover
@@ -958,7 +968,7 @@ export function UsersPage() {
                         <UserCog size={14} />
                         Administrador
                       </SelectItem>
-                      <SelectItem value="barber">Profissional</SelectItem>
+                      <SelectItem value="professional">Profissional</SelectItem>
                       <SelectItem value="receptionist">Recepcionista</SelectItem>
                     </SelectContent>
                   </Select>
@@ -1025,7 +1035,7 @@ export function UsersPage() {
               </div>
 
               {/* Seção exclusiva para profissionais */}
-              {form.role === "barber" && (
+              {form.role === "professional" && (
                 <div className="space-y-4 rounded-xl border border-border bg-secondary/30 p-4">
                   <h4 className="text-sm font-semibold text-foreground">Configurações do profissional</h4>
 
@@ -1129,37 +1139,40 @@ export function UsersPage() {
           if (!open) setPermissionsUser(null);
         }}
       >
-        <DialogContent className="sm:max-w-3xl">
-          <form onSubmit={handlePermissionsSubmit} className="space-y-5">
-            <DialogHeader>
-              <DialogTitle>Permissoes do funcionario</DialogTitle>
-              <DialogDescription>
-                {permissionsUser
-                  ? `Defina os acessos de ${permissionsUser.name}.`
-                  : "Defina os acessos deste funcionario."}
-              </DialogDescription>
-            </DialogHeader>
+        <DialogContent className="flex max-h-[calc(100dvh-1rem)] flex-col gap-0 overflow-hidden p-0 sm:max-h-[90dvh] sm:max-w-3xl">
+          <form onSubmit={handlePermissionsSubmit} className="flex min-h-0 flex-1 flex-col">
+            <div className="shrink-0 border-b border-border px-4 py-4 pr-12 sm:px-6 sm:py-5 sm:pr-12">
+              <DialogHeader>
+                <DialogTitle>Permissoes do funcionario</DialogTitle>
+                <DialogDescription className="break-words">
+                  {permissionsUser
+                    ? `Defina os acessos de ${permissionsUser.name}.`
+                    : "Defina os acessos deste funcionario."}
+                </DialogDescription>
+              </DialogHeader>
+            </div>
 
-            {permissionsUser && roleFromUser(permissionsUser) === "admin" ? (
-              <div className="rounded-md border border-border bg-secondary/50 p-4 text-sm text-muted-foreground">
-                Administradores possuem acesso total automaticamente.
-              </div>
-            ) : (
-              <>
-                <div className="flex justify-end gap-2">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
+              {permissionsUser && roleFromUser(permissionsUser) === "admin" ? (
+                <div className="rounded-md border border-border bg-secondary/50 p-4 text-sm text-muted-foreground">
+                  Administradores possuem acesso total automaticamente.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap justify-stretch gap-2 sm:justify-end">
                   <Button type="button" variant="outline" size="sm" onClick={() => setAllPermissions(true)}>
                     Marcar todas
                   </Button>
                   <Button type="button" variant="outline" size="sm" onClick={() => setAllPermissions(false)}>
                     Limpar
                   </Button>
-                </div>
+                  </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   {permissionOptions.map((permission) => (
                     <div
                       key={permission.key}
-                      className="flex items-start justify-between gap-3 rounded-md border border-border p-3"
+                      className="flex min-w-0 items-start justify-between gap-3 rounded-md border border-border p-3"
                     >
                       <div className="min-w-0">
                         <Label
@@ -1173,17 +1186,19 @@ export function UsersPage() {
                         </p>
                       </div>
                       <Switch
+                        className="shrink-0"
                         id={`permission-dialog-${permission.key}`}
                         checked={permissionsForm[permission.key]}
                         onCheckedChange={(checked) => setPermission(permission.key, checked)}
                       />
                     </div>
                   ))}
+                  </div>
                 </div>
-              </>
-            )}
+              )}
+            </div>
 
-            <DialogFooter>
+            <DialogFooter className="shrink-0 border-t border-border bg-background px-4 py-4 sm:px-6">
               <Button
                 type="button"
                 variant="outline"

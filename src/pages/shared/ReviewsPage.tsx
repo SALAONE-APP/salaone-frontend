@@ -142,7 +142,7 @@ export function ReviewsPage() {
                       <div className="flex items-center gap-1">{renderStars(review.rating)}</div>
                     </td>
                     <td className="px-4 py-3 text-sm text-foreground">{review.clientName || "-"}</td>
-                    <td className="px-4 py-3 text-sm text-foreground">{review.barberName || "-"}</td>
+                    <td className="px-4 py-3 text-sm text-foreground">{review.professionalName || "-"}</td>
                     <td className="max-w-64 px-4 py-3 text-sm text-muted-foreground">
                       <span className="block truncate">{review.services?.join(", ") || "-"}</span>
                     </td>

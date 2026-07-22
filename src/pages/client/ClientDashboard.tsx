@@ -65,8 +65,8 @@ export function ClientDashboard() {
   const [nextAppointment, setNextAppointment] = useState<string>("—");
   const [completedCount, setCompletedCount] = useState<number | string>("—");
   const [upcomingCount, setUpcomingCount] = useState<number | string>("—");
-  const [topBarbersLoading, setTopBarbersLoading] = useState(true);
-  const [topBarbersError, setTopBarbersError] = useState<string | null>(null);
+  const [topProfessionalsLoading, setTopProfessionalsLoading] = useState(true);
+  const [topProfessionalsError, setTopProfessionalsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -78,7 +78,7 @@ export function ClientDashboard() {
           startAt: a.startAt,
           status: a.status,
           clientName: a.client?.name ?? "—",
-          barberName: a.barber?.displayName ?? "—",
+          professionalName: a.professional?.displayName ?? "—",
           serviceLabel: a.services[0]?.serviceName ?? "—",
           serviceCount: a.services.length,
         }));
@@ -107,8 +107,8 @@ export function ClientDashboard() {
   useEffect(() => {
     if (!user?.id) return;
 
-    setTopBarbersLoading(true);
-    setTopBarbersError(null);
+    setTopProfessionalsLoading(true);
+    setTopProfessionalsError(null);
 
     listReviews({ limit: 300 })
       .then((res) => {
@@ -116,14 +116,14 @@ export function ClientDashboard() {
       })
       .catch(() => {
         setReviews([]);
-        setTopBarbersError("Nao foi possivel carregar o ranking de profissionais.");
+        setTopProfessionalsError("Nao foi possivel carregar o ranking de profissionais.");
       })
       .finally(() => {
-        setTopBarbersLoading(false);
+        setTopProfessionalsLoading(false);
       });
   }, [user?.id]);
 
-  const topBarbers = useMemo(() => {
+  const topProfessionals = useMemo(() => {
     const grouped = new Map<
       string,
       {
@@ -135,25 +135,25 @@ export function ClientDashboard() {
     >();
 
     reviews.forEach((review) => {
-      if (!review.barberId) return;
+      if (!review.professionalId) return;
 
-      const current = grouped.get(review.barberId) ?? {
-        id: review.barberId,
-        name: review.barberName || "Profissional",
+      const current = grouped.get(review.professionalId) ?? {
+        id: review.professionalId,
+        name: review.professionalName || "Profissional",
         reviewCount: 0,
         ratingSum: 0,
       };
 
-      current.name = review.barberName || current.name;
+      current.name = review.professionalName || current.name;
       current.reviewCount += 1;
       current.ratingSum += Number(review.rating || 0);
-      grouped.set(review.barberId, current);
+      grouped.set(review.professionalId, current);
     });
 
     return Array.from(grouped.values())
-      .map((barber) => ({
-        ...barber,
-        averageRating: barber.reviewCount ? barber.ratingSum / barber.reviewCount : 0,
+      .map((professional) => ({
+        ...professional,
+        averageRating: professional.reviewCount ? professional.ratingSum / professional.reviewCount : 0,
       }))
       .sort((a, b) => {
         if (b.reviewCount !== a.reviewCount) return b.reviewCount - a.reviewCount;
@@ -259,22 +259,22 @@ export function ClientDashboard() {
           <Trophy className="h-5 w-5 text-amber-500" />
         </div>
 
-        {topBarbersLoading ? (
+        {topProfessionalsLoading ? (
           <div className="p-10 text-center text-sm text-muted-foreground">
             <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
             Carregando ranking...
           </div>
-        ) : topBarbersError ? (
-          <div className="p-6 text-sm text-destructive">{topBarbersError}</div>
-        ) : topBarbers.length === 0 ? (
+        ) : topProfessionalsError ? (
+          <div className="p-6 text-sm text-destructive">{topProfessionalsError}</div>
+        ) : topProfessionals.length === 0 ? (
           <div className="p-10 text-center text-sm text-muted-foreground">
             <Star className="mx-auto mb-2 h-5 w-5" />
             Nenhuma avaliacao registrada ainda.
           </div>
         ) : (
           <div className="divide-y divide-border">
-            {topBarbers.map((barber, index) => (
-              <div key={barber.id} className="grid gap-4 p-4 sm:grid-cols-[auto_1fr_auto] sm:items-center">
+            {topProfessionals.map((professional, index) => (
+              <div key={professional.id} className="grid gap-4 p-4 sm:grid-cols-[auto_1fr_auto] sm:items-center">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500/10 text-sm font-semibold text-amber-600">
                   #{index + 1}
                 </div>
@@ -282,24 +282,24 @@ export function ClientDashboard() {
                 <div className="flex min-w-0 items-center gap-3">
                   <Avatar className="h-10 w-10">
                     <AvatarFallback className="bg-primary/10 text-xs text-primary">
-                      {getInitials(barber.name)}
+                      {getInitials(professional.name)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-foreground">{barber.name}</p>
+                    <p className="truncate text-sm font-medium text-foreground">{professional.name}</p>
                     <div className="mt-1 flex items-center gap-2">
-                      <div className="flex">{renderStars(barber.averageRating)}</div>
+                      <div className="flex">{renderStars(professional.averageRating)}</div>
                       <span className="text-xs text-muted-foreground">
-                        {barber.averageRating.toFixed(1)}
+                        {professional.averageRating.toFixed(1)}
                       </span>
                     </div>
                   </div>
                 </div>
 
                 <div className="rounded-lg border border-border px-3 py-2 text-left sm:text-right">
-                  <p className="text-lg font-semibold text-foreground">{barber.reviewCount}</p>
+                  <p className="text-lg font-semibold text-foreground">{professional.reviewCount}</p>
                   <p className="text-xs text-muted-foreground">
-                    {barber.reviewCount === 1 ? "avaliacao" : "avaliacoes"}
+                    {professional.reviewCount === 1 ? "avaliacao" : "avaliacoes"}
                   </p>
                 </div>
               </div>

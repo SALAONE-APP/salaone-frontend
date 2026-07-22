@@ -57,7 +57,7 @@ import {
   type BookingPaymentMethod,
   type PaymentFrequency,
   type Settings,
-  type SubscriptionBarberRule,
+  type SubscriptionProfessionalRule,
   updatePaymentFrequencySettings,
   updateSettings,
 } from '../../service/settingsService';
@@ -171,6 +171,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   const profilePhotoFileInputRef = useRef<HTMLInputElement | null>(null);
   const [businessForm, setBusinessForm] = useState({
     name: '',
+    businessType: 'beauty_salon' as import('../../service/salonProfileService').BusinessType,
     email: '',
     phone: '',
     cnpj: '',
@@ -178,6 +179,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   });
   const [businessSlug, setBusinessSlug] = useState('');
   const [businessLogoUrl, setBusinessLogoUrl] = useState('');
+  const [businessLogoPublicId, setBusinessLogoPublicId] = useState<string | null>(null);
   const [isUploadingBusinessLogo, setIsUploadingBusinessLogo] = useState(false);
   const businessLogoFileInputRef = useRef<HTMLInputElement | null>(null);
   const [homeInfo, setHomeInfo] = useState<HomeInfo | null>(null);
@@ -185,6 +187,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     hero_title: '',
     hero_subtitle: '',
     hero_images: [] as string[],
+    hero_image_public_ids: [] as string[],
   });
   const [heroImageUrl, setHeroImageUrl] = useState('');
   const [isUploadingHeroImage, setIsUploadingHeroImage] = useState(false);
@@ -249,16 +252,16 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     pix: true,
     local: true,
   });
-  const [barberPaymentFrequency, setBarberPaymentFrequency] =
+  const [professionalPaymentFrequency, setProfessionalPaymentFrequency] =
     useState<PaymentFrequency>('monthly');
   const [employeePaymentFrequency, setEmployeePaymentFrequency] =
     useState<PaymentFrequency>('monthly');
   const [hasLoadedPaymentSettings, setHasLoadedPaymentSettings] = useState(false);
   const [isLoadingPaymentSettings, setIsLoadingPaymentSettings] = useState(false);
   const [isSavingPaymentSettings, setIsSavingPaymentSettings] = useState(false);
-  const [subscriptionBarberRule, setSubscriptionBarberRule] = useState<SubscriptionBarberRule>('fixed');
-  const [hasLoadedBarberRule, setHasLoadedBarberRule] = useState(false);
-  const [isSavingBarberRule, setIsSavingBarberRule] = useState(false);
+  const [subscriptionProfessionalRule, setSubscriptionProfessionalRule] = useState<SubscriptionProfessionalRule>('fixed');
+  const [hasLoadedProfessionalRule, setHasLoadedProfessionalRule] = useState(false);
+  const [isSavingProfessionalRule, setIsSavingProfessionalRule] = useState(false);
   const salon = useMemo(() => getStoredSalon(), []);
   const canManageSecurityDocuments = user?.role === 'admin' || user?.isAdmin === true;
   const isAdmin = user?.role === 'admin' || user?.isAdmin === true;
@@ -287,6 +290,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
 
         setBusinessForm({
           name: profile.name ?? '',
+          businessType: profile.businessType ?? 'beauty_salon',
           email: profile.email ?? '',
           phone: profile.phone ? formatPhone(profile.phone) : '',
           cnpj: profile.cnpj ? formatCNPJ(profile.cnpj) : '',
@@ -294,6 +298,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         });
         setBusinessSlug(profile.slug ?? '');
         setBusinessLogoUrl(profile.logoUrl ?? '');
+        setBusinessLogoPublicId(profile.logoPublicId ?? null);
         setPagarmeRecipientId(profile.pagarmeRecipientId ?? null);
         setPagarmeRecipientStatus(profile.pagarmeRecipientStatus ?? null);
 
@@ -420,6 +425,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
           hero_title: data.hero_title ?? '',
           hero_subtitle: data.hero_subtitle ?? '',
           hero_images: getHeroImages(data),
+          hero_image_public_ids: data.hero_image_public_ids ?? [],
         });
         setHeroImageUrl('');
         setWorkingHoursForm({
@@ -459,30 +465,30 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   }, [activeTab]);
 
   useEffect(() => {
-    if (activeTab !== 'general' || hasLoadedBarberRule) {
+    if (activeTab !== 'general' || hasLoadedProfessionalRule) {
       return;
     }
 
     let isMounted = true;
 
-    async function loadBarberRule() {
+    async function loadProfessionalRule() {
       try {
         const settingsData = await getSettings();
         if (!isMounted) return;
-        setSubscriptionBarberRule(settingsData.subscriptionBarberRule ?? 'fixed');
+        setSubscriptionProfessionalRule(settingsData.subscriptionProfessionalRule ?? 'fixed');
         setSettings(settingsData);
-        setHasLoadedBarberRule(true);
+        setHasLoadedProfessionalRule(true);
       } catch {
         // silently ignore — default 'fixed' remains
       }
     }
 
-    loadBarberRule();
+    loadProfessionalRule();
 
     return () => {
       isMounted = false;
     };
-  }, [activeTab, hasLoadedBarberRule]);
+  }, [activeTab, hasLoadedProfessionalRule]);
 
   useEffect(() => {
     if (activeTab !== 'payments' || hasLoadedPaymentSettings) {
@@ -510,7 +516,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
           pix: !settingsData.hiddenBookingPaymentMethods.includes('pix'),
           local: !settingsData.hiddenBookingPaymentMethods.includes('local'),
         });
-        setBarberPaymentFrequency(frequencyData.barberPaymentFrequency);
+        setProfessionalPaymentFrequency(frequencyData.professionalPaymentFrequency);
         setEmployeePaymentFrequency(frequencyData.employeePaymentFrequency);
         setHasLoadedPaymentSettings(true);
       } catch {
@@ -588,15 +594,18 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     try {
       const profile = await updateSalonProfile({
         name: businessForm.name.trim(),
+        businessType: businessForm.businessType,
         email: businessForm.email.trim(),
         phone: businessForm.phone.trim(),
         cnpj: businessForm.cnpj.replace(/\D/g, ''),
         logoUrl: businessLogoUrl,
+        logoPublicId: businessLogoPublicId,
         googleMapsUrl: businessForm.googleMapsUrl.trim(),
       });
 
       setBusinessForm({
         name: profile.name ?? '',
+        businessType: profile.businessType ?? 'beauty_salon',
         email: profile.email ?? '',
         phone: profile.phone ?? '',
         cnpj: profile.cnpj ? formatCNPJ(profile.cnpj) : '',
@@ -675,6 +684,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     setHeroForm((current) => ({
       ...current,
       hero_images: [...current.hero_images, trimmedUrl],
+      hero_image_public_ids: [...current.hero_image_public_ids, ''],
     }));
     setHeroImageUrl('');
   }
@@ -693,16 +703,17 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     setIsUploadingHeroImage(true);
 
     try {
-      const secureUrl = await uploadHeroImage(file);
+      const image = await uploadHeroImage(file);
 
       setHeroForm((current) => {
-        if (current.hero_images.includes(secureUrl)) {
+        if (current.hero_images.includes(image.secure_url)) {
           return current;
         }
 
         return {
           ...current,
-          hero_images: [...current.hero_images, secureUrl].slice(0, MAX_HERO_IMAGES),
+          hero_images: [...current.hero_images, image.secure_url].slice(0, MAX_HERO_IMAGES),
+          hero_image_public_ids: [...current.hero_image_public_ids, image.public_id].slice(0, MAX_HERO_IMAGES),
         };
       });
 
@@ -728,18 +739,21 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     void uploadHeroImageFile(file);
   }
 
-  async function saveBusinessLogo(logoUrl: string, successMessage: string) {
+  async function saveBusinessLogo(logoUrl: string, logoPublicId: string | null, successMessage: string) {
     const profile = await updateSalonProfile({
       name: businessForm.name,
+      businessType: businessForm.businessType,
       email: businessForm.email,
       phone: businessForm.phone,
       cnpj: businessForm.cnpj,
       logoUrl,
+      logoPublicId,
       googleMapsUrl: businessForm.googleMapsUrl,
     });
 
     setBusinessForm({
       name: profile.name ?? '',
+      businessType: profile.businessType ?? 'beauty_salon',
       email: profile.email ?? '',
       phone: profile.phone ?? '',
       cnpj: profile.cnpj ?? '',
@@ -747,6 +761,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     });
     setBusinessSlug(profile.slug ?? '');
     setBusinessLogoUrl(profile.logoUrl ?? '');
+    setBusinessLogoPublicId(profile.logoPublicId ?? null);
     persistStoredSalon(profile);
     toast.success(successMessage);
   }
@@ -765,8 +780,8 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     setIsUploadingBusinessLogo(true);
 
     try {
-      const secureUrl = await uploadBusinessLogo(file);
-      await saveBusinessLogo(secureUrl, 'Logo atualizada com sucesso.');
+      const image = await uploadBusinessLogo(file);
+      await saveBusinessLogo(image.secure_url, image.public_id, 'Logo atualizada com sucesso.');
     } catch (error) {
       const message = getApiErrorMessage(error);
       toast.error(message || 'Erro ao atualizar logo da salão.');
@@ -796,7 +811,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     setIsUploadingBusinessLogo(true);
 
     try {
-      await saveBusinessLogo('', 'Logo removida com sucesso.');
+      await saveBusinessLogo('', null, 'Logo removida com sucesso.');
     } catch (error) {
       const message = getApiErrorMessage(error);
       toast.error(message || 'Erro ao remover logo da salão.');
@@ -805,13 +820,13 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     }
   }
 
-  async function saveProfilePhoto(photoUrl: string | null, successMessage: string) {
+  async function saveProfilePhoto(photoUrl: string | null, photoPublicId: string | null, successMessage: string) {
     if (!user?.id) {
       toast.error('Usuario autenticado nao encontrado.');
       return;
     }
 
-    const updatedUser = await updateProfilePhoto(user.id, photoUrl);
+    const updatedUser = await updateProfilePhoto(user.id, photoUrl, photoPublicId);
 
     updateUser({
       ...user,
@@ -831,8 +846,8 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     setIsUploadingProfilePhoto(true);
 
     try {
-      const secureUrl = await uploadProfilePhoto(file);
-      await saveProfilePhoto(secureUrl, 'Foto de perfil atualizada com sucesso.');
+      const image = await uploadProfilePhoto(file);
+      await saveProfilePhoto(image.secure_url, image.public_id, 'Foto de perfil atualizada com sucesso.');
     } catch (error) {
       const message = getApiErrorMessage(error);
       toast.error(message || 'Erro ao atualizar foto de perfil.');
@@ -862,7 +877,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     setIsUploadingProfilePhoto(true);
 
     try {
-      await saveProfilePhoto(null, 'Foto de perfil removida com sucesso.');
+      await saveProfilePhoto(null, null, 'Foto de perfil removida com sucesso.');
     } catch (error) {
       const message = getApiErrorMessage(error);
       toast.error(message || 'Erro ao remover foto de perfil.');
@@ -875,6 +890,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     setHeroForm((current) => ({
       ...current,
       hero_images: current.hero_images.filter((image) => image !== imageUrl),
+      hero_image_public_ids: current.hero_image_public_ids.filter((_, index) => current.hero_images[index] !== imageUrl),
     }));
   }
 
@@ -1059,6 +1075,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       hero_subtitle: heroForm.hero_subtitle.trim(),
       hero_image: trimmedHeroImages[0] ?? '',
       hero_images: trimmedHeroImages,
+      hero_image_public_ids: heroForm.hero_image_public_ids,
     };
     const trimmedAboutForm = {
       about_title: aboutForm.about_title.trim(),
@@ -1103,10 +1120,12 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       const [profile, updatedHomeInfo] = await Promise.all([
         updateSalonProfile({
           name: businessForm.name,
+          businessType: businessForm.businessType,
           email: businessForm.email,
           phone: businessForm.phone,
           cnpj: businessForm.cnpj,
           logoUrl: businessLogoUrl,
+          logoPublicId: businessLogoPublicId,
           googleMapsUrl: businessForm.googleMapsUrl,
         }),
         updateHomeInfo({
@@ -1120,6 +1139,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
 
       setBusinessForm({
         name: profile.name ?? '',
+        businessType: profile.businessType ?? 'beauty_salon',
         email: profile.email ?? '',
         phone: profile.phone ?? '',
         cnpj: profile.cnpj ?? '',
@@ -1133,6 +1153,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         hero_title: updatedHomeInfo.hero_title ?? '',
         hero_subtitle: updatedHomeInfo.hero_subtitle ?? '',
         hero_images: getHeroImages(updatedHomeInfo),
+        hero_image_public_ids: updatedHomeInfo.hero_image_public_ids ?? [],
       });
       setHeroImageUrl('');
       setWorkingHoursForm({
@@ -1172,6 +1193,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       hero_subtitle: heroForm.hero_subtitle.trim(),
       hero_image: trimmedHeroImages[0] ?? '',
       hero_images: trimmedHeroImages,
+      hero_image_public_ids: heroForm.hero_image_public_ids,
     };
 
     setIsSavingGeneralSettings(true);
@@ -1180,10 +1202,12 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       const [profile, updatedHomeInfo] = await Promise.all([
         updateSalonProfile({
           name: businessForm.name,
+          businessType: businessForm.businessType,
           email: businessForm.email,
           phone: businessForm.phone,
           cnpj: businessForm.cnpj,
           logoUrl: businessLogoUrl,
+          logoPublicId: businessLogoPublicId,
           googleMapsUrl: businessForm.googleMapsUrl,
         }),
         updateHomeInfo({
@@ -1194,6 +1218,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
 
       setBusinessForm({
         name: profile.name ?? '',
+        businessType: profile.businessType ?? 'beauty_salon',
         email: profile.email ?? '',
         phone: profile.phone ?? '',
         cnpj: profile.cnpj ?? '',
@@ -1207,6 +1232,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         hero_title: updatedHomeInfo.hero_title ?? '',
         hero_subtitle: updatedHomeInfo.hero_subtitle ?? '',
         hero_images: getHeroImages(updatedHomeInfo),
+        hero_image_public_ids: updatedHomeInfo.hero_image_public_ids ?? [],
       });
       setHeroImageUrl('');
       toast.success('Aparencia salva com sucesso.');
@@ -1297,7 +1323,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         termsDocumentName,
         hiddenBookingPaymentMethods:
           currentSettings.hiddenBookingPaymentMethods ?? getHiddenBookingPaymentMethods(),
-        subscriptionBarberRule: currentSettings.subscriptionBarberRule ?? subscriptionBarberRule,
+        subscriptionProfessionalRule: currentSettings.subscriptionProfessionalRule ?? subscriptionProfessionalRule,
       });
 
       setSettings(updatedSettings);
@@ -1368,10 +1394,10 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
           termsDocumentUrl: settings?.termsDocumentUrl ?? '',
           termsDocumentName: settings?.termsDocumentName ?? '',
           hiddenBookingPaymentMethods: getHiddenBookingPaymentMethods(),
-          subscriptionBarberRule: settings?.subscriptionBarberRule ?? subscriptionBarberRule,
+          subscriptionProfessionalRule: settings?.subscriptionProfessionalRule ?? subscriptionProfessionalRule,
         }),
         updatePaymentFrequencySettings({
-          barberPaymentFrequency,
+          professionalPaymentFrequency,
           employeePaymentFrequency,
         }),
       ]);
@@ -1382,7 +1408,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         pix: !updatedSettings.hiddenBookingPaymentMethods.includes('pix'),
         local: !updatedSettings.hiddenBookingPaymentMethods.includes('local'),
       });
-      setBarberPaymentFrequency(updatedFrequencySettings.barberPaymentFrequency);
+      setProfessionalPaymentFrequency(updatedFrequencySettings.professionalPaymentFrequency);
       setEmployeePaymentFrequency(updatedFrequencySettings.employeePaymentFrequency);
       setHasLoadedPaymentSettings(true);
       toast.success('Configuracoes de pagamento salvas com sucesso.');
@@ -1394,10 +1420,10 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     }
   }
 
-  async function saveBarberRuleSettings() {
-    if (isSavingBarberRule) return;
+  async function saveProfessionalRuleSettings() {
+    if (isSavingProfessionalRule) return;
 
-    setIsSavingBarberRule(true);
+    setIsSavingProfessionalRule(true);
 
     try {
       const currentSettings = settings ?? await getSettings();
@@ -1406,7 +1432,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         termsDocumentUrl: currentSettings.termsDocumentUrl ?? '',
         termsDocumentName: currentSettings.termsDocumentName ?? '',
         hiddenBookingPaymentMethods: currentSettings.hiddenBookingPaymentMethods ?? [],
-        subscriptionBarberRule,
+        subscriptionProfessionalRule,
       });
 
       setSettings(updatedSettings);
@@ -1416,7 +1442,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       const message = getApiErrorMessage(error);
       toast.error(message || 'Erro ao salvar regra de profissional.');
     } finally {
-      setIsSavingBarberRule(false);
+      setIsSavingProfessionalRule(false);
     }
   }
 
@@ -1513,6 +1539,21 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
                 />
               </div>
               <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Tipo de empresa</label>
+                <select
+                  value={businessForm.businessType}
+                  onChange={(event) => updateBusinessField('businessType', event.target.value as typeof businessForm.businessType)}
+                  disabled={isLoadingBusinessProfile}
+                  className="w-full bg-secondary text-sm text-foreground rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="beauty_salon">Salão de beleza</option>
+                  <option value="aesthetics">Clínica de estética / Esteticista</option>
+                  <option value="manicure_pedicure">Manicure e pedicure</option>
+                  <option value="spa">Spa</option>
+                  <option value="other">Outro</option>
+                </select>
+              </div>
+              <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Email</label>
                 <input 
                   type="email" 
@@ -1579,10 +1620,10 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
                 <label className="flex items-start gap-3 cursor-pointer group">
                   <input
                     type="radio"
-                    name="subscriptionBarberRule"
+                    name="subscriptionProfessionalRule"
                     value="fixed"
-                    checked={subscriptionBarberRule === 'fixed'}
-                    onChange={() => setSubscriptionBarberRule('fixed')}
+                    checked={subscriptionProfessionalRule === 'fixed'}
+                    onChange={() => setSubscriptionProfessionalRule('fixed')}
                     className="mt-1 accent-primary"
                   />
                   <div>
@@ -1595,10 +1636,10 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
                 <label className="flex items-start gap-3 cursor-pointer group">
                   <input
                     type="radio"
-                    name="subscriptionBarberRule"
+                    name="subscriptionProfessionalRule"
                     value="free_choice"
-                    checked={subscriptionBarberRule === 'free_choice'}
-                    onChange={() => setSubscriptionBarberRule('free_choice')}
+                    checked={subscriptionProfessionalRule === 'free_choice'}
+                    onChange={() => setSubscriptionProfessionalRule('free_choice')}
                     className="mt-1 accent-primary"
                   />
                   <div>
@@ -1612,11 +1653,11 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
               <div className="mt-4 flex justify-end">
                 <button
                   type="button"
-                  onClick={saveBarberRuleSettings}
-                  disabled={isSavingBarberRule}
+                  onClick={saveProfessionalRuleSettings}
+                  disabled={isSavingProfessionalRule}
                   className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSavingBarberRule ? 'Salvando...' : 'Salvar regra'}
+                  {isSavingProfessionalRule ? 'Salvando...' : 'Salvar regra'}
                 </button>
               </div>
             </div>
@@ -2286,9 +2327,9 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <AppSelect
                 label="Frequencia de pagamento - Profissionais"
-                value={barberPaymentFrequency}
+                value={professionalPaymentFrequency}
                 onChange={(value) =>
-                  setBarberPaymentFrequency(value as PaymentFrequency)
+                  setProfessionalPaymentFrequency(value as PaymentFrequency)
                 }
                 options={PAYMENT_FREQUENCY_OPTIONS}
                 disabled={isLoadingPaymentSettings || isSavingPaymentSettings}

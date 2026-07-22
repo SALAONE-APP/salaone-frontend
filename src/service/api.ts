@@ -1,10 +1,8 @@
 import axios from "axios";
-
-const API_URL =
-  import.meta.env.VITE_API_URL;
+import { env } from "../config/env";
 
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: env.API_URL,
 });
 
 api.interceptors.request.use((config) => {
@@ -20,6 +18,18 @@ api.interceptors.request.use((config) => {
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  const salonJson = localStorage.getItem("salon");
+  if (salonJson) {
+    try {
+      const salon = JSON.parse(salonJson);
+      if (salon?.id) {
+        config.headers["x-salon-id"] = salon.id;
+      }
+    } catch {
+      // ignore
+    }
   }
 
   return config;

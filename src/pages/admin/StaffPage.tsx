@@ -18,12 +18,12 @@ interface StaffMember {
 }
 
 const staffMembers: StaffMember[] = [
-  { id: 1, name: 'Rodrigues', role: 'Senior Barber', email: 'rodrigues@salaone.com.br', phone: '(85) 98765-8585', rating: 4.7, services: 156, revenue: 7850, status: 'ativos', avatar: 'https://i.pravatar.cc/150?u=olivia' },
-  { id: 2, name: 'Pedro', role: 'Senior Barber', email: 'pedro@salaone.com.br', phone: '(85) 98765-2222', rating: 4.7, services: 142, revenue: 7100, status: 'ativos', avatar: 'https://i.pravatar.cc/150?u=daniel' },
-  { id: 3, name: 'James Anderson', role: 'Senior Barber', email: 'james@salaone.com.br', phone: '(85) 98765-3333', rating: 4.7, services: 138, revenue: 6900, status: 'ativos', avatar: 'https://i.pravatar.cc/150?u=james' },
-  { id: 4, name: 'Olivia Brown', role: 'Senior Barber', email: 'olivia@salaone.com.br', phone: '(85) 98765-4444', rating: 4.7, services: 145, revenue: 7250, status: 'ativos', avatar: 'https://i.pravatar.cc/150?u=lucas' },
-  { id: 5, name: 'Michael Thompson', role: 'Senior Barber', email: 'michael@salaone.com.br', phone: '(85) 98765-5555', rating: 4.7, services: 132, revenue: 6600, status: 'ativos', avatar: 'https://i.pravatar.cc/150?u=michael' },
-  { id: 6, name: 'Emily Carter', role: 'Junior Barber', email: 'emily@salaone.com.br', phone: '(85) 98765-6666', rating: 4.5, services: 89, revenue: 3560, status: 'ativos', avatar: 'https://i.pravatar.cc/150?u=emily' },
+  { id: 1, name: 'Rodrigues', role: 'Senior Professional', email: 'rodrigues@salaone.com.br', phone: '(85) 98765-8585', rating: 4.7, services: 156, revenue: 7850, status: 'ativos', avatar: 'https://i.pravatar.cc/150?u=olivia' },
+  { id: 2, name: 'Pedro', role: 'Senior Professional', email: 'pedro@salaone.com.br', phone: '(85) 98765-2222', rating: 4.7, services: 142, revenue: 7100, status: 'ativos', avatar: 'https://i.pravatar.cc/150?u=daniel' },
+  { id: 3, name: 'James Anderson', role: 'Senior Professional', email: 'james@salaone.com.br', phone: '(85) 98765-3333', rating: 4.7, services: 138, revenue: 6900, status: 'ativos', avatar: 'https://i.pravatar.cc/150?u=james' },
+  { id: 4, name: 'Olivia Brown', role: 'Senior Professional', email: 'olivia@salaone.com.br', phone: '(85) 98765-4444', rating: 4.7, services: 145, revenue: 7250, status: 'ativos', avatar: 'https://i.pravatar.cc/150?u=lucas' },
+  { id: 5, name: 'Michael Thompson', role: 'Senior Professional', email: 'michael@salaone.com.br', phone: '(85) 98765-5555', rating: 4.7, services: 132, revenue: 6600, status: 'ativos', avatar: 'https://i.pravatar.cc/150?u=michael' },
+  { id: 6, name: 'Emily Carter', role: 'Junior Professional', email: 'emily@salaone.com.br', phone: '(85) 98765-6666', rating: 4.5, services: 89, revenue: 3560, status: 'ativos', avatar: 'https://i.pravatar.cc/150?u=emily' },
 ];
 
 export function StaffPage() {

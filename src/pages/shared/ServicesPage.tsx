@@ -74,7 +74,7 @@ import {
 } from "@/service/serviceService";
 import { getMyActiveSubscription, type Subscription } from "@/service/subscriptionService";
 import { uploadImage } from "@/service/uploadService";
-import { getSettings, type SubscriptionBarberRule } from "@/service/settingsService";
+import { getSettings, type SubscriptionProfessionalRule } from "@/service/settingsService";
 
 const normalizeText = (value: string) => {
   return value
@@ -93,6 +93,7 @@ interface ServiceFormState {
   commissionPercent: string;
   promotionalPrice: string;
   imageUrl: string;
+  imagePublicId: string | null;
   coveredByPlan: boolean;
   active: boolean;
 }
@@ -105,6 +106,7 @@ const emptyForm: ServiceFormState = {
   commissionPercent: "",
   promotionalPrice: "0",
   imageUrl: "",
+  imagePublicId: null,
   coveredByPlan: false,
   active: true,
 };
@@ -158,6 +160,7 @@ function serviceToForm(service: Service): ServiceFormState {
     commissionPercent: getCommission(service) == null ? "" : String(getCommission(service)),
     promotionalPrice: String(service.promotionalPrice ?? 0),
     imageUrl: service.imageUrl ?? "",
+    imagePublicId: service.imagePublicId ?? service.image_public_id ?? null,
     coveredByPlan: service.covered_by_plan === true,
     active: service.active !== false,
   };
@@ -181,15 +184,15 @@ export function ServicesPage() {
   const [serviceToDeactivate, setServiceToDeactivate] = useState<Service | null>(null);
   const [serviceToReactivate, setServiceToReactivate] = useState<Service | null>(null);
   const [form, setForm] = useState<ServiceFormState>(emptyForm);
-  const [subscriptionBarberRule, setSubscriptionBarberRule] = useState<SubscriptionBarberRule>("fixed");
+  const [subscriptionProfessionalRule, setSubscriptionProfessionalRule] = useState<SubscriptionProfessionalRule>("fixed");
 
   useEffect(() => {
     getSettings()
-      .then((s) => setSubscriptionBarberRule(s.subscriptionBarberRule ?? "fixed"))
+      .then((s) => setSubscriptionProfessionalRule(s.subscriptionProfessionalRule ?? "fixed"))
       .catch(() => {});
   }, []);
 
-  const isFreeChoice = subscriptionBarberRule === "free_choice" && user?.role !== "client";
+  const isFreeChoice = subscriptionProfessionalRule === "free_choice" && user?.role !== "client";
 
   const [mySubscription, setMySubscription] = useState<Subscription | null>(null);
 
@@ -304,8 +307,8 @@ export function ServicesPage() {
     setUploadingImage(true);
 
     try {
-      const imageUrl = await uploadImage(file);
-      setField("imageUrl", imageUrl);
+      const image = await uploadImage(file, "services");
+      setForm((current) => ({ ...current, imageUrl: image.secure_url, imagePublicId: image.public_id }));
       toast.success("Imagem do servico enviada.");
     } catch (err) {
       toast.error(getApiMessage(err));
@@ -316,7 +319,7 @@ export function ServicesPage() {
   }
 
   function removeServiceImage() {
-    setField("imageUrl", "");
+    setForm((current) => ({ ...current, imageUrl: "", imagePublicId: null }));
     resetImageInput();
   }
 
@@ -372,6 +375,7 @@ export function ServicesPage() {
       promotionalPrice: parseCurrencyInput(form.promotionalPrice || "0"),
       covered_by_plan: form.coveredByPlan,
       imageUrl: form.imageUrl || null,
+      imagePublicId: form.imagePublicId,
       active: form.active,
     };
 

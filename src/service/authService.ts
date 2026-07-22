@@ -63,7 +63,7 @@ interface BackendSalon {
 }
 
 function normalizeRole(role?: string) {
-  return role === "professional" ? "barber" : role;
+  return role === "professional" ? "professional" : role;
 }
 
 function normalizeSalon(salon: BackendSalon): StoredSalon {
@@ -111,6 +111,7 @@ export async function login(data: LoginPayload): Promise<AuthResponse> {
 }
 
 export async function register(_data: RegisterPayload) {
+  void _data;
   throw new Error("O backend atual não oferece autocadastro público.");
 }
 
@@ -143,9 +144,12 @@ export async function fetchMe() {
 }
 
 export async function forgotPassword(_email: string): Promise<{ message: string }> {
+  void _email;
   throw new Error("O backend atual não oferece recuperação de senha.");
 }
 
 export async function resetPassword(_password: string, _token: string): Promise<{ message: string }> {
+  void _password;
+  void _token;
   throw new Error("O backend atual não oferece redefinição pública de senha.");
 }

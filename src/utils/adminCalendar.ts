@@ -1,5 +1,5 @@
 import type { Appointment } from "@/service/appointmentService";
-import type { Barber } from "@/service/barberService";
+import type { Professional } from "@/service/professionalService";
 
 export interface CalendarColor {
   accent: string;
@@ -40,7 +40,7 @@ export interface FreeSlot {
   durationMinutes: number;
 }
 
-export const BARBER_CALENDAR_COLORS: CalendarColor[] = [
+export const PROFESSIONAL_CALENDAR_COLORS: CalendarColor[] = [
   { accent: '#38bdf8', tint: 'rgba(56,189,248,0.05)',  tintStrong: 'rgba(56,189,248,0.12)',  border: 'rgba(56,189,248,0.30)',  cardBg: 'rgba(8,47,73,0.90)',   cardText: '#bae6fd' },
   { accent: '#fb923c', tint: 'rgba(251,146,60,0.05)',  tintStrong: 'rgba(251,146,60,0.12)',  border: 'rgba(251,146,60,0.30)',  cardBg: 'rgba(67,20,7,0.90)',   cardText: '#fed7aa' },
   { accent: '#f472b6', tint: 'rgba(244,114,182,0.05)', tintStrong: 'rgba(244,114,182,0.12)', border: 'rgba(244,114,182,0.30)', cardBg: 'rgba(80,7,36,0.90)',   cardText: '#fbcfe8' },
@@ -51,7 +51,7 @@ export const BARBER_CALENDAR_COLORS: CalendarColor[] = [
   { accent: '#e879f9', tint: 'rgba(232,121,249,0.05)', tintStrong: 'rgba(232,121,249,0.12)', border: 'rgba(232,121,249,0.30)', cardBg: 'rgba(74,4,78,0.90)',   cardText: '#f0abfc' },
 ];
 
-export const FIT_APPOINTMENT_NOTE_MARKER = '[barberone:fit]';
+export const FIT_APPOINTMENT_NOTE_MARKER = '[professionalone:fit]';
 
 export const FIT_APPOINTMENT_COLOR: CalendarColor = {
   accent: '#0ea5e9',
@@ -149,13 +149,13 @@ export const CALENDAR_FIT_SLOT_MAX_MINUTES = 40;
 export const CALENDAR_START_MINUTES = 8 * 60;
 export const CALENDAR_END_MINUTES = 20 * 60;
 
-export const getStableCalendarColor = (barber: Barber | { id?: string; displayName?: string; name?: string } | null, fallbackIndex = 0): CalendarColor => {
-  const value = String((barber as any)?.id ?? (barber as any)?.displayName ?? (barber as any)?.name ?? fallbackIndex);
+export const getStableCalendarColor = (professional: Professional | { id?: string; displayName?: string; name?: string } | null, fallbackIndex = 0): CalendarColor => {
+  const value = String((professional as any)?.id ?? (professional as any)?.displayName ?? (professional as any)?.name ?? fallbackIndex);
   let hash = 0;
   for (let i = 0; i < value.length; i++) {
     hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
   }
-  return BARBER_CALENDAR_COLORS[hash % BARBER_CALENDAR_COLORS.length]!;
+  return PROFESSIONAL_CALENDAR_COLORS[hash % PROFESSIONAL_CALENDAR_COLORS.length]!;
 };
 
 export const isFitAppointment = (appointment: Appointment | null | undefined): boolean =>
@@ -255,19 +255,19 @@ export const getAppointmentClientStatus = (
   return APPOINTMENT_CLIENT_STATUS_CONFIG.no_plan;
 };
 
-export const buildCalendarAppointmentsByBarber = ({
+export const buildCalendarAppointmentsByProfessional = ({
   appointments,
-  barbers,
+  professionals,
   activeDateKey,
   getAppointmentStartDate,
 }: {
   appointments: Appointment[];
-  barbers: Barber[];
+  professionals: Professional[];
   activeDateKey: string;
   getAppointmentStartDate: (a: Appointment) => Date | null;
 }): Map<string, CalendarAppointment[]> => {
   const map = new Map<string, CalendarAppointment[]>();
-  barbers.forEach((b) => map.set(b.id, []));
+  professionals.forEach((b) => map.set(b.id, []));
 
   appointments.forEach((appointment, index) => {
     if (appointment.status === 'cancelled') return;
@@ -275,10 +275,10 @@ export const buildCalendarAppointmentsByBarber = ({
     const startDate = getAppointmentStartDate(appointment);
     if (!startDate || getLocalDateKey(startDate) !== activeDateKey) return;
 
-    const barberId = appointment.barberId || appointment.barber?.id;
-    if (!barberId) return;
+    const professionalId = appointment.professionalId || appointment.professional?.id;
+    if (!professionalId) return;
 
-    if (!map.has(barberId)) map.set(barberId, []);
+    if (!map.has(professionalId)) map.set(professionalId, []);
 
     const startTime = startDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const duration = getAppointmentDurationMinutes(appointment, getAppointmentStartDate);
@@ -286,7 +286,7 @@ export const buildCalendarAppointmentsByBarber = ({
     const clientStatus = getAppointmentClientStatus(appointment, getAppointmentStartDate);
     const color = clientStatus.color;
 
-    map.get(barberId)!.push({
+    map.get(professionalId)!.push({
       ...appointment,
       startTime,
       duration,
@@ -328,17 +328,17 @@ const createFreeFitSlot = ({ freeSlots, gapStart, gapEnd, minutesPerSlot, fitSlo
   freeSlots.push({ startMinutes: normalizedStart, durationMinutes });
 };
 
-export const buildCalendarFreeSlotsByBarber = ({
-  barbers,
-  appointmentsByBarber,
+export const buildCalendarFreeSlotsByProfessional = ({
+  professionals,
+  appointmentsByProfessional,
   startMinutes = CALENDAR_START_MINUTES,
   endMinutes = CALENDAR_END_MINUTES,
   minutesPerSlot = CALENDAR_MINUTES_PER_SLOT,
   fitSlotMaxMinutes = CALENDAR_FIT_SLOT_MAX_MINUTES,
   nowMinutes = null,
 }: {
-  barbers: Barber[];
-  appointmentsByBarber: Map<string, CalendarAppointment[]>;
+  professionals: Professional[];
+  appointmentsByProfessional: Map<string, CalendarAppointment[]>;
   startMinutes?: number;
   endMinutes?: number;
   minutesPerSlot?: number;
@@ -347,8 +347,8 @@ export const buildCalendarFreeSlotsByBarber = ({
 }): Map<string, FreeSlot[]> => {
   const map = new Map<string, FreeSlot[]>();
 
-  barbers.forEach((barber) => {
-    const apts = (appointmentsByBarber.get(barber.id) || [])
+  professionals.forEach((professional) => {
+    const apts = (appointmentsByProfessional.get(professional.id) || [])
       .map((apt) => {
         const [h, m] = String(apt.startTime || '00:00').split(':').map(Number);
         const startM = (h ?? 0) * 60 + (m ?? 0);
@@ -384,7 +384,7 @@ export const buildCalendarFreeSlotsByBarber = ({
     if (apts.length === 0) {
       const gapStart = nowMinutes !== null ? Math.max(startMinutes, nowMinutes) : startMinutes;
       createFreeFitSlot({ freeSlots, gapStart, gapEnd: endMinutes, minutesPerSlot, fitSlotMaxMinutes, endMinutes });
-      map.set(barber.id, freeSlots);
+      map.set(professional.id, freeSlots);
       return;
     }
 
@@ -401,7 +401,7 @@ export const buildCalendarFreeSlotsByBarber = ({
       createFreeFitSlot({ freeSlots, gapStart: cursor, gapEnd: endMinutes, minutesPerSlot, fitSlotMaxMinutes, endMinutes });
     }
 
-    map.set(barber.id, freeSlots);
+    map.set(professional.id, freeSlots);
   });
 
   return map;

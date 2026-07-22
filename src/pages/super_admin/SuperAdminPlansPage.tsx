@@ -39,7 +39,7 @@ const EMPTY_FORM = {
   name: "", description: "", price: "", interval: "month", intervalCount: "1",
   trialPeriodDays: "0", statementDescriptor: "SALAONE",
   paymentMethods: ["credit_card"] as string[], features: "",
-  maxBarbers: "", maxAdmins: "", maxReceptionists: "",
+  maxProfessionals: "", maxAdmins: "", maxReceptionists: "",
   isPublic: true, isRecommended: false, sortOrder: "0", syncPagarme: true,
 };
 
@@ -57,7 +57,7 @@ const FORM_FIELDS: { label: string; id: string; key: keyof PlanForm; type?: stri
   { label: "Qtd. do intervalo", id: "pn-ic", key: "intervalCount", type: "number", min: "1", placeholder: "1" },
   { label: "Dias gratis (trial)", id: "pn-trial", key: "trialPeriodDays", type: "number", min: "0", placeholder: "0" },
   { label: "Ordem na landing", id: "pn-sort", key: "sortOrder", type: "number", placeholder: "0" },
-  { label: "Max. profissionais", id: "pn-mb", key: "maxBarbers", type: "number", min: "0", placeholder: "Vazio = ilimitado" },
+  { label: "Max. profissionais", id: "pn-mb", key: "maxProfessionals", type: "number", min: "0", placeholder: "Vazio = ilimitado" },
   { label: "Max. admins", id: "pn-ma", key: "maxAdmins", type: "number", min: "0", placeholder: "Vazio = ilimitado" },
   { label: "Max. recepcionistas", id: "pn-mr", key: "maxReceptionists", type: "number", min: "0", placeholder: "Vazio = ilimitado" },
   { label: "Descricao na fatura (max. 13)", id: "pn-stmt", key: "statementDescriptor", maxLength: 13, placeholder: "SALAONE" },
@@ -98,7 +98,7 @@ export function SuperAdminPlansPage() {
         trialPeriodDays: Number(form.trialPeriodDays || 0), statementDescriptor: form.statementDescriptor.trim(),
         paymentMethods: form.paymentMethods,
         features: form.features.split("\n").map((f) => f.trim()).filter(Boolean),
-        maxBarbers: form.maxBarbers ? Number(form.maxBarbers) : null,
+        maxProfessionals: form.maxProfessionals ? Number(form.maxProfessionals) : null,
         maxAdmins: form.maxAdmins ? Number(form.maxAdmins) : null,
         maxReceptionists: form.maxReceptionists ? Number(form.maxReceptionists) : null,
         isPublic: form.isPublic, isRecommended: form.isRecommended,
@@ -126,7 +126,7 @@ export function SuperAdminPlansPage() {
       statementDescriptor: plan.statementDescriptor ?? "SALAONE",
       paymentMethods: pm,
       features: Array.isArray(plan.features) ? plan.features.join("\n") : "",
-      maxBarbers: plan.maxBarbers != null ? String(plan.maxBarbers) : plan.max_barbers != null ? String(plan.max_barbers) : "",
+      maxProfessionals: plan.maxProfessionals != null ? String(plan.maxProfessionals) : plan.max_professionals != null ? String(plan.max_professionals) : "",
       maxAdmins: plan.maxAdmins != null ? String(plan.maxAdmins) : plan.max_admins != null ? String(plan.max_admins) : "",
       maxReceptionists: plan.maxReceptionists != null ? String(plan.maxReceptionists) : plan.max_receptionists != null ? String(plan.max_receptionists) : "",
       isPublic: Boolean(plan.isPublic ?? plan.is_public),
@@ -149,7 +149,7 @@ export function SuperAdminPlansPage() {
         features: editForm.features.split("\n").map((f) => f.trim()).filter(Boolean),
         isPublic: editForm.isPublic, isRecommended: editForm.isRecommended,
         sortOrder: Number(editForm.sortOrder || 0),
-        maxBarbers: editForm.maxBarbers ? Number(editForm.maxBarbers) : null,
+        maxProfessionals: editForm.maxProfessionals ? Number(editForm.maxProfessionals) : null,
         maxAdmins: editForm.maxAdmins ? Number(editForm.maxAdmins) : null,
         maxReceptionists: editForm.maxReceptionists ? Number(editForm.maxReceptionists) : null,
         statementDescriptor: editForm.statementDescriptor.trim(),
@@ -354,7 +354,7 @@ export function SuperAdminPlansPage() {
                   <label className="text-xs font-medium text-muted-foreground">Ordem na landing</label>
                   <input type="number" value={editForm.sortOrder} onChange={(e) => setEditForm((p) => ({ ...p, sortOrder: e.target.value }))} className={inputCls} />
                 </div>
-                {[{ label: "Max. profissionais", key: "maxBarbers" }, { label: "Max. admins", key: "maxAdmins" }, { label: "Max. recepcionistas", key: "maxReceptionists" }].map((f) => (
+                {[{ label: "Max. profissionais", key: "maxProfessionals" }, { label: "Max. admins", key: "maxAdmins" }, { label: "Max. recepcionistas", key: "maxReceptionists" }].map((f) => (
                   <div key={f.key} className="space-y-1.5">
                     <label className="text-xs font-medium text-muted-foreground">{f.label}</label>
                     <input type="number" min="0" value={editForm[f.key as keyof PlanForm] as string}

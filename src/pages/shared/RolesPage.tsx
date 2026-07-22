@@ -20,7 +20,7 @@ const roles: Role[] = [
   { id: 4, name: 'Receptionist', description: 'Handle bookings and customer service', users: 1, permissions: 15, status: 'active' },
   { id: 5, name: 'Accountant', description: 'Financial and payment management', users: 1, permissions: 20, status: 'inactive' },
   { id: 6, name: 'Marketing', description: 'Promotions and customer communications', users: 1, permissions: 10, status: 'active' },
-  { id: 7, name: 'Barber', description: 'View schedule and manage appointments', users: 6, permissions: 8, status: 'active' },
+  { id: 7, name: 'Professional', description: 'View schedule and manage appointments', users: 6, permissions: 8, status: 'active' },
 ];
 
 

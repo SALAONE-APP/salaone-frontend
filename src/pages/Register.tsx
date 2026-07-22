@@ -5,6 +5,7 @@ import { Loader2, Eye, EyeOff } from "lucide-react";
 
 import salaOneLogo from "../assets/image/logo-icone-salaone.jpeg";
 import { AppCalendar } from "../components/AppCalendar";
+import { getDefaultRouteForRole } from "../config/profileConfig";
 import { useAuth } from "../hooks/useAuth";
 import {
   listPublicSalons,
@@ -116,9 +117,10 @@ export function Register() {
         if (!ignore) {
           setSalons(data);
         }
-      } catch {
+      } catch (loadError) {
+        console.error("[Register] Falha ao carregar salões:", loadError);
         if (!ignore) {
-          setError("Não foi possível carregar os salões.");
+          setError("Não foi possível carregar os salões. Verifique a conexão com o backend e o banco de dados.");
         }
       } finally {
         if (!ignore) {
@@ -149,8 +151,8 @@ export function Register() {
       return;
     }
 
-    if (password.length < 4) {
-      setError("A senha precisa ter no mínimo 4 caracteres.");
+    if (password.length < 6) {
+      setError("A senha precisa ter no mínimo 6 caracteres.");
       return;
     }
 
@@ -182,7 +184,7 @@ export function Register() {
 
       updateUser(res.user);
 
-      navigate("/", { replace: true });
+      navigate(getDefaultRouteForRole(res.user.role), { replace: true });
     } catch (err: unknown) {
       setError(getErrorMessage(err));
     } finally {
@@ -339,7 +341,7 @@ export function Register() {
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Mínimo 4 caracteres"
+                  placeholder="Mínimo 6 caracteres"
                   className="h-11 w-full rounded-lg border border-border bg-background pl-4 pr-10 text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                   required
                 />
