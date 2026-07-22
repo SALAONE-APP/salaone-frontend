@@ -9,6 +9,7 @@ import { BookingsPage } from "../pages/shared/BookingsPage";
 import { CashClosingPage } from "../pages/shared/CashClosingPage";
 import { FitAppointmentPage } from "../pages/shared/FitAppointmentPage";
 import { CustomersPage } from "../pages/shared/CustomersPage";
+import { ClientRecordsPage } from "../pages/shared/ClientRecordsPage";
 import { HelpCenterPage } from "../pages/shared/HelpCenterPage";
 import { OverviewPage } from "../pages/shared/OverviewPage";
 import { PaymentsPage } from "../pages/shared/PaymentsPage";
@@ -73,6 +74,12 @@ export const adminRoutes: AppRoute[] = [
     title: "Clientes",
     breadcrumbs: ["Administracao", "Clientes"],
     Component: CustomersPage,
+  },
+  {
+    path: "/client-records",
+    title: "Prontuário",
+    breadcrumbs: ["Administração", "Prontuário"],
+    Component: ClientRecordsPage,
   },
   {
     path: "/extra-payments",

@@ -3,6 +3,7 @@ import { ReceptionistSettingsPage } from "../pages/receptionist/ReceptionistSett
 import { BookingsPage } from "../pages/shared/BookingsPage";
 import { CashClosingPage } from "../pages/shared/CashClosingPage";
 import { CustomersPage } from "../pages/shared/CustomersPage";
+import { ClientRecordsPage } from "../pages/shared/ClientRecordsPage";
 import { FitAppointmentPage } from "../pages/shared/FitAppointmentPage";
 import { PaymentsPage } from "../pages/shared/PaymentsPage";
 import { ProductsPage } from "../pages/admin/ProductsPage";
@@ -55,6 +56,13 @@ export const receptionistRoutes: AppRoute[] = [
     title: "Clientes",
     breadcrumbs: ["Atendimento", "Clientes"],
     Component: CustomersPage,
+    requiredPermission: "manageCustomers",
+  },
+  {
+    path: "/client-records",
+    title: "Prontuário",
+    breadcrumbs: ["Atendimento", "Prontuário"],
+    Component: ClientRecordsPage,
     requiredPermission: "manageCustomers",
   },
   /* Visualização sem permissão — ações de edição são bloqueadas dentro das páginas */

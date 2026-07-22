@@ -1,4 +1,4 @@
-import { Calendar, Home, Scissors, Settings, UserCheck, Wallet } from "lucide-react";
+import { Calendar, ClipboardPlus, Home, Scissors, Settings, UserCheck, Wallet } from "lucide-react";
 
 import { usePermissions } from "../../hooks/usePermissions";
 import { ProfileSidebar } from "../shared/ProfileSidebar";
@@ -14,6 +14,7 @@ export function ProfessionalSidebar() {
 
   const serviceItems: SidebarItem[] = [
     { icon: UserCheck, label: "Clientes", href: "/customers", requiredPermission: "manageCustomers" },
+    { icon: ClipboardPlus, label: "Prontuário", href: "/client-records" },
     { icon: Scissors, label: "Servicos", href: "/services", requiredPermission: "manageServices" },
   ];
 

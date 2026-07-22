@@ -4,6 +4,7 @@ import {
   Boxes,
   CircleDollarSign,
   CreditCard,
+  ClipboardPlus,
   HandCoins,
   Image,
   Package,
@@ -86,6 +87,7 @@ function buildSections(): SidebarSection[] {
           children: [
             { icon: UserCog, label: "Funcionarios", href: "/users" },
             { icon: Users, label: "Clientes", href: "/customers" },
+            { icon: ClipboardPlus, label: "Prontuário", href: "/client-records" },
             { icon: Settings, label: "Configuracoes", href: "/settings" },
           ],
         },

@@ -4,6 +4,7 @@ import { ProfessionalEarningsPage } from "../pages/professional/ProfessionalEarn
 import { ProfessionalSchedulePage } from "../pages/professional/ProfessionalSchedulePage";
 import { ProfessionalSettingsPage } from "../pages/professional/ProfessionalSettingsPage";
 import { CustomersPage } from "../pages/shared/CustomersPage";
+import { ClientRecordsPage } from "../pages/shared/ClientRecordsPage";
 import { HelpCenterPage } from "../pages/shared/HelpCenterPage";
 import { ServicesPage } from "../pages/shared/ServicesPage";
 import type { AppRoute } from "./types";
@@ -34,6 +35,12 @@ export const professionalRoutes: AppRoute[] = [
     breadcrumbs: ["Profissional", "Clientes"],
     Component: CustomersPage,
     requiredPermission: "manageCustomers",
+  },
+  {
+    path: "/client-records",
+    title: "Prontuário",
+    breadcrumbs: ["Profissional", "Prontuário"],
+    Component: ClientRecordsPage,
   },
   {
     path: "/services",

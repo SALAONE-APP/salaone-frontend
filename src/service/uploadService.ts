@@ -1,6 +1,6 @@
 import api from './api';
 
-export type ImageCategory = 'profiles' | 'products' | 'services' | 'gallery' | 'logos';
+export type ImageCategory = 'profiles' | 'products' | 'services' | 'gallery' | 'logos' | 'records';
 
 export interface UploadedImage {
   secure_url: string;
