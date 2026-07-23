@@ -10,6 +10,7 @@ export interface WhatsAppMessageData {
   date: string;
   time: string;
   services: string[];
+  products?: Array<{ name: string; quantity: number; totalPrice?: number }>;
   total?: number;
   notes?: string;
   googleMapsUrl?: string | null;
@@ -49,6 +50,14 @@ function formatDateTimeBR(isoString: string): { date: string; time: string } {
 
 export function buildWhatsAppMessage(data: WhatsAppMessageData): string {
   const serviceList = data.services.map((s) => `  - ${s}`).join("\n");
+  const productLines = (data.products ?? []).map((product) =>
+    `  - ${product.quantity}x ${product.name}${
+      product.totalPrice != null ? ` - ${formatCurrencyBR(product.totalPrice)}` : ""
+    }`,
+  );
+  const productsSection = productLines.length
+    ? ["*Produtos:*", productLines.join("\n")]
+    : [];
   const totalLine =
     data.total != null && data.total > 0
       ? `\n*Total:* ${formatCurrencyBR(data.total)}`
@@ -71,6 +80,7 @@ export function buildWhatsAppMessage(data: WhatsAppMessageData): string {
     `*Horario:* ${data.time}`,
     `*Servicos:*`,
     serviceList,
+    ...productsSection,
     ...(notesLine ? [notesLine] : []),
     totalLine,
     ...mapsLine,
@@ -139,6 +149,9 @@ function buildConfirmationMessage(
     "Cliente";
   const { date, time } = formatDateTimeBR(appointment.startAt);
   const services = appointment.services.map((s) => s.serviceName).join(" e ");
+  const products = appointment.products.map((product) =>
+    `${product.quantity}x ${product.productName}`,
+  ).join(", ");
   const professionalName = appointment.professional?.displayName ?? "Profissional";
 
   return [
@@ -149,6 +162,7 @@ function buildConfirmationMessage(
     ` Data: ${date}`,
     ` Horario: ${time}`,
     ` Servico: ${services}`,
+    ...(products ? [` Produtos: ${products}`] : []),
     ` Profissional: ${professionalName}`,
     ...(appointment.notes?.trim() ? [``, ` Observacao: ${appointment.notes.trim()}`] : []),
     ...(salon?.googleMapsUrl?.trim()
