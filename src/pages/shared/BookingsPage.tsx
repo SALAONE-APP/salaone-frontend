@@ -7,6 +7,7 @@ import {
   Filter,
   Loader2,
   MoreHorizontal,
+  Package,
   Plus,
   Search,
   Scissors,
@@ -353,11 +354,15 @@ export function BookingsPage() {
       const serviceNames = appointment.services
         .map((service) => service.serviceName)
         .join(" ");
+      const productNames = appointment.products
+        .map((product) => product.productName)
+        .join(" ");
       const haystack = normalizeText(
         [
           appointment.client?.name,
           appointment.professional?.displayName,
           serviceNames,
+          productNames,
           appointment.notes,
         ]
           .filter(Boolean)
@@ -668,7 +673,7 @@ export function BookingsPage() {
                     Cliente
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Servico
+                    Serviço / Produtos
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Data e Hora
@@ -743,6 +748,14 @@ export function BookingsPage() {
                             <Scissors size={14} className="text-muted-foreground" />
                             <span className="max-w-56 truncate">{serviceText}</span>
                           </div>
+                          {appointment.products.length > 0 ? (
+                            <div className="mt-1 flex items-start gap-2 text-xs text-violet-600">
+                              <Package size={13} className="mt-0.5 shrink-0" />
+                              <span className="max-w-56">
+                                {appointment.products.map((product) => `${product.quantity}x ${product.productName}`).join(", ")}
+                              </span>
+                            </div>
+                          ) : null}
                         </td>
                         <td className="px-4 py-3">
                           <div className="space-y-1">
