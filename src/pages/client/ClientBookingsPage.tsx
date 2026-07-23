@@ -6,6 +6,8 @@ import {
   Info,
   Lock,
   Loader2,
+  Minus,
+  Package,
   MoreHorizontal,
   Plus,
   Search,
@@ -72,6 +74,7 @@ import { getSettings, type BookingPaymentMethod, type SubscriptionProfessionalRu
 import { createAppointmentPayment } from "@/service/paymentService";
 import { createReview } from "@/service/reviewService";
 import { listServices, type Service } from "@/service/serviceService";
+import { listProducts, type Product } from "@/service/productService";
 import { isFitAppointment } from "@/utils/fitAppointment";
 import { buildWhatsAppMessage, openWhatsApp, type WhatsAppMessageData } from "@/utils/whatsapp";
 
@@ -82,6 +85,7 @@ interface BookingFormState {
   date: string;
   time: string;
   serviceIds: string[];
+  productQuantities: Record<string, number>;
   notes: string;
 }
 
@@ -90,6 +94,7 @@ const emptyForm: BookingFormState = {
   date: dateToDateString(new Date()),
   time: "",
   serviceIds: [],
+  productQuantities: {},
   notes: "",
 };
 
@@ -227,6 +232,7 @@ export function ClientBookingsPage() {
   const [bookingForDependent, setBookingForDependent] = useState<Dependent | null>(null);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
 
@@ -295,13 +301,15 @@ export function ClientBookingsPage() {
     async function load() {
       try {
         const salonId = getStoredSalonId();
-        const [b, s, profile] = await Promise.all([
+        const [b, s, availableProducts, profile] = await Promise.all([
           listProfessionals({ page: 1, limit: 100, salonId }),
           listServices({ includeInactive: false, page: 1, limit: 100, salonId }),
+          listProducts({ active: true }),
           getSalonProfile(salonId),
         ]);
         setProfessionals(b.items);
         setServices(s.items.filter((sv) => sv.active));
+        setProducts(availableProducts);
         setSalonProfile(profile);
       } catch (err) { toast.error(getApiMessage(err)); }
 
@@ -326,8 +334,14 @@ export function ClientBookingsPage() {
   }, [bookingOpen, user?.id]);
 
   const selectedServices = useMemo(() => services.filter((s) => form.serviceIds.includes(s.id)), [form.serviceIds, services]);
+  const selectedProducts = useMemo(() => products
+    .filter((product) => (form.productQuantities[product.id] ?? 0) > 0)
+    .map((product) => ({ ...product, quantity: form.productQuantities[product.id] ?? 0 })),
+  [form.productQuantities, products]);
   const totalDuration = useMemo(() => selectedServices.reduce((sum, s) => sum + getServiceDuration(s), 0), [selectedServices]);
-  const totalPrice = useMemo(() => selectedServices.reduce((sum, s) => sum + getServicePrice(s), 0), [selectedServices]);
+  const serviceTotal = useMemo(() => selectedServices.reduce((sum, s) => sum + getServicePrice(s), 0), [selectedServices]);
+  const productTotal = useMemo(() => selectedProducts.reduce((sum, product) => sum + product.price * product.quantity, 0), [selectedProducts]);
+  const totalPrice = serviceTotal + productTotal;
 
   const isFixedRule = subscriptionProfessionalRule === "fixed";
   const hasActiveSubscription =
@@ -365,9 +379,10 @@ export function ClientBookingsPage() {
   const allSelectedServicesCoveredByPlan = useMemo(
     () =>
       selectedServices.length > 0 &&
+      selectedProducts.length === 0 &&
       hasActiveSubscriptionForBooking &&
       selectedServices.every((s) => isServiceCoveredByPlan(s)),
-    [hasActiveSubscriptionForBooking, isServiceCoveredByPlan, selectedServices],
+    [hasActiveSubscriptionForBooking, isServiceCoveredByPlan, selectedProducts.length, selectedServices],
   );
 
   useEffect(() => {
@@ -419,6 +434,14 @@ export function ClientBookingsPage() {
     }));
   }
 
+  function changeProductQuantity(product: Product, quantity: number) {
+    const next = Math.max(0, Math.min(product.stock, quantity));
+    setForm((current) => ({
+      ...current,
+      productQuantities: { ...current.productQuantities, [product.id]: next },
+    }));
+  }
+
   function validateForm(): string | null {
     if (!form.professionalId) return "Selecione o profissional.";
     if (!form.date) return "Selecione a data.";
@@ -452,7 +475,7 @@ export function ClientBookingsPage() {
         time: form.time,
         notes: form.notes.trim() || null,
         services: selectedServices.map((s) => ({ id: s.id, name: s.name, basePrice: s.basePrice, durationMinutes: s.durationMinutes, quantity: 1 })),
-        products: [],
+        products: selectedProducts.map((product) => ({ id: product.id, name: product.name, price: product.price, quantity: product.quantity })),
       });
 
       // Registro de pagamento é secundário — agendamento já confirmado
@@ -508,7 +531,7 @@ export function ClientBookingsPage() {
         time: form.time,
         notes: form.notes.trim() || null,
         services: selectedServices.map((s) => ({ id: s.id, name: s.name, basePrice: s.basePrice, durationMinutes: s.durationMinutes, quantity: 1 })),
-        products: [],
+        products: selectedProducts.map((product) => ({ id: product.id, name: product.name, price: product.price, quantity: product.quantity })),
       });
 
       try {
@@ -563,7 +586,7 @@ export function ClientBookingsPage() {
         time: form.time,
         notes: form.notes.trim() || null,
         services: selectedServices.map((s) => ({ id: s.id, name: s.name, basePrice: s.basePrice, durationMinutes: s.durationMinutes, quantity: 1 })),
-        products: [],
+        products: selectedProducts.map((product) => ({ id: product.id, name: product.name, price: product.price, quantity: product.quantity })),
       });
 
       let paymentId = "";
@@ -993,6 +1016,50 @@ export function ClientBookingsPage() {
                     Total: <span className="font-medium text-foreground">{formatCurrency(totalPrice)}</span>
                   </p>
                 )}
+              </div>
+
+              <div className="space-y-3 md:col-span-2">
+                <Label>Produtos (opcional)</Label>
+                <div className="grid max-h-56 gap-2 overflow-y-auto rounded-md border border-border p-3 md:grid-cols-2">
+                  {products.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nenhum produto disponível.</p>
+                  ) : products.map((product) => {
+                    const quantity = form.productQuantities[product.id] ?? 0;
+                    return (
+                      <div key={product.id} className="flex items-center justify-between gap-3 rounded-md p-2 hover:bg-secondary/60">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-md bg-muted">
+                            {product.imageUrl || product.image_url ? (
+                              <img src={product.imageUrl ?? product.image_url ?? ""} alt={product.name} className="h-full w-full object-cover" />
+                            ) : <Package size={18} className="text-muted-foreground" />}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{product.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatCurrency(product.price)} · {product.stock > 0 ? `${product.stock} em estoque` : "Sem estoque"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button type="button" variant="outline" size="icon" className="h-8 w-8" disabled={quantity <= 0} onClick={() => changeProductQuantity(product, quantity - 1)}>
+                            <Minus size={13} />
+                          </Button>
+                          <span className="w-6 text-center text-sm font-medium">{quantity}</span>
+                          <Button type="button" variant="outline" size="icon" className="h-8 w-8" disabled={product.stock <= 0 || quantity >= product.stock} onClick={() => changeProductQuantity(product, quantity + 1)}>
+                            <Plus size={13} />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {selectedProducts.length > 0 ? (
+                  <div className="space-y-1 text-right text-xs text-muted-foreground">
+                    <p>Serviços: {formatCurrency(serviceTotal)}</p>
+                    <p>Produtos: {formatCurrency(productTotal)}</p>
+                    <p className="text-sm font-semibold text-foreground">Total: {formatCurrency(totalPrice)}</p>
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-2 md:col-span-2">
