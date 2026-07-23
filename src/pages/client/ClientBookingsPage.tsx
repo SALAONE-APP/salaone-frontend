@@ -400,7 +400,7 @@ export function ClientBookingsPage() {
     const term = normalizeText(search.trim());
     if (!term) return appointments;
     return appointments.filter((a) => {
-      const haystack = normalizeText([a.professional?.displayName, ...a.services.map((s) => s.serviceName), a.notes].filter(Boolean).join(" "));
+      const haystack = normalizeText([a.professional?.displayName, ...a.services.map((s) => s.serviceName), ...a.products.map((product) => product.productName), a.notes].filter(Boolean).join(" "));
       return haystack.includes(term);
     });
   }, [appointments, search]);
@@ -498,6 +498,7 @@ export function ClientBookingsPage() {
         date: formatDateBR(form.date),
         time: form.time,
         services: selectedServices.map((s) => s.name),
+        products: selectedProducts.map((product) => ({ name: product.name, quantity: product.quantity, totalPrice: product.price * product.quantity })),
         total: totalPrice,
         notes: form.notes?.trim(),
         googleMapsUrl: salonProfile?.googleMapsUrl,
@@ -553,6 +554,7 @@ export function ClientBookingsPage() {
         date: formatDateBR(form.date),
         time: form.time,
         services: selectedServices.map((s) => s.name),
+        products: selectedProducts.map((product) => ({ name: product.name, quantity: product.quantity, totalPrice: product.price * product.quantity })),
         total: 0, // 0 custo extra
         notes: form.notes?.trim(),
         googleMapsUrl: salonProfile?.googleMapsUrl,
@@ -608,6 +610,7 @@ export function ClientBookingsPage() {
           date: formatDateBR(form.date),
           time: form.time,
           services: selectedServices.map((s) => s.name),
+          products: selectedProducts.map((product) => ({ name: product.name, quantity: product.quantity, totalPrice: product.price * product.quantity })),
           total: totalPrice,
           notes: form.notes?.trim(),
           googleMapsUrl: salonProfile?.googleMapsUrl,
@@ -654,6 +657,7 @@ export function ClientBookingsPage() {
       date: formatDateBR(form.date),
       time: form.time,
       services: selectedServices.map((s) => s.name),
+      products: selectedProducts.map((product) => ({ name: product.name, quantity: product.quantity, totalPrice: product.price * product.quantity })),
       total: totalPrice,
       notes: form.notes?.trim(),
       googleMapsUrl: salonProfile?.googleMapsUrl,
@@ -774,7 +778,7 @@ export function ClientBookingsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  {["Servico", "Data e Hora", "Profissional", "Valor", "Status"].map((col) => (
+                  {["Serviço / Produtos", "Data e Hora", "Profissional", "Valor", "Status"].map((col) => (
                     <th key={col} className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">{col}</th>
                   ))}
                   <th className="w-10 px-4 py-3" />
@@ -801,6 +805,14 @@ export function ClientBookingsPage() {
                               <Scissors size={14} className="text-muted-foreground" />
                               <span className="max-w-56 truncate">{serviceText}</span>
                             </div>
+                            {appt.products.length > 0 ? (
+                              <div className="flex items-start gap-2 text-xs text-violet-600">
+                                <Package size={13} className="mt-0.5 shrink-0" />
+                                <span className="max-w-56">
+                                  {appt.products.map((product) => `${product.quantity}x ${product.productName}`).join(", ")}
+                                </span>
+                              </div>
+                            ) : null}
                             {appt.dependent && (
                               <div className="flex items-center gap-1.5 text-xs text-primary font-medium">
                                 <UserIcon size={12} className="text-primary" />
