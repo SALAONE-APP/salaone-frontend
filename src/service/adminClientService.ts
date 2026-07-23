@@ -17,9 +17,10 @@ interface BackendClient {
 function mapClient(client: BackendClient): UserProfile {
   const visits = (client.appointments ?? []).filter((item) => item.status === "completed");
   const lastVisit = visits.map((item) => item.start_at).sort().at(-1) ?? null;
+  const birthDate = client.birth_date?.slice(0, 10) ?? null;
   return {
     id: client.id, name: client.name, email: client.email ?? "", phone: client.phone, cpf: client.cpf ?? null,
-    birthDate: client.birth_date ?? null, birth_date: client.birth_date ?? null,
+    birthDate, birth_date: birthDate,
     role: "client", isAdmin: false, createdAt: client.created_at, updatedAt: client.updated_at,
     visits: visits.length, lastVisit,
     lastAppointmentStatus: client.is_active ? null : "inactive",

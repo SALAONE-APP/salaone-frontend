@@ -211,31 +211,49 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
-function formatBirthday(birthDate?: string | null) {
+function parseBirthDate(birthDate?: string | null) {
   if (!birthDate) return null;
-  const date = new Date(birthDate);
-  if (Number.isNaN(date.getTime())) return null;
+
+  const [year, month, day] = birthDate.slice(0, 10).split("-").map(Number);
+  if (!year || !month || !day) return null;
+
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
+}
+
+function formatBirthday(birthDate?: string | null) {
+  const date = parseBirthDate(birthDate);
+  if (!date) return null;
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
   return `${day}/${month}`;
 }
 
 function isBirthdayToday(birthDate?: string | null) {
-  if (!birthDate) return false;
   const today = new Date();
-  const date = new Date(birthDate);
-  if (Number.isNaN(date.getTime())) return false;
+  const date = parseBirthDate(birthDate);
+  if (!date) return false;
   return date.getDate() === today.getDate() && date.getMonth() === today.getMonth();
 }
 
 function isBirthdaySoon(birthDate?: string | null, withinDays = 7) {
-  if (!birthDate) return false;
   const today = new Date();
-  const date = new Date(birthDate);
-  if (Number.isNaN(date.getTime())) return false;
+  const date = parseBirthDate(birthDate);
+  if (!date) return false;
+  const todayAtMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const nextBirthday = new Date(today.getFullYear(), date.getMonth(), date.getDate());
-  if (nextBirthday < today) nextBirthday.setFullYear(today.getFullYear() + 1);
-  const diffDays = Math.floor((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (nextBirthday < todayAtMidnight) nextBirthday.setFullYear(today.getFullYear() + 1);
+  const diffDays = Math.round(
+    (nextBirthday.getTime() - todayAtMidnight.getTime()) / (1000 * 60 * 60 * 24),
+  );
   return diffDays >= 0 && diffDays <= withinDays;
 }
 
