@@ -1,40 +1,174 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { AlertTriangle, CalendarDays, Camera, ChevronRight, ClipboardPlus, Droplets, Edit3, ImagePlus, Loader2, PackageOpen, Search, Sparkles, Trash2, UserRound } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarDays,
+  Camera,
+  ChevronRight,
+  ClipboardPlus,
+  ListChecks,
+  Droplets,
+  Edit3,
+  ImagePlus,
+  Loader2,
+  PackageOpen,
+  Search,
+  Sparkles,
+  Trash2,
+  UserRound,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { listAdminClients } from "@/service/adminClientService";
-import { createClientRecord, deleteClientRecord, listClientRecords, updateClientRecord, type ClientRecord, type ClientRecordPayload, type RecordPhoto, type RecordPhotoType } from "@/service/clientRecordService";
+import {
+  createClientRecord,
+  deleteClientRecord,
+  listClientRecords,
+  listRecordQuestions,
+  saveRecordQuestions,
+  updateClientRecord,
+  type ClientRecord,
+  type ClientRecordPayload,
+  type RecordPhoto,
+  type RecordPhotoType,
+  type RecordQuestion,
+  type RecordQuestionType,
+} from "@/service/clientRecordService";
 import { uploadImage } from "@/service/uploadService";
 import type { UserProfile } from "@/service/userService";
 
-const skinTypes = ["Normal", "Seca", "Oleosa", "Mista", "Sensível", "Acneica", "Madura"];
+const skinTypes = [
+  "Normal",
+  "Seca",
+  "Oleosa",
+  "Mista",
+  "Sensível",
+  "Acneica",
+  "Madura",
+];
 const today = () => new Date().toISOString().slice(0, 10);
-const emptyForm = (clientId = ""): ClientRecordPayload => ({ clientId, treatmentDate: today(), skinType: "", allergies: "", productsUsed: "", notes: "", photos: [] });
-const initials = (name: string) => name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-const dateLabel = (value: string) => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(value));
-const apiMessage = (error: unknown) => (error as { response?: { data?: { message?: string } } })?.response?.data?.message || (error instanceof Error ? error.message : "Não foi possível concluir a operação.");
+const emptyForm = (clientId = ""): ClientRecordPayload => ({
+  clientId,
+  treatmentDate: today(),
+  skinType: "",
+  allergies: "",
+  productsUsed: "",
+  notes: "",
+  photos: [],
+  customAnswers: [],
+});
+const initials = (name: string) =>
+  name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+const dateLabel = (value: string) =>
+  new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(value));
+const apiMessage = (error: unknown) =>
+  (error as { response?: { data?: { message?: string } } })?.response?.data
+    ?.message ||
+  (error instanceof Error
+    ? error.message
+    : "Não foi possível concluir a operação.");
 
-function PhotoPicker({ type, photos, uploading, onUpload, onRemove }: { type: RecordPhotoType; photos: RecordPhoto[]; uploading: RecordPhotoType | null; onUpload: (type: RecordPhotoType, file: File) => void; onRemove: (photo: RecordPhoto) => void }) {
+function PhotoPicker({
+  type,
+  photos,
+  uploading,
+  onUpload,
+  onRemove,
+}: {
+  type: RecordPhotoType;
+  photos: RecordPhoto[];
+  uploading: RecordPhotoType | null;
+  onUpload: (type: RecordPhotoType, file: File) => void;
+  onRemove: (photo: RecordPhoto) => void;
+}) {
   const input = useRef<HTMLInputElement>(null);
   const selected = photos.filter((photo) => photo.type === type);
   const title = type === "before" ? "Antes" : "Depois";
-  return <div className="rounded-2xl border border-dashed border-purple-200 bg-purple-50/40 p-3">
-    <div className="mb-3 flex items-center justify-between"><span className="text-sm font-semibold text-slate-700">{title}</span><Badge variant="outline" className="bg-white text-xs">{selected.length} foto{selected.length === 1 ? "" : "s"}</Badge></div>
-    <div className="grid grid-cols-3 gap-2">
-      {selected.map((photo) => <button type="button" key={photo.publicId} onClick={() => onRemove(photo)} className="group relative aspect-square overflow-hidden rounded-xl bg-white"><img src={photo.url} alt={`Foto ${title}`} className="h-full w-full object-cover"/><span className="absolute inset-0 grid place-items-center bg-black/50 text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">Remover</span></button>)}
-      <button type="button" onClick={() => input.current?.click()} disabled={Boolean(uploading)} className="grid aspect-square place-items-center rounded-xl border bg-white text-purple-600 transition hover:border-purple-400 hover:bg-purple-50">
-        {uploading === type ? <Loader2 className="h-5 w-5 animate-spin"/> : <ImagePlus className="h-5 w-5"/>}
-      </button>
+  return (
+    <div className="rounded-2xl border border-dashed border-purple-200 bg-purple-50/40 p-3">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-sm font-semibold text-slate-700">{title}</span>
+        <Badge variant="outline" className="bg-white text-xs">
+          {selected.length} foto{selected.length === 1 ? "" : "s"}
+        </Badge>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {selected.map((photo) => (
+          <button
+            type="button"
+            key={photo.publicId}
+            onClick={() => onRemove(photo)}
+            className="group relative aspect-square overflow-hidden rounded-xl bg-white"
+          >
+            <img
+              src={photo.url}
+              alt={`Foto ${title}`}
+              className="h-full w-full object-cover"
+            />
+            <span className="absolute inset-0 grid place-items-center bg-black/50 text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">
+              Remover
+            </span>
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => input.current?.click()}
+          disabled={Boolean(uploading)}
+          className="grid aspect-square place-items-center rounded-xl border bg-white text-purple-600 transition hover:border-purple-400 hover:bg-purple-50"
+        >
+          {uploading === type ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <ImagePlus className="h-5 w-5" />
+          )}
+        </button>
+      </div>
+      <input
+        ref={input}
+        className="hidden"
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple
+        onChange={(event) => {
+          Array.from(event.target.files ?? []).forEach((file) =>
+            onUpload(type, file),
+          );
+          event.target.value = "";
+        }}
+      />
     </div>
-    <input ref={input} className="hidden" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => { Array.from(event.target.files ?? []).forEach((file) => onUpload(type, file)); event.target.value = ""; }}/>
-  </div>;
+  );
 }
 
 export function ClientRecordsPage() {
@@ -48,38 +182,940 @@ export function ClientRecordsPage() {
   const [form, setForm] = useState<ClientRecordPayload>(emptyForm());
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<RecordPhotoType | null>(null);
+  const [questions, setQuestions] = useState<RecordQuestion[]>([]);
+  const [questionsOpen, setQuestionsOpen] = useState(false);
+  const [savingQuestions, setSavingQuestions] = useState(false);
+  const [questionLabel, setQuestionLabel] = useState("");
+  const [questionType, setQuestionType] =
+    useState<RecordQuestionType>("single");
+  const [questionOptions, setQuestionOptions] = useState("");
 
   async function load() {
     setLoading(true);
     try {
-      const [clientResult, recordResult] = await Promise.all([listAdminClients({ limit: 500 }), listClientRecords()]);
-      setClients(clientResult.items); setRecords(recordResult);
-      const urlClient = new URLSearchParams(window.location.search).get("client");
-      setSelectedId((current) => current || (urlClient && clientResult.items.some((item) => item.id === urlClient) ? urlClient : clientResult.items[0]?.id || ""));
-    } catch (error) { toast.error(apiMessage(error)); } finally { setLoading(false); }
+      const [clientResult, recordResult, questionResult] = await Promise.all([
+        listAdminClients({ limit: 500 }),
+        listClientRecords(),
+        listRecordQuestions(),
+      ]);
+      setClients(clientResult.items);
+      setRecords(recordResult);
+      setQuestions(questionResult);
+      const urlClient = new URLSearchParams(window.location.search).get(
+        "client",
+      );
+      setSelectedId(
+        (current) =>
+          current ||
+          (urlClient && clientResult.items.some((item) => item.id === urlClient)
+            ? urlClient
+            : clientResult.items[0]?.id || ""),
+      );
+    } catch (error) {
+      toast.error(apiMessage(error));
+    } finally {
+      setLoading(false);
+    }
   }
-  useEffect(() => { void load(); }, []);
-  const filteredClients = useMemo(() => clients.filter((client) => `${client.name} ${client.phone ?? ""}`.toLowerCase().includes(query.toLowerCase())), [clients, query]);
+  useEffect(() => {
+    void load();
+  }, []);
+  const filteredClients = useMemo(
+    () =>
+      clients.filter((client) =>
+        `${client.name} ${client.phone ?? ""}`
+          .toLowerCase()
+          .includes(query.toLowerCase()),
+      ),
+    [clients, query],
+  );
   const selectedClient = clients.find((client) => client.id === selectedId);
-  const clientRecords = records.filter((record) => record.clientId === selectedId);
-  const clientsWithRecords = new Set(records.map((record) => record.clientId)).size;
+  const clientRecords = records.filter(
+    (record) => record.clientId === selectedId,
+  );
+  const clientsWithRecords = new Set(records.map((record) => record.clientId))
+    .size;
 
-  function openNew() { setEditing(null); setForm(emptyForm(selectedId)); setDialogOpen(true); }
-  function openEdit(record: ClientRecord) { setEditing(record); setForm({ clientId: record.clientId, treatmentDate: record.treatmentDate.slice(0, 10), skinType: record.skinType || "", allergies: record.allergies || "", productsUsed: record.productsUsed || "", notes: record.notes || "", photos: record.photos }); setDialogOpen(true); }
-  async function handleUpload(type: RecordPhotoType, file: File) { setUploading(type); try { const image = await uploadImage(file, "records"); setForm((current) => ({ ...current, photos: [...current.photos, { type, url: image.secure_url, publicId: image.public_id }] })); } catch (error) { toast.error(apiMessage(error)); } finally { setUploading(null); } }
-  async function handleSubmit(event: FormEvent) { event.preventDefault(); if (!form.clientId) return toast.error("Selecione um cliente."); setSaving(true); try { if (editing) { const saved = await updateClientRecord(editing.id, form); setRecords((current) => current.map((item) => item.id === saved.id ? saved : item)); toast.success("Prontuário atualizado."); } else { const saved = await createClientRecord(form); setRecords((current) => [saved, ...current]); setSelectedId(saved.clientId); toast.success("Prontuário salvo com sucesso."); } setDialogOpen(false); } catch (error) { toast.error(apiMessage(error)); } finally { setSaving(false); } }
-  async function removeRecord(record: ClientRecord) { if (!window.confirm("Excluir este registro do prontuário?")) return; try { await deleteClientRecord(record.id); setRecords((current) => current.filter((item) => item.id !== record.id)); toast.success("Registro excluído."); } catch (error) { toast.error(apiMessage(error)); } }
+  function openNew() {
+    setEditing(null);
+    setForm(emptyForm(selectedId));
+    setDialogOpen(true);
+  }
+  function openEdit(record: ClientRecord) {
+    setEditing(record);
+    setForm({
+      clientId: record.clientId,
+      treatmentDate: record.treatmentDate.slice(0, 10),
+      skinType: record.skinType || "",
+      allergies: record.allergies || "",
+      productsUsed: record.productsUsed || "",
+      notes: record.notes || "",
+      photos: record.photos,
+      customAnswers: record.customAnswers,
+    });
+    setDialogOpen(true);
+  }
+  async function handleUpload(type: RecordPhotoType, file: File) {
+    setUploading(type);
+    try {
+      const image = await uploadImage(file, "records");
+      setForm((current) => ({
+        ...current,
+        photos: [
+          ...current.photos,
+          { type, url: image.secure_url, publicId: image.public_id },
+        ],
+      }));
+    } catch (error) {
+      toast.error(apiMessage(error));
+    } finally {
+      setUploading(null);
+    }
+  }
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!form.clientId) return toast.error("Selecione um cliente.");
+    setSaving(true);
+    try {
+      if (editing) {
+        const saved = await updateClientRecord(editing.id, form);
+        setRecords((current) =>
+          current.map((item) => (item.id === saved.id ? saved : item)),
+        );
+        toast.success("Prontuário atualizado.");
+      } else {
+        const saved = await createClientRecord(form);
+        setRecords((current) => [saved, ...current]);
+        setSelectedId(saved.clientId);
+        toast.success("Prontuário salvo com sucesso.");
+      }
+      setDialogOpen(false);
+    } catch (error) {
+      toast.error(apiMessage(error));
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function removeRecord(record: ClientRecord) {
+    if (!window.confirm("Excluir este registro do prontuário?")) return;
+    try {
+      await deleteClientRecord(record.id);
+      setRecords((current) => current.filter((item) => item.id !== record.id));
+      toast.success("Registro excluído.");
+    } catch (error) {
+      toast.error(apiMessage(error));
+    }
+  }
 
-  return <div className="space-y-6 pb-8">
-    <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#4d167d] via-[#7b2cbf] to-[#d63384] p-6 text-white shadow-xl shadow-purple-900/10 md:p-8">
-      <div className="absolute -right-16 -top-20 h-64 w-64 rounded-full bg-white/10 blur-2xl"/><div className="absolute bottom-0 right-1/4 h-32 w-32 rounded-full bg-pink-300/20 blur-2xl"/>
-      <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-end"><div><Badge className="mb-4 border-white/20 bg-white/15 text-white hover:bg-white/20"><Sparkles className="mr-1.5 h-3.5 w-3.5"/>Cuidado personalizado</Badge><h1 className="font-brand text-3xl font-semibold md:text-4xl">Prontuário estético</h1><p className="mt-2 max-w-xl text-sm text-purple-50 md:text-base">Histórico completo de cada cliente, evolução visual e informações essenciais para um atendimento seguro.</p></div><Button onClick={openNew} disabled={!selectedId} className="h-12 rounded-xl bg-white px-5 font-semibold text-purple-700 shadow-lg hover:bg-purple-50"><ClipboardPlus className="mr-2 h-5 w-5"/>Novo registro</Button></div>
-    </section>
-    <div className="grid gap-4 sm:grid-cols-3"><div className="rounded-2xl border bg-white p-5 shadow-sm"><p className="text-sm text-muted-foreground">Registros realizados</p><p className="mt-1 text-3xl font-semibold text-slate-800">{records.length}</p></div><div className="rounded-2xl border bg-white p-5 shadow-sm"><p className="text-sm text-muted-foreground">Clientes acompanhados</p><p className="mt-1 text-3xl font-semibold text-slate-800">{clientsWithRecords}</p></div><div className="rounded-2xl border bg-white p-5 shadow-sm"><p className="text-sm text-muted-foreground">Comparativos com fotos</p><p className="mt-1 text-3xl font-semibold text-slate-800">{records.filter((item) => item.photos.some((p) => p.type === "before") && item.photos.some((p) => p.type === "after")).length}</p></div></div>
-    <div className="grid min-h-[560px] gap-5 lg:grid-cols-[320px_1fr]">
-      <aside className="overflow-hidden rounded-2xl border bg-white shadow-sm"><div className="border-b p-4"><h2 className="text-lg font-semibold">Clientes</h2><div className="relative mt-3"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"/><Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar cliente..." className="pl-9"/></div></div><div className="max-h-[620px] overflow-y-auto p-2">{loading ? <div className="grid h-40 place-items-center"><Loader2 className="h-6 w-6 animate-spin text-purple-600"/></div> : filteredClients.map((client) => { const count = records.filter((item) => item.clientId === client.id).length; const active = client.id === selectedId; return <button key={client.id} onClick={() => setSelectedId(client.id)} className={`mb-1 flex w-full items-center gap-3 rounded-xl p-3 text-left transition ${active ? "bg-purple-50 ring-1 ring-purple-200" : "hover:bg-slate-50"}`}><Avatar className="h-10 w-10"><AvatarFallback className={active ? "bg-purple-600 text-white" : "bg-slate-100 text-slate-600"}>{initials(client.name)}</AvatarFallback></Avatar><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-800">{client.name}</p><p className="text-xs text-muted-foreground">{count ? `${count} registro${count > 1 ? "s" : ""}` : "Sem prontuário"}</p></div><ChevronRight className={`h-4 w-4 ${active ? "text-purple-600" : "text-slate-300"}`}/></button>; })}</div></aside>
-      <main className="rounded-2xl border bg-[#fcfafc] p-4 shadow-sm md:p-6">{!selectedClient ? <div className="grid h-full min-h-80 place-items-center text-center"><div><UserRound className="mx-auto h-12 w-12 text-purple-200"/><p className="mt-3 text-muted-foreground">Selecione um cliente para visualizar o prontuário.</p></div></div> : <><div className="mb-6 flex items-center gap-4 border-b pb-5"><Avatar className="h-14 w-14"><AvatarFallback className="brand-gradient text-lg text-white">{initials(selectedClient.name)}</AvatarFallback></Avatar><div><h2 className="text-xl font-semibold text-slate-900">{selectedClient.name}</h2><p className="text-sm text-muted-foreground">{selectedClient.phone || selectedClient.email || "Cliente cadastrado"}</p></div></div>{clientRecords.length === 0 ? <div className="grid min-h-96 place-items-center rounded-2xl border border-dashed bg-white text-center"><div className="max-w-sm p-6"><div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-purple-50"><ClipboardPlus className="h-8 w-8 text-purple-500"/></div><h3 className="mt-4 text-lg font-semibold">Comece o acompanhamento</h3><p className="mt-2 text-sm text-muted-foreground">Registre a avaliação, produtos utilizados e fotos da evolução deste cliente.</p><Button onClick={openNew} className="brand-gradient mt-5">Criar primeiro registro</Button></div></div> : <div className="space-y-5">{clientRecords.map((record) => { const before = record.photos.filter((p) => p.type === "before"), after = record.photos.filter((p) => p.type === "after"); return <article key={record.id} className="overflow-hidden rounded-2xl border bg-white shadow-sm"><div className="flex items-center justify-between border-b bg-gradient-to-r from-purple-50/80 to-pink-50/60 px-5 py-4"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-white text-purple-600 shadow-sm"><CalendarDays className="h-5 w-5"/></div><div><p className="font-semibold capitalize text-slate-800">{dateLabel(record.treatmentDate)}</p><p className="text-xs text-muted-foreground">Sessão estética</p></div></div><div className="flex gap-1"><Button variant="ghost" size="icon" onClick={() => openEdit(record)}><Edit3 className="h-4 w-4"/></Button><Button variant="ghost" size="icon" onClick={() => void removeRecord(record)} className="text-rose-500 hover:text-rose-600"><Trash2 className="h-4 w-4"/></Button></div></div><div className="grid gap-5 p-5 xl:grid-cols-[1fr_300px]"><div className="grid content-start gap-4 sm:grid-cols-2"><div className="rounded-xl bg-slate-50 p-4"><div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-purple-700"><Droplets className="h-4 w-4"/>Tipo de pele</div><p className="text-sm text-slate-700">{record.skinType || "Não informado"}</p></div><div className={`rounded-xl p-4 ${record.allergies ? "bg-amber-50" : "bg-slate-50"}`}><div className={`mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide ${record.allergies ? "text-amber-700" : "text-slate-500"}`}><AlertTriangle className="h-4 w-4"/>Alergias</div><p className="whitespace-pre-line text-sm text-slate-700">{record.allergies || "Nenhuma informada"}</p></div><div className="rounded-xl bg-slate-50 p-4 sm:col-span-2"><div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-purple-700"><PackageOpen className="h-4 w-4"/>Produtos utilizados</div><p className="whitespace-pre-line text-sm text-slate-700">{record.productsUsed || "Não informado"}</p></div>{record.notes && <div className="rounded-xl border-l-4 border-pink-400 bg-pink-50/60 p-4 sm:col-span-2"><p className="mb-1 text-xs font-semibold uppercase tracking-wide text-pink-700">Observações</p><p className="whitespace-pre-line text-sm text-slate-700">{record.notes}</p></div>}</div><div>{record.photos.length ? <div className="grid grid-cols-2 gap-2"><div><p className="mb-2 text-center text-xs font-semibold uppercase text-muted-foreground">Antes</p>{before[0] ? <img src={before[0].url} alt="Antes" className="aspect-[4/5] w-full rounded-xl object-cover"/> : <div className="grid aspect-[4/5] place-items-center rounded-xl bg-slate-100"><Camera className="text-slate-300"/></div>}</div><div><p className="mb-2 text-center text-xs font-semibold uppercase text-muted-foreground">Depois</p>{after[0] ? <img src={after[0].url} alt="Depois" className="aspect-[4/5] w-full rounded-xl object-cover"/> : <div className="grid aspect-[4/5] place-items-center rounded-xl bg-slate-100"><Camera className="text-slate-300"/></div>}</div></div> : <div className="grid h-full min-h-44 place-items-center rounded-xl border border-dashed bg-slate-50 text-center"><div><Camera className="mx-auto text-slate-300"/><p className="mt-2 text-xs text-muted-foreground">Sem fotos nesta sessão</p></div></div>}</div></div></article>; })}</div>}</>}</main>
+  function addQuestion() {
+    const label = questionLabel.trim();
+    const options =
+      questionType === "text"
+        ? []
+        : questionOptions
+            .split(",")
+            .map((option) => option.trim())
+            .filter(
+              (option, index, all) => option && all.indexOf(option) === index,
+            );
+    if (label.length < 2) return toast.error("Informe a pergunta.");
+    if (questionType !== "text" && options.length < 2)
+      return toast.error(
+        "Informe pelo menos duas opções separadas por vírgula.",
+      );
+    setQuestions((current) => [
+      ...current,
+      { id: crypto.randomUUID(), label, type: questionType, options },
+    ]);
+    setQuestionLabel("");
+    setQuestionOptions("");
+  }
+
+  async function persistQuestions() {
+    setSavingQuestions(true);
+    try {
+      const saved = await saveRecordQuestions(questions);
+      setQuestions(saved);
+      setQuestionsOpen(false);
+      toast.success("Perguntas do prontuário salvas.");
+    } catch (error) {
+      toast.error(apiMessage(error));
+    } finally {
+      setSavingQuestions(false);
+    }
+  }
+
+  function setAnswer(question: RecordQuestion, values: string[]) {
+    setForm((current) => ({
+      ...current,
+      customAnswers: [
+        ...current.customAnswers.filter(
+          (answer) =>
+            answer.questionId !== question.id &&
+            !questions.some(
+              (dependent) =>
+                dependent.id === answer.questionId &&
+                dependent.dependsOn === question.id &&
+                !values.includes(dependent.dependsValue ?? ""),
+            ),
+        ),
+        ...(values.length
+          ? [{ questionId: question.id, label: question.label, values }]
+          : []),
+      ],
+    }));
+  }
+
+  return (
+    <div className="space-y-6 pb-8">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#4d167d] via-[#7b2cbf] to-[#d63384] p-6 text-white shadow-xl shadow-purple-900/10 md:p-8">
+        <div className="absolute -right-16 -top-20 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
+        <div className="absolute bottom-0 right-1/4 h-32 w-32 rounded-full bg-pink-300/20 blur-2xl" />
+        <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-end">
+          <div>
+            <Badge className="mb-4 border-white/20 bg-white/15 text-white hover:bg-white/20">
+              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+              Cuidado personalizado
+            </Badge>
+            <h1 className="font-brand text-3xl font-semibold md:text-4xl">
+              Prontuário estético
+            </h1>
+            <p className="mt-2 max-w-xl text-sm text-purple-50 md:text-base">
+              Histórico completo de cada cliente, evolução visual e informações
+              essenciais para um atendimento seguro.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setQuestionsOpen(true)}
+              className="h-12 rounded-xl border-white/40 bg-white/10 px-5 text-white hover:bg-white/20 hover:text-white"
+            >
+              <ListChecks className="mr-2 h-5 w-5" />
+              Configurar perguntas
+            </Button>
+            <Button
+              onClick={openNew}
+              disabled={!selectedId}
+              className="h-12 rounded-xl bg-white px-5 font-semibold text-purple-700 shadow-lg hover:bg-purple-50"
+            >
+              <ClipboardPlus className="mr-2 h-5 w-5" />
+              Novo registro
+            </Button>
+          </div>
+        </div>
+      </section>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+          <p className="text-sm text-muted-foreground">Registros realizados</p>
+          <p className="mt-1 text-3xl font-semibold text-slate-800">
+            {records.length}
+          </p>
+        </div>
+        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+          <p className="text-sm text-muted-foreground">Clientes acompanhados</p>
+          <p className="mt-1 text-3xl font-semibold text-slate-800">
+            {clientsWithRecords}
+          </p>
+        </div>
+        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+          <p className="text-sm text-muted-foreground">
+            Comparativos com fotos
+          </p>
+          <p className="mt-1 text-3xl font-semibold text-slate-800">
+            {
+              records.filter(
+                (item) =>
+                  item.photos.some((p) => p.type === "before") &&
+                  item.photos.some((p) => p.type === "after"),
+              ).length
+            }
+          </p>
+        </div>
+      </div>
+      <div className="grid min-h-[560px] gap-5 lg:grid-cols-[320px_1fr]">
+        <aside className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+          <div className="border-b p-4">
+            <h2 className="text-lg font-semibold">Clientes</h2>
+            <div className="relative mt-3">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar cliente..."
+                className="pl-9"
+              />
+            </div>
+          </div>
+          <div className="max-h-[620px] overflow-y-auto p-2">
+            {loading ? (
+              <div className="grid h-40 place-items-center">
+                <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
+              </div>
+            ) : (
+              filteredClients.map((client) => {
+                const count = records.filter(
+                  (item) => item.clientId === client.id,
+                ).length;
+                const active = client.id === selectedId;
+                return (
+                  <button
+                    key={client.id}
+                    onClick={() => setSelectedId(client.id)}
+                    className={`mb-1 flex w-full items-center gap-3 rounded-xl p-3 text-left transition ${active ? "bg-purple-50 ring-1 ring-purple-200" : "hover:bg-slate-50"}`}
+                  >
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback
+                        className={
+                          active
+                            ? "bg-purple-600 text-white"
+                            : "bg-slate-100 text-slate-600"
+                        }
+                      >
+                        {initials(client.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-800">
+                        {client.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {count
+                          ? `${count} registro${count > 1 ? "s" : ""}`
+                          : "Sem prontuário"}
+                      </p>
+                    </div>
+                    <ChevronRight
+                      className={`h-4 w-4 ${active ? "text-purple-600" : "text-slate-300"}`}
+                    />
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </aside>
+        <main className="rounded-2xl border bg-[#fcfafc] p-4 shadow-sm md:p-6">
+          {!selectedClient ? (
+            <div className="grid h-full min-h-80 place-items-center text-center">
+              <div>
+                <UserRound className="mx-auto h-12 w-12 text-purple-200" />
+                <p className="mt-3 text-muted-foreground">
+                  Selecione um cliente para visualizar o prontuário.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="mb-6 flex items-center gap-4 border-b pb-5">
+                <Avatar className="h-14 w-14">
+                  <AvatarFallback className="brand-gradient text-lg text-white">
+                    {initials(selectedClient.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h2 className="text-xl font-semibold text-slate-900">
+                    {selectedClient.name}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedClient.phone ||
+                      selectedClient.email ||
+                      "Cliente cadastrado"}
+                  </p>
+                </div>
+              </div>
+              {clientRecords.length === 0 ? (
+                <div className="grid min-h-96 place-items-center rounded-2xl border border-dashed bg-white text-center">
+                  <div className="max-w-sm p-6">
+                    <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-purple-50">
+                      <ClipboardPlus className="h-8 w-8 text-purple-500" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold">
+                      Comece o acompanhamento
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Registre a avaliação, produtos utilizados e fotos da
+                      evolução deste cliente.
+                    </p>
+                    <Button onClick={openNew} className="brand-gradient mt-5">
+                      Criar primeiro registro
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  {clientRecords.map((record) => {
+                    const before = record.photos.filter(
+                        (p) => p.type === "before",
+                      ),
+                      after = record.photos.filter((p) => p.type === "after");
+                    return (
+                      <article
+                        key={record.id}
+                        className="overflow-hidden rounded-2xl border bg-white shadow-sm"
+                      >
+                        <div className="flex items-center justify-between border-b bg-gradient-to-r from-purple-50/80 to-pink-50/60 px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="grid h-10 w-10 place-items-center rounded-xl bg-white text-purple-600 shadow-sm">
+                              <CalendarDays className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <p className="font-semibold capitalize text-slate-800">
+                                {dateLabel(record.treatmentDate)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Sessão estética
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEdit(record)}
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => void removeRecord(record)}
+                              className="text-rose-500 hover:text-rose-600"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="grid gap-5 p-5 xl:grid-cols-[1fr_300px]">
+                          <div className="grid content-start gap-4 sm:grid-cols-2">
+                            <div className="rounded-xl bg-slate-50 p-4">
+                              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-purple-700">
+                                <Droplets className="h-4 w-4" />
+                                Tipo de pele
+                              </div>
+                              <p className="text-sm text-slate-700">
+                                {record.skinType || "Não informado"}
+                              </p>
+                            </div>
+                            <div
+                              className={`rounded-xl p-4 ${record.allergies ? "bg-amber-50" : "bg-slate-50"}`}
+                            >
+                              <div
+                                className={`mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide ${record.allergies ? "text-amber-700" : "text-slate-500"}`}
+                              >
+                                <AlertTriangle className="h-4 w-4" />
+                                Alergias
+                              </div>
+                              <p className="whitespace-pre-line text-sm text-slate-700">
+                                {record.allergies || "Nenhuma informada"}
+                              </p>
+                            </div>
+                            <div className="rounded-xl bg-slate-50 p-4 sm:col-span-2">
+                              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-purple-700">
+                                <PackageOpen className="h-4 w-4" />
+                                Produtos utilizados
+                              </div>
+                              <p className="whitespace-pre-line text-sm text-slate-700">
+                                {record.productsUsed || "Não informado"}
+                              </p>
+                            </div>
+                            {record.notes && (
+                              <div className="rounded-xl border-l-4 border-pink-400 bg-pink-50/60 p-4 sm:col-span-2">
+                                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-pink-700">
+                                  Observações
+                                </p>
+                                <p className="whitespace-pre-line text-sm text-slate-700">
+                                  {record.notes}
+                                </p>
+                              </div>
+                            )}
+                            {record.customAnswers.map((answer) => (
+                              <div
+                                key={answer.questionId}
+                                className="rounded-xl bg-purple-50/70 p-4 sm:col-span-2"
+                              >
+                                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-purple-700">
+                                  {answer.label}
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {answer.values.map((value) => (
+                                    <Badge
+                                      key={value}
+                                      variant="secondary"
+                                      className="bg-white"
+                                    >
+                                      {value}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div>
+                            {record.photos.length ? (
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <p className="mb-2 text-center text-xs font-semibold uppercase text-muted-foreground">
+                                    Antes
+                                  </p>
+                                  {before[0] ? (
+                                    <img
+                                      src={before[0].url}
+                                      alt="Antes"
+                                      className="aspect-[4/5] w-full rounded-xl object-cover"
+                                    />
+                                  ) : (
+                                    <div className="grid aspect-[4/5] place-items-center rounded-xl bg-slate-100">
+                                      <Camera className="text-slate-300" />
+                                    </div>
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="mb-2 text-center text-xs font-semibold uppercase text-muted-foreground">
+                                    Depois
+                                  </p>
+                                  {after[0] ? (
+                                    <img
+                                      src={after[0].url}
+                                      alt="Depois"
+                                      className="aspect-[4/5] w-full rounded-xl object-cover"
+                                    />
+                                  ) : (
+                                    <div className="grid aspect-[4/5] place-items-center rounded-xl bg-slate-100">
+                                      <Camera className="text-slate-300" />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="grid h-full min-h-44 place-items-center rounded-xl border border-dashed bg-slate-50 text-center">
+                                <div>
+                                  <Camera className="mx-auto text-slate-300" />
+                                  <p className="mt-2 text-xs text-muted-foreground">
+                                    Sem fotos nesta sessão
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </main>
+      </div>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => !saving && setDialogOpen(open)}
+      >
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
+          <form onSubmit={handleSubmit}>
+            <DialogHeader>
+              <DialogTitle>
+                {editing ? "Editar registro" : "Novo registro no prontuário"}
+              </DialogTitle>
+              <DialogDescription>
+                Documente a sessão com informações objetivas e fotos da
+                evolução.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-5 py-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label>Cliente *</Label>
+                  <Select
+                    value={form.clientId}
+                    onValueChange={(value) =>
+                      setForm((current) => ({ ...current, clientId: value }))
+                    }
+                    disabled={Boolean(editing)}
+                  >
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Data do atendimento *</Label>
+                  <Input
+                    className="mt-2"
+                    type="date"
+                    value={form.treatmentDate}
+                    onChange={(e) =>
+                      setForm((current) => ({
+                        ...current,
+                        treatmentDate: e.target.value,
+                      }))
+                    }
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Tipo de pele</Label>
+                <Select
+                  value={form.skinType || undefined}
+                  onValueChange={(value) =>
+                    setForm((current) => ({ ...current, skinType: value }))
+                  }
+                >
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Selecione o tipo de pele" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {skinTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Alergias e sensibilidades</Label>
+                <Textarea
+                  className="mt-2 min-h-20"
+                  value={form.allergies || ""}
+                  onChange={(e) =>
+                    setForm((current) => ({
+                      ...current,
+                      allergies: e.target.value,
+                    }))
+                  }
+                  placeholder="Ex.: alergia a ácido salicílico, pele reativa..."
+                />
+              </div>
+              <div>
+                <Label>Produtos utilizados</Label>
+                <Textarea
+                  className="mt-2 min-h-20"
+                  value={form.productsUsed || ""}
+                  onChange={(e) =>
+                    setForm((current) => ({
+                      ...current,
+                      productsUsed: e.target.value,
+                    }))
+                  }
+                  placeholder="Liste produtos, marcas ou ativos utilizados"
+                />
+              </div>
+              <div>
+                <div className="mb-2">
+                  <Label>Registro fotográfico</Label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    JPEG, PNG ou WEBP de até 5 MB.
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <PhotoPicker
+                    type="before"
+                    photos={form.photos}
+                    uploading={uploading}
+                    onUpload={handleUpload}
+                    onRemove={(photo) =>
+                      setForm((current) => ({
+                        ...current,
+                        photos: current.photos.filter(
+                          (item) => item.publicId !== photo.publicId,
+                        ),
+                      }))
+                    }
+                  />
+                  <PhotoPicker
+                    type="after"
+                    photos={form.photos}
+                    uploading={uploading}
+                    onUpload={handleUpload}
+                    onRemove={(photo) =>
+                      setForm((current) => ({
+                        ...current,
+                        photos: current.photos.filter(
+                          (item) => item.publicId !== photo.publicId,
+                        ),
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Observações</Label>
+                <Textarea
+                  className="mt-2 min-h-28"
+                  value={form.notes || ""}
+                  onChange={(e) =>
+                    setForm((current) => ({
+                      ...current,
+                      notes: e.target.value,
+                    }))
+                  }
+                  placeholder="Evolução, reação da pele, recomendações e próximos passos..."
+                />
+              </div>
+              {questions.length > 0 && (
+                <div className="space-y-4 rounded-2xl border bg-purple-50/40 p-4">
+                  <div>
+                    <h3 className="font-semibold text-slate-800">
+                      Perguntas personalizadas
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Preencha as informações adicionais deste atendimento.
+                    </p>
+                  </div>
+                  {questions.map((question) => {
+                    const selected =
+                      form.customAnswers.find(
+                        (answer) => answer.questionId === question.id,
+                      )?.values ?? [];
+                    const dependencyAnswer = question.dependsOn
+                      ? form.customAnswers.find(
+                          (answer) => answer.questionId === question.dependsOn,
+                        )
+                      : null;
+                    if (
+                      question.dependsOn &&
+                      !dependencyAnswer?.values.includes(
+                        question.dependsValue ?? "",
+                      )
+                    )
+                      return null;
+                    const section =
+                      question.id === "10000000-0000-4000-8000-000000000001"
+                        ? "Sobre seu cabelo"
+                        : question.id === "10000000-0000-4000-8000-000000000005"
+                          ? "Histórico químico"
+                          : question.id ===
+                              "10000000-0000-4000-8000-000000000009"
+                            ? "Restrições"
+                            : null;
+                    return (
+                      <div key={question.id} className="space-y-2">
+                        {section && (
+                          <h4 className="border-b pb-2 text-base font-semibold text-purple-800">
+                            {section}
+                          </h4>
+                        )}
+                        <Label>{question.label}</Label>
+                        {question.type === "text" ? (
+                          <Textarea
+                            className="min-h-20 bg-white"
+                            value={selected[0] ?? ""}
+                            onChange={(event) =>
+                              setAnswer(
+                                question,
+                                event.target.value ? [event.target.value] : [],
+                              )
+                            }
+                            placeholder="Digite sua resposta"
+                          />
+                        ) : question.type === "single" ? (
+                          <Select
+                            value={selected[0]}
+                            onValueChange={(value) =>
+                              setAnswer(question, [value])
+                            }
+                          >
+                            <SelectTrigger className="mt-2 bg-white">
+                              <SelectValue placeholder="Selecione uma opção" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {question.options.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {option}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                            {question.options.map((option) => (
+                              <label
+                                key={option}
+                                className="flex cursor-pointer items-center gap-2 rounded-lg border bg-white p-3 text-sm"
+                              >
+                                <Checkbox
+                                  checked={selected.includes(option)}
+                                  onCheckedChange={(checked) =>
+                                    setAnswer(
+                                      question,
+                                      checked
+                                        ? [...selected, option]
+                                        : selected.filter(
+                                            (value) => value !== option,
+                                          ),
+                                    )
+                                  }
+                                />
+                                {option}
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDialogOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={saving || Boolean(uploading)}
+                className="brand-gradient min-w-32"
+              >
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editing ? "Salvar alterações" : "Salvar prontuário"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={questionsOpen} onOpenChange={setQuestionsOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Configurar perguntas do prontuário</DialogTitle>
+            <DialogDescription>
+              Crie perguntas de seleção única ou múltipla para os próximos
+              registros.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5">
+            <div className="space-y-3 rounded-2xl border bg-slate-50 p-4">
+              <div>
+                <Label>Nova pergunta</Label>
+                <Input
+                  className="mt-2 bg-white"
+                  value={questionLabel}
+                  onChange={(event) => setQuestionLabel(event.target.value)}
+                  placeholder="Ex.: Quais procedimentos já realizou?"
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label>Tipo de resposta</Label>
+                  <Select
+                    value={questionType}
+                    onValueChange={(value: RecordQuestionType) =>
+                      setQuestionType(value)
+                    }
+                  >
+                    <SelectTrigger className="mt-2 bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="single">Seleção única</SelectItem>
+                      <SelectItem value="multi">Múltipla seleção</SelectItem>
+                      <SelectItem value="text">Campo de texto</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {questionType !== "text" && (
+                  <div>
+                    <Label>Opções (separadas por vírgula)</Label>
+                    <Input
+                      className="mt-2 bg-white"
+                      value={questionOptions}
+                      onChange={(event) =>
+                        setQuestionOptions(event.target.value)
+                      }
+                      placeholder="Sim, Não, Talvez"
+                    />
+                  </div>
+                )}
+              </div>
+              <Button type="button" variant="outline" onClick={addQuestion}>
+                <ClipboardPlus className="mr-2 h-4 w-4" />
+                Adicionar pergunta
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {questions.length === 0 ? (
+                <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  Nenhuma pergunta personalizada criada.
+                </p>
+              ) : (
+                questions.map((question) => (
+                  <div
+                    key={question.id}
+                    className="flex items-start justify-between gap-3 rounded-xl border p-4"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-slate-800">
+                          {question.label}
+                        </p>
+                        {question.id.startsWith("10000000-") && (
+                          <Badge variant="outline">Padrão</Badge>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {question.type === "multi"
+                          ? "Múltipla seleção"
+                          : question.type === "text"
+                            ? "Campo de texto"
+                            : "Seleção única"}
+                        {question.options.length > 0 &&
+                          ` · ${question.options.join(", ")}`}
+                      </p>
+                    </div>
+                    {!question.id.startsWith("10000000-") && (
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="shrink-0 text-rose-500"
+                        onClick={() =>
+                          setQuestions((current) =>
+                            current.filter((item) => item.id !== question.id),
+                          )
+                        }
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setQuestionsOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              className="brand-gradient"
+              disabled={savingQuestions}
+              onClick={() => void persistQuestions()}
+            >
+              {savingQuestions && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Salvar perguntas
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
-    <Dialog open={dialogOpen} onOpenChange={(open) => !saving && setDialogOpen(open)}><DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl"><form onSubmit={handleSubmit}><DialogHeader><DialogTitle>{editing ? "Editar registro" : "Novo registro no prontuário"}</DialogTitle><DialogDescription>Documente a sessão com informações objetivas e fotos da evolução.</DialogDescription></DialogHeader><div className="grid gap-5 py-5"><div className="grid gap-4 sm:grid-cols-2"><div><Label>Cliente *</Label><Select value={form.clientId} onValueChange={(value) => setForm((current) => ({ ...current, clientId: value }))} disabled={Boolean(editing)}><SelectTrigger className="mt-2"><SelectValue placeholder="Selecione"/></SelectTrigger><SelectContent>{clients.map((client) => <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>)}</SelectContent></Select></div><div><Label>Data do atendimento *</Label><Input className="mt-2" type="date" value={form.treatmentDate} onChange={(e) => setForm((current) => ({ ...current, treatmentDate: e.target.value }))} required/></div></div><div><Label>Tipo de pele</Label><Select value={form.skinType || undefined} onValueChange={(value) => setForm((current) => ({ ...current, skinType: value }))}><SelectTrigger className="mt-2"><SelectValue placeholder="Selecione o tipo de pele"/></SelectTrigger><SelectContent>{skinTypes.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent></Select></div><div><Label>Alergias e sensibilidades</Label><Textarea className="mt-2 min-h-20" value={form.allergies || ""} onChange={(e) => setForm((current) => ({ ...current, allergies: e.target.value }))} placeholder="Ex.: alergia a ácido salicílico, pele reativa..."/></div><div><Label>Produtos utilizados</Label><Textarea className="mt-2 min-h-20" value={form.productsUsed || ""} onChange={(e) => setForm((current) => ({ ...current, productsUsed: e.target.value }))} placeholder="Liste produtos, marcas ou ativos utilizados"/></div><div><div className="mb-2"><Label>Registro fotográfico</Label><p className="mt-1 text-xs text-muted-foreground">JPEG, PNG ou WEBP de até 5 MB.</p></div><div className="grid gap-3 sm:grid-cols-2"><PhotoPicker type="before" photos={form.photos} uploading={uploading} onUpload={handleUpload} onRemove={(photo) => setForm((current) => ({ ...current, photos: current.photos.filter((item) => item.publicId !== photo.publicId) }))}/><PhotoPicker type="after" photos={form.photos} uploading={uploading} onUpload={handleUpload} onRemove={(photo) => setForm((current) => ({ ...current, photos: current.photos.filter((item) => item.publicId !== photo.publicId) }))}/></div></div><div><Label>Observações</Label><Textarea className="mt-2 min-h-28" value={form.notes || ""} onChange={(e) => setForm((current) => ({ ...current, notes: e.target.value }))} placeholder="Evolução, reação da pele, recomendações e próximos passos..."/></div></div><DialogFooter><Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button><Button type="submit" disabled={saving || Boolean(uploading)} className="brand-gradient min-w-32">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}{editing ? "Salvar alterações" : "Salvar prontuário"}</Button></DialogFooter></form></DialogContent></Dialog>
-  </div>;
+  );
 }
