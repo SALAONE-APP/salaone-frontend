@@ -77,7 +77,6 @@ interface ProductFormState {
   description: string;
   category: string;
   price: string;
-  stock: string;
   subscriberDiscount: string;
   imageUrl: string;
   imagePublicId: string | null;
@@ -89,7 +88,6 @@ const emptyForm: ProductFormState = {
   description: "",
   category: "",
   price: "",
-  stock: "0",
   subscriberDiscount: "0",
   imageUrl: "",
   imagePublicId: null,
@@ -152,7 +150,6 @@ function productToForm(product: Product): ProductFormState {
     description: product.description ?? "",
     category: product.category ?? "",
     price: String(product.price ?? ""),
-    stock: String(product.stock ?? 0),
     subscriberDiscount: String(product.subscriberDiscount ?? product.subscriber_discount ?? 0),
     imageUrl: product.imageUrl ?? product.image_url ?? "",
     imagePublicId: product.imagePublicId ?? product.image_public_id ?? null,
@@ -279,12 +276,10 @@ export function ProductsPage() {
 
   function validateForm() {
     const price = parseCurrencyInput(form.price);
-    const stock = Number(form.stock);
     const subscriberDiscount = Number(form.subscriberDiscount);
 
     if (!form.name.trim()) return "Informe o nome do produto.";
     if (!Number.isFinite(price) || price <= 0) return "Informe um preco maior que zero.";
-    if (!Number.isInteger(stock) || stock < 0) return "Informe um estoque valido.";
     if (
       !Number.isInteger(subscriberDiscount) ||
       subscriberDiscount < 0 ||
@@ -310,7 +305,6 @@ export function ProductsPage() {
       description: form.description.trim() || null,
       category: form.category.trim() || null,
       price: parseCurrencyInput(form.price),
-      stock: Number(form.stock),
       subscriberDiscount: Number(form.subscriberDiscount),
       imageUrl: form.imageUrl || null,
       imagePublicId: form.imagePublicId,
@@ -582,9 +576,12 @@ export function ProductsPage() {
               <DialogTitle>
                 {editingProduct ? "Editar Produto" : "Adicionar Produto"}
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="sr-only">
                 Cadastre produtos vendidos pela salão e controle estoque.
               </DialogDescription>
+              <p className="text-sm text-muted-foreground">
+                Cadastre os dados do produto. A quantidade deve ser lançada no Controle de Estoque.
+              </p>
             </DialogHeader>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -624,17 +621,6 @@ export function ProductsPage() {
                   placeholder="35,00"
                   inputMode="decimal"
                   required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="product-stock">Estoque</Label>
-                <Input
-                  id="product-stock"
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={form.stock}
-                  onChange={(event) => setField("stock", event.target.value)}
                 />
               </div>
               <div className="space-y-2">

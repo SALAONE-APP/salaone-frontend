@@ -33,7 +33,6 @@ export interface ProductPayload {
   subscriberDiscount?: number;
   imageUrl?: string | null;
   imagePublicId?: string | null;
-  stock?: number;
   active?: boolean;
 }
 
