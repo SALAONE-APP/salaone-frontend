@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
 import {
   ArrowLeftRight,
   Calendar,
@@ -6,6 +12,7 @@ import {
   Clock,
   Filter,
   Loader2,
+  Minus,
   MoreHorizontal,
   Package,
   Plus,
@@ -61,9 +68,19 @@ import {
   type Appointment,
   type AppointmentStatus,
 } from "@/service/appointmentService";
-import { listProfessionals, type Professional } from "@/service/professionalService";
-import { listBlockedDates, type BlockedDate } from "@/service/blockedDateService";
-import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
+import {
+  listProfessionals,
+  type Professional,
+} from "@/service/professionalService";
+import { listProducts, type Product } from "@/service/productService";
+import {
+  listBlockedDates,
+  type BlockedDate,
+} from "@/service/blockedDateService";
+import {
+  getSalonProfile,
+  type SalonProfile,
+} from "@/service/salonProfileService";
 import { listServices, type Service } from "@/service/serviceService";
 import { isFitAppointment } from "@/utils/fitAppointment";
 import { ClientPickerModal } from "@/components/ClientPickerModal";
@@ -78,6 +95,7 @@ interface BookingFormState {
   date: string;
   time: string;
   serviceIds: string[];
+  productQuantities: Record<string, number>;
   notes: string;
   allowOutsideBusinessHours: boolean;
 }
@@ -88,6 +106,7 @@ const emptyForm: BookingFormState = {
   date: dateToDateString(new Date()),
   time: "",
   serviceIds: [],
+  productQuantities: {},
   notes: "",
   allowOutsideBusinessHours: false,
 };
@@ -165,7 +184,8 @@ function formatCurrency(value: number) {
 }
 
 function getApiMessage(error: unknown) {
-  const responseData = (error as { response?: { data?: unknown } })?.response?.data;
+  const responseData = (error as { response?: { data?: unknown } })?.response
+    ?.data;
 
   if (Array.isArray(responseData)) return responseData.join(" ");
 
@@ -208,16 +228,21 @@ export function BookingsPage() {
   const [form, setForm] = useState<BookingFormState>(emptyForm);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
-  const [appointmentToTransfer, setAppointmentToTransfer] = useState<Appointment | null>(null);
+  const [appointmentToTransfer, setAppointmentToTransfer] =
+    useState<Appointment | null>(null);
   const [transferProfessionalId, setTransferProfessionalId] = useState("");
   const [transferSaving, setTransferSaving] = useState(false);
-  const [blockedDateWarning, setBlockedDateWarning] = useState<BlockedDate | null>(null);
+  const [blockedDateWarning, setBlockedDateWarning] =
+    useState<BlockedDate | null>(null);
   const [salonProfile, setSalonProfile] = useState<SalonProfile | null>(null);
   const [todayCount, setTodayCount] = useState<number | null>(null);
-  const [sendingWhatsAppId, setSendingWhatsAppId] = useState<string | null>(null);
+  const [sendingWhatsAppId, setSendingWhatsAppId] = useState<string | null>(
+    null,
+  );
 
   const limit = 20;
 
@@ -234,7 +259,9 @@ export function BookingsPage() {
       });
 
       // Backend retorna em start_at asc — garantir ordenação crescente no cliente também
-      result.items.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+      result.items.sort(
+        (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
+      );
 
       setAppointments(result.items);
       setTotal(result.total);
@@ -250,12 +277,19 @@ export function BookingsPage() {
   }, [loadAppointments]);
 
   useEffect(() => {
-    getSalonProfile().then(setSalonProfile).catch(() => null);
+    getSalonProfile()
+      .then(setSalonProfile)
+      .catch(() => null);
   }, []);
 
   useEffect(() => {
     const today = dateToDateString(new Date());
-    listAppointments({ allAppointments: true, dateFrom: today, dateTo: today, limit: 1 })
+    listAppointments({
+      allAppointments: true,
+      dateFrom: today,
+      dateTo: today,
+      limit: 1,
+    })
       .then((r) => setTodayCount(r.total))
       .catch(() => null);
   }, []);
@@ -265,13 +299,16 @@ export function BookingsPage() {
 
     async function loadFormOptions() {
       try {
-        const [professionalsResult, servicesResult] = await Promise.all([
-          listProfessionals({ page: 1, limit: 100 }),
-          listServices({ includeInactive: false, page: 1, limit: 100 }),
-        ]);
+        const [professionalsResult, servicesResult, productsResult] =
+          await Promise.all([
+            listProfessionals({ page: 1, limit: 100 }),
+            listServices({ includeInactive: false, page: 1, limit: 100 }),
+            listProducts({ active: true }),
+          ]);
 
         setProfessionals(professionalsResult.items);
         setServices(servicesResult.items.filter((service) => service.active));
+        setProducts(productsResult);
       } catch (err) {
         toast.error(getApiMessage(err));
       }
@@ -292,13 +329,52 @@ export function BookingsPage() {
     [form.serviceIds, services],
   );
 
+  const selectedProducts = useMemo(
+    () =>
+      products
+        .filter((product) => (form.productQuantities[product.id] ?? 0) > 0)
+        .map((product) => ({
+          ...product,
+          quantity: form.productQuantities[product.id] ?? 0,
+        })),
+    [form.productQuantities, products],
+  );
+
+  const servicesTotal = useMemo(
+    () =>
+      selectedServices.reduce(
+        (sum, service) => sum + Number(service.basePrice ?? 0),
+        0,
+      ),
+    [selectedServices],
+  );
+
+  const productsTotal = useMemo(
+    () =>
+      selectedProducts.reduce(
+        (sum, product) => sum + product.price * product.quantity,
+        0,
+      ),
+    [selectedProducts],
+  );
+
   const totalDuration = useMemo(
-    () => selectedServices.reduce((sum, service) => sum + getServiceDuration(service), 0),
+    () =>
+      selectedServices.reduce(
+        (sum, service) => sum + getServiceDuration(service),
+        0,
+      ),
     [selectedServices],
   );
 
   useEffect(() => {
-    if (!dialogOpen || !form.professionalId || !form.date || totalDuration <= 0 || form.allowOutsideBusinessHours) {
+    if (
+      !dialogOpen ||
+      !form.professionalId ||
+      !form.date ||
+      totalDuration <= 0 ||
+      form.allowOutsideBusinessHours
+    ) {
       setSlots([]);
       return;
     }
@@ -324,7 +400,13 @@ export function BookingsPage() {
     return () => {
       active = false;
     };
-  }, [dialogOpen, form.allowOutsideBusinessHours, form.professionalId, form.date, totalDuration]);
+  }, [
+    dialogOpen,
+    form.allowOutsideBusinessHours,
+    form.professionalId,
+    form.date,
+    totalDuration,
+  ]);
 
   // Verifica se a data/profissional selecionado tem bloqueio
   useEffect(() => {
@@ -333,7 +415,11 @@ export function BookingsPage() {
       return;
     }
 
-    listBlockedDates({ dateFrom: form.date, dateTo: form.date, professionalId: form.professionalId })
+    listBlockedDates({
+      dateFrom: form.date,
+      dateTo: form.date,
+      professionalId: form.professionalId,
+    })
       .then((items) => {
         const block = items.find((b) => {
           if (b.date.slice(0, 10) !== form.date) return false;
@@ -378,10 +464,15 @@ export function BookingsPage() {
     const today = dateToDateString(new Date());
 
     return {
-      today: appointments.filter((appointment) => appointment.startAt.slice(0, 10) === today)
-        .length,
-      scheduled: appointments.filter((appointment) => appointment.status === "scheduled").length,
-      confirmed: appointments.filter((appointment) => appointment.status === "confirmed").length,
+      today: appointments.filter(
+        (appointment) => appointment.startAt.slice(0, 10) === today,
+      ).length,
+      scheduled: appointments.filter(
+        (appointment) => appointment.status === "scheduled",
+      ).length,
+      confirmed: appointments.filter(
+        (appointment) => appointment.status === "confirmed",
+      ).length,
     };
   }, [appointments]);
 
@@ -419,13 +510,25 @@ export function BookingsPage() {
     }));
   }
 
+  function changeProductQuantity(product: Product, quantity: number) {
+    const next = Math.max(0, Math.min(product.stock, quantity));
+    setForm((current) => ({
+      ...current,
+      productQuantities: {
+        ...current.productQuantities,
+        [product.id]: next,
+      },
+    }));
+  }
+
   function validateForm() {
     if (!form.clientId) return "Selecione o cliente.";
     if (!form.professionalId) return "Selecione o profissional.";
     if (!form.date) return "Selecione a data.";
     if (!form.time) return "Selecione ou informe o horario.";
     if (form.serviceIds.length === 0) return "Selecione pelo menos um servico.";
-    if (!/^\d{2}:\d{2}$/.test(form.time)) return "Informe o horario no formato HH:MM.";
+    if (!/^\d{2}:\d{2}$/.test(form.time))
+      return "Informe o horario no formato HH:MM.";
 
     return null;
   }
@@ -456,7 +559,12 @@ export function BookingsPage() {
           durationMinutes: service.durationMinutes,
           quantity: 1,
         })),
-        products: [],
+        products: selectedProducts.map((product) => ({
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          quantity: product.quantity,
+        })),
       });
 
       toast.success("Agendamento criado.");
@@ -497,7 +605,10 @@ export function BookingsPage() {
     }
   }
 
-  async function changeStatus(appointment: Appointment, status: AppointmentStatus) {
+  async function changeStatus(
+    appointment: Appointment,
+    status: AppointmentStatus,
+  ) {
     try {
       await updateAppointment(appointment.id, { status });
       await loadAppointments();
@@ -545,8 +656,12 @@ export function BookingsPage() {
     }
     setTransferSaving(true);
     try {
-      await updateAppointment(appointmentToTransfer.id, { professionalId: transferProfessionalId });
-      const newProfessionalName = professionals.find((b) => b.id === transferProfessionalId)?.displayName ?? "novo profissional";
+      await updateAppointment(appointmentToTransfer.id, {
+        professionalId: transferProfessionalId,
+      });
+      const newProfessionalName =
+        professionals.find((b) => b.id === transferProfessionalId)
+          ?.displayName ?? "novo profissional";
       toast.success(`Agendamento transferido para ${newProfessionalName}!`);
       setTransferDialogOpen(false);
       await loadAppointments();
@@ -561,20 +676,28 @@ export function BookingsPage() {
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <div className="rounded-xl border border-border bg-card p-5">
-          <p className="mb-1 text-sm text-muted-foreground">Total Agendamentos</p>
+          <p className="mb-1 text-sm text-muted-foreground">
+            Total Agendamentos
+          </p>
           <h3 className="text-2xl font-semibold text-foreground">{total}</h3>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="mb-1 text-sm text-muted-foreground">Hoje</p>
-          <h3 className="text-2xl font-semibold text-foreground">{todayCount ?? "—"}</h3>
+          <h3 className="text-2xl font-semibold text-foreground">
+            {todayCount ?? "—"}
+          </h3>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="mb-1 text-sm text-muted-foreground">Agendados</p>
-          <h3 className="text-2xl font-semibold text-foreground">{stats.scheduled}</h3>
+          <h3 className="text-2xl font-semibold text-foreground">
+            {stats.scheduled}
+          </h3>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="mb-1 text-sm text-muted-foreground">Confirmados</p>
-          <h3 className="text-2xl font-semibold text-foreground">{stats.confirmed}</h3>
+          <h3 className="text-2xl font-semibold text-foreground">
+            {stats.confirmed}
+          </h3>
         </div>
       </div>
 
@@ -625,20 +748,38 @@ export function BookingsPage() {
                     setPage(1);
                   }}
                 >
-                  <DropdownMenuRadioItem value="active">Ativos (pendentes e confirmados)</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="active">
+                    Ativos (pendentes e confirmados)
+                  </DropdownMenuRadioItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuRadioItem value="completed">Finalizados</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="cancelled">Cancelados</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="no_show">Nao compareceu</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="completed">
+                    Finalizados
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="cancelled">
+                    Cancelados
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="no_show">
+                    Nao compareceu
+                  </DropdownMenuRadioItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuRadioItem value="scheduled">Somente agendados</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="confirmed">Somente confirmados</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="scheduled">
+                    Somente agendados
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="confirmed">
+                    Somente confirmados
+                  </DropdownMenuRadioItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuRadioItem value="all">Todos</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="all">
+                    Todos
+                  </DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button size="sm" className="gap-2" onClick={() => openCreateDialog(false)}>
+            <Button
+              size="sm"
+              className="gap-2"
+              onClick={() => openCreateDialog(false)}
+            >
               <Plus size={14} />
               Novo Agendamento
             </Button>
@@ -694,14 +835,20 @@ export function BookingsPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-sm text-muted-foreground">
+                    <td
+                      colSpan={8}
+                      className="p-8 text-center text-sm text-muted-foreground"
+                    >
                       <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
                       Carregando agendamentos...
                     </td>
                   </tr>
                 ) : filteredAppointments.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-sm text-muted-foreground">
+                    <td
+                      colSpan={8}
+                      className="p-8 text-center text-sm text-muted-foreground"
+                    >
                       Nenhum agendamento encontrado.
                     </td>
                   </tr>
@@ -709,10 +856,16 @@ export function BookingsPage() {
                   filteredAppointments.map((appointment) => {
                     const start = formatDateTime(appointment.startAt);
                     const serviceText =
-                      appointment.services.map((service) => service.serviceName).join(", ") ||
-                      "Sem servico";
-                    const clientName = appointment.dependent?.name || appointment.client?.name || "Cliente";
-                    const professionalName = appointment.professional?.displayName || "Sem profissional";
+                      appointment.services
+                        .map((service) => service.serviceName)
+                        .join(", ") || "Sem servico";
+                    const clientName =
+                      appointment.dependent?.name ||
+                      appointment.client?.name ||
+                      "Cliente";
+                    const professionalName =
+                      appointment.professional?.displayName ||
+                      "Sem profissional";
 
                     return (
                       <tr
@@ -746,14 +899,24 @@ export function BookingsPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2 text-sm text-foreground">
-                            <Scissors size={14} className="text-muted-foreground" />
-                            <span className="max-w-56 truncate">{serviceText}</span>
+                            <Scissors
+                              size={14}
+                              className="text-muted-foreground"
+                            />
+                            <span className="max-w-56 truncate">
+                              {serviceText}
+                            </span>
                           </div>
                           {appointment.products.length > 0 ? (
                             <div className="mt-1 flex items-start gap-2 text-xs text-violet-600">
                               <Package size={13} className="mt-0.5 shrink-0" />
                               <span className="max-w-56">
-                                {appointment.products.map((product) => `${product.quantity}x ${product.productName}`).join(", ")}
+                                {appointment.products
+                                  .map(
+                                    (product) =>
+                                      `${product.quantity}x ${product.productName}`,
+                                  )
+                                  .join(", ")}
                               </span>
                             </div>
                           ) : null}
@@ -761,7 +924,10 @@ export function BookingsPage() {
                         <td className="px-4 py-3">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2 text-sm text-foreground">
-                              <Calendar size={14} className="text-muted-foreground" />
+                              <Calendar
+                                size={14}
+                                className="text-muted-foreground"
+                              />
                               {start.date}
                             </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -808,29 +974,40 @@ export function BookingsPage() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
                                 disabled={appointment.status === "confirmed"}
-                                onClick={() => changeStatus(appointment, "confirmed")}
+                                onClick={() =>
+                                  changeStatus(appointment, "confirmed")
+                                }
                               >
                                 <CheckCircle2 size={14} />
                                 Confirmar
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 disabled={appointment.status === "completed"}
-                                onClick={() => changeStatus(appointment, "completed")}
+                                onClick={() =>
+                                  changeStatus(appointment, "completed")
+                                }
                               >
                                 <CheckCircle2 size={14} />
                                 Finalizar
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 disabled={appointment.status === "no_show"}
-                                onClick={() => changeStatus(appointment, "no_show")}
+                                onClick={() =>
+                                  changeStatus(appointment, "no_show")
+                                }
                               >
                                 <XCircle size={14} />
                                 Nao compareceu
                               </DropdownMenuItem>
-                              {(appointment.status === "scheduled" || appointment.status === "confirmed") && (
+                              {(appointment.status === "scheduled" ||
+                                appointment.status === "confirmed") && (
                                 <>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => openTransferDialog(appointment)}>
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      openTransferDialog(appointment)
+                                    }
+                                  >
                                     <ArrowLeftRight size={14} />
                                     Transferir profissional
                                   </DropdownMenuItem>
@@ -839,10 +1016,16 @@ export function BookingsPage() {
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 disabled={sendingWhatsAppId === appointment.id}
-                                onClick={() => void handleSendAppointmentWhatsApp(appointment)}
+                                onClick={() =>
+                                  void handleSendAppointmentWhatsApp(
+                                    appointment,
+                                  )
+                                }
                               >
                                 <WhatsAppIcon size={14} />
-                                {sendingWhatsAppId === appointment.id ? "Carregando telefone" : "Enviar WhatsApp"}
+                                {sendingWhatsAppId === appointment.id
+                                  ? "Carregando telefone"
+                                  : "Enviar WhatsApp"}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
@@ -882,7 +1065,9 @@ export function BookingsPage() {
               variant="outline"
               size="sm"
               disabled={page >= totalPages || loading}
-              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              onClick={() =>
+                setPage((current) => Math.min(totalPages, current + 1))
+              }
             >
               Proxima
             </Button>
@@ -905,7 +1090,9 @@ export function BookingsPage() {
               <p className="text-sm text-muted-foreground">
                 Cliente:{" "}
                 <span className="font-medium text-foreground">
-                  {appointmentToTransfer?.dependent?.name || appointmentToTransfer?.client?.name || "—"}
+                  {appointmentToTransfer?.dependent?.name ||
+                    appointmentToTransfer?.client?.name ||
+                    "—"}
                 </span>
               </p>
               <p className="text-sm text-muted-foreground">
@@ -918,7 +1105,10 @@ export function BookingsPage() {
 
             <div className="space-y-2">
               <Label>Novo profissional</Label>
-              <Select value={transferProfessionalId} onValueChange={setTransferProfessionalId}>
+              <Select
+                value={transferProfessionalId}
+                onValueChange={setTransferProfessionalId}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecionar profissional" />
                 </SelectTrigger>
@@ -948,7 +1138,8 @@ export function BookingsPage() {
               disabled={
                 transferSaving ||
                 !transferProfessionalId ||
-                transferProfessionalId === appointmentToTransfer?.professional?.id
+                transferProfessionalId ===
+                  appointmentToTransfer?.professional?.id
               }
             >
               {transferSaving ? (
@@ -966,7 +1157,10 @@ export function BookingsPage() {
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-3xl">
-          <form onSubmit={handleCreateSubmit} className="flex min-h-0 flex-1 flex-col gap-5">
+          <form
+            onSubmit={handleCreateSubmit}
+            className="flex min-h-0 flex-1 flex-col gap-5"
+          >
             <DialogHeader>
               <DialogTitle>
                 {form.allowOutsideBusinessHours
@@ -986,8 +1180,12 @@ export function BookingsPage() {
                 {bookForSelf ? (
                   <div className="flex items-center gap-2 rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm">
                     <User size={14} className="text-muted-foreground" />
-                    <span className="text-foreground">{user?.name ?? "Administrador"}</span>
-                    <span className="ml-auto text-xs text-muted-foreground">(você)</span>
+                    <span className="text-foreground">
+                      {user?.name ?? "Administrador"}
+                    </span>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      (você)
+                    </span>
                   </div>
                 ) : (
                   <Button
@@ -1067,11 +1265,20 @@ export function BookingsPage() {
                   <Select
                     value={form.time}
                     onValueChange={(value) => setField("time", value)}
-                    disabled={!form.professionalId || !form.date || totalDuration <= 0 || slotsLoading}
+                    disabled={
+                      !form.professionalId ||
+                      !form.date ||
+                      totalDuration <= 0 ||
+                      slotsLoading
+                    }
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue
-                        placeholder={slotsLoading ? "Carregando horarios" : "Selecionar horario"}
+                        placeholder={
+                          slotsLoading
+                            ? "Carregando horarios"
+                            : "Selecionar horario"
+                        }
                       />
                     </SelectTrigger>
                     <SelectContent>
@@ -1083,9 +1290,12 @@ export function BookingsPage() {
                     </SelectContent>
                   </Select>
                 )}
-                {!form.allowOutsideBusinessHours && !slotsLoading && totalDuration > 0 ? (
+                {!form.allowOutsideBusinessHours &&
+                !slotsLoading &&
+                totalDuration > 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    {slots.length} horarios disponiveis para {totalDuration} min.
+                    {slots.length} horarios disponiveis para {totalDuration}{" "}
+                    min.
                   </p>
                 ) : null}
               </div>
@@ -1094,7 +1304,9 @@ export function BookingsPage() {
                 <Label>Servicos</Label>
                 <div className="grid max-h-56 gap-2 overflow-y-auto rounded-md border border-border p-3 md:grid-cols-2">
                   {services.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nenhum servico ativo.</p>
+                    <p className="text-sm text-muted-foreground">
+                      Nenhum servico ativo.
+                    </p>
                   ) : (
                     services.map((service) => (
                       <label
@@ -1112,7 +1324,8 @@ export function BookingsPage() {
                             {service.name}
                           </span>
                           <span className="block text-xs text-muted-foreground">
-                            {getServiceDuration(service)} min - {formatCurrency(service.basePrice)}
+                            {getServiceDuration(service)} min -{" "}
+                            {formatCurrency(service.basePrice)}
                           </span>
                         </span>
                       </label>
@@ -1121,10 +1334,109 @@ export function BookingsPage() {
                 </div>
               </div>
 
+              <div className="space-y-3 md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <Label>Produtos</Label>
+                  <span className="text-xs text-muted-foreground">
+                    Opcional
+                  </span>
+                </div>
+                <div className="grid max-h-64 gap-2 overflow-y-auto rounded-md border border-border p-3 md:grid-cols-2">
+                  {products.length === 0 ? (
+                    <p className="text-sm text-muted-foreground md:col-span-2">
+                      Nenhum produto ativo encontrado.
+                    </p>
+                  ) : (
+                    products.map((product) => {
+                      const quantity = form.productQuantities[product.id] ?? 0;
+                      return (
+                        <div
+                          key={product.id}
+                          className="flex items-center justify-between gap-3 rounded-md p-2 hover:bg-secondary/60"
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-md bg-secondary">
+                              {product.imageUrl || product.image_url ? (
+                                <img
+                                  src={
+                                    product.imageUrl ?? product.image_url ?? ""
+                                  }
+                                  alt={product.name}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <Package className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">
+                                {product.name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatCurrency(product.price)} ·{" "}
+                                {product.stock > 0
+                                  ? `${product.stock} em estoque`
+                                  : "Sem estoque"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8"
+                              disabled={quantity <= 0}
+                              onClick={() =>
+                                changeProductQuantity(product, quantity - 1)
+                              }
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="w-5 text-center text-sm font-medium">
+                              {quantity}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8"
+                              disabled={
+                                product.stock <= 0 || quantity >= product.stock
+                              }
+                              onClick={() =>
+                                changeProductQuantity(product, quantity + 1)
+                              }
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-md border bg-secondary/30 p-3 text-sm md:col-span-2">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Serviços</span>
+                  <span>{formatCurrency(servicesTotal)}</span>
+                </div>
+                <div className="mt-1 flex justify-between text-muted-foreground">
+                  <span>Produtos</span>
+                  <span>{formatCurrency(productsTotal)}</span>
+                </div>
+                <div className="mt-2 flex justify-between border-t pt-2 font-semibold">
+                  <span>Total do agendamento</span>
+                  <span>{formatCurrency(servicesTotal + productsTotal)}</span>
+                </div>
+              </div>
+
               {form.allowOutsideBusinessHours ? (
                 <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 md:col-span-2">
-                  Este agendamento sera criado fora do horario comercial e ainda respeita conflitos
-                  de agenda do profissional.
+                  Este agendamento sera criado fora do horario comercial e ainda
+                  respeita conflitos de agenda do profissional.
                 </div>
               ) : null}
 
@@ -1136,7 +1448,9 @@ export function BookingsPage() {
                     : blockedDateWarning.professionalId
                       ? "O profissional está indisponível neste dia"
                       : "A salão está fechada neste dia"}
-                  {blockedDateWarning.reason ? ` — ${blockedDateWarning.reason}` : ""}
+                  {blockedDateWarning.reason
+                    ? ` — ${blockedDateWarning.reason}`
+                    : ""}
                 </div>
               )}
 
@@ -1162,7 +1476,10 @@ export function BookingsPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={saving || (!!blockedDateWarning && !blockedDateWarning.startTime)}
+                disabled={
+                  saving ||
+                  (!!blockedDateWarning && !blockedDateWarning.startTime)
+                }
               >
                 {saving ? (
                   <>
