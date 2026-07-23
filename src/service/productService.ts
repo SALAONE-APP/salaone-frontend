@@ -33,7 +33,6 @@ export interface ProductPayload {
   subscriberDiscount?: number;
   imageUrl?: string | null;
   imagePublicId?: string | null;
-  stock?: number;
   active?: boolean;
 }
 
@@ -129,5 +128,16 @@ export async function createProductStockMovement(data: ProductStockMovementPaylo
     movement: ProductStockMovement;
   }>("/products/stock-movements", data);
 
+  return response.data;
+}
+
+export async function purchaseProduct(productId: string, quantity: number) {
+  const response = await api.post<{
+    orderId: string;
+    paymentId: string;
+    total: number;
+    status: string;
+    stock: number;
+  }>("/products/purchase", { productId, quantity });
   return response.data;
 }

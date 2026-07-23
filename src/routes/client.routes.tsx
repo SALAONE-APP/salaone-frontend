@@ -2,6 +2,7 @@ import { ClientBookingsPage } from "../pages/client/ClientBookingsPage";
 import { ClientDashboard } from "../pages/client/ClientDashboard";
 import { ClientReviewsPage } from "../pages/client/ClientReviewsPage";
 import { ClientSettingsPage } from "../pages/client/ClientSettingsPage";
+import { ClientProductsPage } from "../pages/client/ClientProductsPage";
 import { ServicesPage } from "../pages/shared/ServicesPage";
 import type { AppRoute } from "./types";
 
@@ -29,6 +30,12 @@ export const clientRoutes: AppRoute[] = [
     title: "Servicos",
     breadcrumbs: ["Cliente", "Servicos"],
     Component: ServicesPage,
+  },
+  {
+    path: "/products",
+    title: "Produtos",
+    breadcrumbs: ["Cliente", "Produtos"],
+    Component: ClientProductsPage,
   },
   {
     path: "/settings",

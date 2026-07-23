@@ -1,11 +1,26 @@
 import { useEffect, useState } from "react";
-import { Calendar, Loader2, Scissors, TrendingUp, Users, Wallet, XCircle } from "lucide-react";
+import { Calendar, Loader2, RefreshCw, Scissors, TrendingUp, Users, Wallet } from "lucide-react";
 
 import { RecentBookings } from "@/components/RecentBookings";
 import { RevenueChart } from "@/components/RevenueChart";
 import { StaffPerformance } from "@/components/StaffPerformance";
 import { StatCard } from "@/components/StatCard";
 import { fetchDashboardStats, type DashboardStats } from "@/service/dashboardService";
+import { Button } from "@/components/ui/button";
+
+const emptyStats: DashboardStats = {
+  appointmentsToday: 0,
+  appointmentsThisMonth: 0,
+  appointmentsCancelledThisMonth: 0,
+  totalClients: 0,
+  newClientsThisMonth: 0,
+  activeSubscriptions: 0,
+  monthlyRecurringRevenue: 0,
+  revenueThisMonth: 0,
+  revenueByDay: [],
+  recentAppointments: [],
+  staff: [],
+};
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -33,24 +48,35 @@ export function OverviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  useEffect(() => {
+  function loadDashboard() {
+    setLoading(true);
+    setError(false);
     fetchDashboardStats()
       .then(setStats)
-      .catch(() => setError(true))
+      .catch(() => {
+        setStats(emptyStats);
+        setError(true);
+      })
       .finally(() => setLoading(false));
-  }, []);
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-        <XCircle size={32} />
-        <p className="text-sm">Não foi possível carregar os dados do dashboard.</p>
-      </div>
-    );
   }
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
 
   return (
     <div className="space-y-6">
+      {error ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+          <p className="text-sm text-amber-700">
+            Os dados não puderam ser atualizados agora. Exibindo valores zerados.
+          </p>
+          <Button type="button" variant="outline" size="sm" className="gap-2" onClick={loadDashboard}>
+            <RefreshCw size={14} />
+            Tentar novamente
+          </Button>
+        </div>
+      ) : null}
       {/* KPI Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
         {loading ? (
