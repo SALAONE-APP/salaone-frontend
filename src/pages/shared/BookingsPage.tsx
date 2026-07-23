@@ -336,6 +336,7 @@ export function BookingsPage() {
     listBlockedDates({ dateFrom: form.date, dateTo: form.date, professionalId: form.professionalId })
       .then((items) => {
         const block = items.find((b) => {
+          if (b.date.slice(0, 10) !== form.date) return false;
           if (!b.professionalId && !form.professionalId) return true;
           if (!b.professionalId) return true; // salão inteira
           return b.professionalId === form.professionalId;
