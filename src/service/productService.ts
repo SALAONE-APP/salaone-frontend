@@ -130,3 +130,14 @@ export async function createProductStockMovement(data: ProductStockMovementPaylo
 
   return response.data;
 }
+
+export async function purchaseProduct(productId: string, quantity: number) {
+  const response = await api.post<{
+    orderId: string;
+    paymentId: string;
+    total: number;
+    status: string;
+    stock: number;
+  }>("/products/purchase", { productId, quantity });
+  return response.data;
+}
