@@ -92,6 +92,19 @@ const dateLabel = (value: string) =>
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(value));
+const normalizeText = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+const isSkinOrHairAllergyQuestion = (question: RecordQuestion) => {
+  const label = normalizeText(question.label);
+  return (
+    label.includes("possui alergia") &&
+    label.includes("pele") &&
+    label.includes("cabelo")
+  );
+};
 const apiMessage = (error: unknown) =>
   (error as { response?: { data?: { message?: string } } })?.response?.data
     ?.message ||
@@ -782,20 +795,6 @@ export function ClientRecordsPage() {
                 </Select>
               </div>
               <div>
-                <Label>Alergias e sensibilidades</Label>
-                <Textarea
-                  className="mt-2 min-h-20"
-                  value={form.allergies || ""}
-                  onChange={(e) =>
-                    setForm((current) => ({
-                      ...current,
-                      allergies: e.target.value,
-                    }))
-                  }
-                  placeholder="Ex.: alergia a ácido salicílico, pele reativa..."
-                />
-              </div>
-              <div>
                 <Label>Produtos utilizados</Label>
                 <Textarea
                   className="mt-2 min-h-20"
@@ -876,6 +875,11 @@ export function ClientRecordsPage() {
                       form.customAnswers.find(
                         (answer) => answer.questionId === question.id,
                       )?.values ?? [];
+                    const isAllergyQuestion =
+                      isSkinOrHairAllergyQuestion(question);
+                    const answeredYes = selected.some(
+                      (value) => normalizeText(value) === "sim",
+                    );
                     const dependencyAnswer = question.dependsOn
                       ? form.customAnswers.find(
                           (answer) => answer.questionId === question.dependsOn,
@@ -918,23 +922,47 @@ export function ClientRecordsPage() {
                             placeholder="Digite sua resposta"
                           />
                         ) : question.type === "single" ? (
-                          <Select
-                            value={selected[0]}
-                            onValueChange={(value) =>
-                              setAnswer(question, [value])
-                            }
-                          >
-                            <SelectTrigger className="mt-2 bg-white">
-                              <SelectValue placeholder="Selecione uma opção" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {question.options.map((option) => (
-                                <SelectItem key={option} value={option}>
-                                  {option}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <>
+                            <Select
+                              value={selected[0]}
+                              onValueChange={(value) => {
+                                setAnswer(question, [value]);
+                                if (
+                                  isAllergyQuestion &&
+                                  normalizeText(value) !== "sim"
+                                ) {
+                                  setForm((current) => ({
+                                    ...current,
+                                    allergies: "",
+                                  }));
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="mt-2 bg-white">
+                                <SelectValue placeholder="Selecione uma opção" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {question.options.map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {option}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {isAllergyQuestion && answeredYes && (
+                              <Textarea
+                                className="mt-2 min-h-20 bg-white"
+                                value={form.allergies || ""}
+                                onChange={(event) =>
+                                  setForm((current) => ({
+                                    ...current,
+                                    allergies: event.target.value,
+                                  }))
+                                }
+                                placeholder="Descreva qual alergia possui e se é na pele ou no cabelo"
+                              />
+                            )}
+                          </>
                         ) : (
                           <div className="mt-2 grid gap-2 sm:grid-cols-2">
                             {question.options.map((option) => (

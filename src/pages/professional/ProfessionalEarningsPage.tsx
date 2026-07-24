@@ -188,6 +188,7 @@ interface EarningsStats {
   payrollPayments: EmployeePayment[];
   extraPaymentsTotal: number;
   payrollPaymentsTotal: number;
+  valesTotal: number;
   totalReceivedPayments: number;
 }
 
@@ -293,9 +294,12 @@ export function ProfessionalEarningsPage() {
     const payrollPaymentsTotal = roundMoney(
       payrollPayments.reduce((sum, p) => sum + Number(p.liquido || 0), 0)
     );
-    const totalReceivedPayments = roundMoney(extraPaymentsTotal + payrollPaymentsTotal);
-    // Apenas pagamentos de folha quitam comissão — extras (adiantamentos) não reduzem o pendente.
-    const adminPaidAmount = payrollPaymentsTotal;
+    const valesTotal = roundMoney(Number(row?.totalVales || 0));
+    const totalReceivedPayments = roundMoney(
+      extraPaymentsTotal + payrollPaymentsTotal + valesTotal
+    );
+    // Vales são adiantamentos já recebidos pelo profissional e também quitam comissão.
+    const adminPaidAmount = roundMoney(payrollPaymentsTotal + valesTotal);
 
     if (row) {
       earnedRevenue = Number(row.totalRevenue || earnedRevenue);
@@ -339,6 +343,7 @@ export function ProfessionalEarningsPage() {
       payrollPayments,
       extraPaymentsTotal,
       payrollPaymentsTotal,
+      valesTotal,
       totalReceivedPayments,
     };
   }, [appointments, row, professional]);
@@ -347,7 +352,8 @@ export function ProfessionalEarningsPage() {
     stats.appointmentsCount > 0 ||
     stats.cancelledCount > 0 ||
     stats.extraPayments.length > 0 ||
-    stats.payrollPayments.length > 0;
+    stats.payrollPayments.length > 0 ||
+    (row?.vales?.length ?? 0) > 0;
 
   const isPageLoading = professionalLoading || loading;
 
@@ -477,6 +483,10 @@ export function ProfessionalEarningsPage() {
                   {
                     label: "Folha recebida",
                     value: formatCurrency(stats.payrollPaymentsTotal),
+                  },
+                  {
+                    label: "Vales recebidos",
+                    value: formatCurrency(stats.valesTotal),
                   },
                   {
                     label: "Salão",
@@ -647,6 +657,57 @@ export function ProfessionalEarningsPage() {
                         </td>
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Tabela de vales recebidos */}
+          {(row?.vales?.length ?? 0) > 0 && (
+            <div className="overflow-hidden rounded-xl border border-border bg-card">
+              <div className="border-b border-border px-5 py-4">
+                <div className="flex items-center gap-2">
+                  <Wallet size={18} className="text-primary" />
+                  <h3 className="text-base font-semibold text-foreground">
+                    Vales recebidos no período
+                  </h3>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-xs text-muted-foreground">
+                      <th className="px-4 py-3 text-left font-medium">Data</th>
+                      <th className="px-4 py-3 text-left font-medium">Descrição</th>
+                      <th className="px-4 py-3 text-left font-medium">Observação</th>
+                      <th className="px-4 py-3 text-right font-medium">
+                        Valor recebido
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {[...(row?.vales ?? [])]
+                      .sort(
+                        (a, b) =>
+                          new Date(b.data).getTime() - new Date(a.data).getTime()
+                      )
+                      .map((vale) => (
+                        <tr key={vale.id} className="transition-colors hover:bg-muted/40">
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {formatDate(vale.data)}
+                          </td>
+                          <td className="px-4 py-3 font-medium text-foreground">
+                            {vale.descricao || vale.motivo || "Vale"}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {vale.observacao || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold text-emerald-500">
+                            {formatCurrency(Number(vale.valor || 0))}
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>
