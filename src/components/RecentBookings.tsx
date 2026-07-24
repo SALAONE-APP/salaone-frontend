@@ -6,11 +6,12 @@ interface Props {
   appointments: DashboardAppointment[];
 }
 
-type AppointmentStatus = "scheduled" | "confirmed" | "completed" | "cancelled" | "no_show";
+type AppointmentStatus = "scheduled" | "confirmed" | "in_service" | "completed" | "cancelled" | "no_show";
 
 const statusConfig: Record<AppointmentStatus, { label: string; className: string }> = {
   scheduled:  { label: "Agendado",   className: "bg-amber-500/10  text-amber-500  border-amber-500/20"  },
   confirmed:  { label: "Confirmado", className: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" },
+  in_service: { label: "Em andamento", className: "bg-violet-500/10 text-violet-500 border-violet-500/20" },
   completed:  { label: "Concluído",  className: "bg-blue-500/10   text-blue-500   border-blue-500/20"   },
   cancelled:  { label: "Cancelado",  className: "bg-red-500/10    text-red-500    border-red-500/20"    },
   no_show:    { label: "Não veio",   className: "bg-zinc-500/10   text-zinc-400   border-zinc-500/20"   },

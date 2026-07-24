@@ -6,6 +6,7 @@ import {
   CreditCard,
   ClipboardPlus,
   HandCoins,
+  History,
   Image,
   Package,
   PlusCircle,
@@ -34,6 +35,7 @@ function buildSections(): SidebarSection[] {
           label: "Operacao",
           children: [
             { icon: Calendar, label: "Agendamentos", href: "/bookings" },
+            { icon: History, label: "Histórico por funcionário", href: "/employee-appointment-history" },
             { icon: Zap, label: "Agenda", href: "/encaixe" },
             { icon: Calendar, label: "Calendario", href: "/schedules" },
           ],
