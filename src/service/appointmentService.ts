@@ -3,6 +3,7 @@ import api from "./api";
 export type AppointmentStatus =
   | "scheduled"
   | "confirmed"
+  | "in_service"
   | "completed"
   | "cancelled"
   | "no_show";
