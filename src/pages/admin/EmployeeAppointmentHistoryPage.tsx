@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  ArrowLeft,
   CalendarClock,
   CheckCircle2,
   Clock3,
@@ -12,6 +13,7 @@ import { toast } from "sonner";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -71,6 +73,13 @@ function formatDateTime(value: string) {
   };
 }
 
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value || 0);
+}
+
 function apiMessage(error: unknown) {
   const message = (error as { response?: { data?: { message?: string } } })
     ?.response?.data?.message;
@@ -102,7 +111,7 @@ async function listAllAppointments() {
 export function EmployeeAppointmentHistoryPage() {
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [professionalId, setProfessionalId] = useState("all");
+  const [professionalId, setProfessionalId] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -134,10 +143,7 @@ export function EmployeeAppointmentHistoryPage() {
 
     return appointments
       .filter((appointment) => {
-        if (
-          professionalId !== "all" &&
-          appointment.professionalId !== professionalId
-        )
+        if (!professionalId || appointment.professionalId !== professionalId)
           return false;
         if (status !== "all" && appointment.status !== status) return false;
 
@@ -179,6 +185,9 @@ export function EmployeeAppointmentHistoryPage() {
     }),
     [filtered],
   );
+  const selectedProfessional = professionals.find(
+    (professional) => professional.id === professionalId,
+  );
 
   return (
     <div className="space-y-6 pb-8">
@@ -190,6 +199,74 @@ export function EmployeeAppointmentHistoryPage() {
           Consulte atendimentos passados, atuais, futuros e cancelados de cada profissional.
         </p>
       </div>
+
+      {loading ? (
+        <div className="grid place-items-center rounded-xl border bg-card py-16">
+          <Loader2 className="animate-spin text-muted-foreground" />
+        </div>
+      ) : !selectedProfessional ? (
+        <div className="overflow-hidden rounded-xl border bg-card">
+          <div className="border-b px-5 py-4">
+            <h2 className="font-semibold">Funcionários</h2>
+            <p className="text-xs text-muted-foreground">
+              Clique em um funcionário para abrir o histórico.
+            </p>
+          </div>
+          <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+            {professionals.map((professional) => {
+              const count = appointments.filter(
+                (appointment) =>
+                  appointment.professionalId === professional.id,
+              ).length;
+              return (
+                <button
+                  key={professional.id}
+                  type="button"
+                  onClick={() => setProfessionalId(professional.id)}
+                  className="flex items-center gap-3 rounded-xl border p-4 text-left transition hover:border-primary/50 hover:bg-muted/40"
+                >
+                  <Avatar className="h-11 w-11">
+                    <AvatarFallback>
+                      {initials(professional.displayName)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">
+                      {professional.displayName}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {count} registro{count === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-3 rounded-xl border bg-card p-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setProfessionalId("")}
+              aria-label="Voltar para funcionários"
+            >
+              <ArrowLeft size={18} />
+            </Button>
+            <Avatar className="h-11 w-11">
+              <AvatarFallback>
+                {initials(selectedProfessional.displayName)}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-semibold">{selectedProfessional.displayName}</p>
+              <p className="text-xs text-muted-foreground">
+                Histórico de agendamentos e atendimentos
+              </p>
+            </div>
+          </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
@@ -208,21 +285,7 @@ export function EmployeeAppointmentHistoryPage() {
         ))}
       </div>
 
-      <div className="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-2 xl:grid-cols-5">
-        <Select value={professionalId} onValueChange={setProfessionalId}>
-          <SelectTrigger>
-            <SelectValue placeholder="Funcionário" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os funcionários</SelectItem>
-            {professionals.map((professional) => (
-              <SelectItem key={professional.id} value={professional.id}>
-                {professional.displayName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
+      <div className="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-2 xl:grid-cols-4">
         <Select value={status} onValueChange={(value) => setStatus(value as StatusFilter)}>
           <SelectTrigger>
             <SelectValue placeholder="Status" />
@@ -268,11 +331,7 @@ export function EmployeeAppointmentHistoryPage() {
           </p>
         </div>
 
-        {loading ? (
-          <div className="grid place-items-center py-16">
-            <Loader2 className="animate-spin text-muted-foreground" />
-          </div>
-        ) : filtered.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="py-16 text-center text-sm text-muted-foreground">
             Nenhum agendamento encontrado com os filtros selecionados.
           </div>
@@ -281,31 +340,33 @@ export function EmployeeAppointmentHistoryPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-xs text-muted-foreground">
-                  <th className="px-4 py-3 text-left font-medium">Funcionário</th>
                   <th className="px-4 py-3 text-left font-medium">Cliente</th>
                   <th className="px-4 py-3 text-left font-medium">Data</th>
                   <th className="px-4 py-3 text-left font-medium">Horário</th>
                   <th className="px-4 py-3 text-left font-medium">Serviços</th>
+                  <th className="px-4 py-3 text-right font-medium">Valor</th>
+                  <th className="px-4 py-3 text-right font-medium">Comissão</th>
                   <th className="px-4 py-3 text-left font-medium">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {filtered.map((appointment) => {
-                  const professionalName =
-                    appointment.professional?.displayName || "Funcionário";
                   const { date, time } = formatDateTime(appointment.startAt);
+                  const serviceValue =
+                    appointment.totalAmount ||
+                    appointment.services.reduce(
+                      (sum, service) => sum + Number(service.totalPrice || 0),
+                      0,
+                    );
+                  const commission =
+                    appointment.commissionAmount ??
+                    appointment.services.reduce(
+                      (sum, service) =>
+                        sum + Number(service.commissionAmount || 0),
+                      0,
+                    );
                   return (
                     <tr key={appointment.id} className="hover:bg-muted/40">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="text-xs">
-                              {initials(professionalName)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">{professionalName}</span>
-                        </div>
-                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <UserRound size={15} className="text-muted-foreground" />
@@ -316,6 +377,12 @@ export function EmployeeAppointmentHistoryPage() {
                       <td className="px-4 py-3 text-muted-foreground">{time}</td>
                       <td className="max-w-64 px-4 py-3 text-muted-foreground">
                         {appointment.services.map((service) => service.serviceName).join(", ") || "-"}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium">
+                        {formatCurrency(serviceValue)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-emerald-600">
+                        {formatCurrency(commission)}
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant="outline" className={statusStyles[appointment.status]}>
@@ -330,6 +397,8 @@ export function EmployeeAppointmentHistoryPage() {
           </div>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }
