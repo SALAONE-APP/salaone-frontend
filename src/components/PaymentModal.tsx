@@ -69,8 +69,21 @@ function onlyNumbers(value: unknown): string {
 function getPaymentErrorMessage(error: unknown, fallback: string) {
   const apiMessage = (error as { response?: { data?: { message?: unknown } } })
     ?.response?.data?.message;
-  if (typeof apiMessage === "string" && apiMessage.trim()) return apiMessage;
-  return error instanceof Error && error.message ? error.message : fallback;
+  const message = typeof apiMessage === "string" && apiMessage.trim()
+    ? apiMessage
+    : error instanceof Error && error.message
+      ? error.message
+      : fallback;
+  return /aprovad|sucesso|success/i.test(message)
+    ? "O pagamento nao foi aprovado. Tente outro cartao ou entre em contato com o banco."
+    : message;
+}
+
+function getRejectedPaymentReason(reason?: string) {
+  if (!reason || /aprovad|sucesso|success/i.test(reason)) {
+    return "O pagamento nao foi aprovado. Tente outro cartao ou entre em contato com o banco.";
+  }
+  return reason;
 }
 
 type ScreenState = "form" | "pix" | "processing" | "rejected";
@@ -197,7 +210,7 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
       }
 
       if (isFailedOrder(result)) {
-        setRejectionReason(result.failureReason || "O pagamento foi recusado pela operadora do cartao.");
+        setRejectionReason(getRejectedPaymentReason(result.failureReason));
         await rollback();
         setProcessing(false);
         setScreen("rejected");
@@ -265,7 +278,7 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
         if (isFailedOrder(latest)) {
           clearPixPolling();
           setRejectionReason(
-            latest.failureReason || "O pagamento foi recusado pela operadora do cartao.",
+            getRejectedPaymentReason(latest.failureReason),
           );
           await rollback();
           setPixOrderId("");
