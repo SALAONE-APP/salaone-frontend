@@ -19,7 +19,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cancelAppointment } from "@/service/appointmentService";
-import { updatePayment } from "@/service/paymentService";
 import {
   checkPagarmeOrderStatus,
   createPagarmeCardToken,
@@ -158,15 +157,10 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
   }
 
   async function persistSuccess(order: Awaited<ReturnType<typeof createPagarmeOrder>>, pm: "card" | "pix") {
-    await updatePayment(
-      { id: data.paymentId, appointmentId: data.appointmentId },
-      {
-        status: "paid",
-        method: pm === "card" ? "credito" : "pix",
-        paidAt: new Date().toISOString(),
-      },
-    );
-    void order; // used via Pagar.me webhook in production
+    // O backend sincroniza a cobrança durante a criação/consulta do pedido e
+    // pelo webhook. O cliente nunca aprova o próprio pagamento.
+    void order;
+    void pm;
   }
 
   async function handleCardSubmit(e: FormEvent) {
@@ -208,10 +202,11 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
       }
 
       // processing/pending — wait for webhook
-      await persistSuccess(result, "card");
+      if (!result.orderId) {
+        throw new Error("Pagar.me nao retornou o identificador do pedido.");
+      }
       setProcessing(false);
-      onClose();
-      onSuccess();
+      startOrderPolling(result.orderId, "card");
     } catch (err) {
       toast.error(getPaymentErrorMessage(err, "Erro ao processar pagamento."));
       await rollback();
@@ -238,7 +233,7 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
       setPixOrderId(result.orderId ?? "");
       setPixQrCode(result.pixQrCode);
       setPixQrCodeUrl(result.pixQrCodeUrl ?? "");
-      startPixPolling(result.orderId ?? "");
+      startOrderPolling(result.orderId ?? "", "pix");
     } catch (err) {
       toast.error(getPaymentErrorMessage(err, "Erro ao gerar PIX."));
     } finally {
@@ -246,7 +241,7 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
     }
   }
 
-  function startPixPolling(orderId: string) {
+  function startOrderPolling(orderId: string, paymentMethod: "card" | "pix") {
     clearPixPolling();
     pixPollingRef.current = setInterval(async () => {
       try {
@@ -255,7 +250,7 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
         if (isPaidOrder(latest)) {
           clearPixPolling();
           setProcessing(true);
-          await persistSuccess(latest, "pix");
+          await persistSuccess(latest, paymentMethod);
           setProcessing(false);
           onClose();
           onSuccess();

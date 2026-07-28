@@ -5,6 +5,7 @@ import {
   Download,
   Edit,
   Filter,
+  KeyRound,
   Loader2,
   Mail,
   MoreHorizontal,
@@ -60,7 +61,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 
 import type { UserProfile } from "@/service/userService";
-import { createAdminClient, deleteAdminClient, listAdminClients, updateAdminClient } from "@/service/adminClientService";
+import { createAdminClient, deleteAdminClient, listAdminClients, resetAdminClientPassword, updateAdminClient } from "@/service/adminClientService";
 import {
   createSubscription,
   type Subscription,
@@ -326,6 +327,9 @@ export function CustomersPage() {
   const [editingCustomer, setEditingCustomer] = useState<UserProfile | null>(null);
   const [form, setForm] = useState<CustomerFormState>(emptyForm);
   const [customerToDelete, setCustomerToDelete] = useState<UserProfile | null>(null);
+  const [customerToResetPassword, setCustomerToResetPassword] = useState<UserProfile | null>(null);
+  const [newClientPassword, setNewClientPassword] = useState("");
+  const [resettingPassword, setResettingPassword] = useState(false);
   const [subscriptionMap, setSubscriptionMap] = useState<Map<string, Subscription>>(new Map());
   const [subDialogCustomer, setSubDialogCustomer] = useState<UserProfile | null>(null);
   const [availablePlans] = useState<Plan[]>([]);
@@ -603,6 +607,27 @@ export function CustomersPage() {
       await reloadCurrentPage();
     } catch (err) {
       toast.error(getApiMessage(err));
+    }
+  }
+
+  async function handleResetClientPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!customerToResetPassword) return;
+    if (newClientPassword.length < 6) {
+      toast.error("A nova senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+
+    setResettingPassword(true);
+    try {
+      await resetAdminClientPassword(customerToResetPassword.id, newClientPassword);
+      toast.success("Senha do cliente redefinida.");
+      setCustomerToResetPassword(null);
+      setNewClientPassword("");
+    } catch (err) {
+      toast.error(getApiMessage(err));
+    } finally {
+      setResettingPassword(false);
     }
   }
 
@@ -905,6 +930,17 @@ export function CustomersPage() {
                                 <Edit size={14} />
                                 Editar cliente
                               </DropdownMenuItem>
+                              {isAdmin && (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setCustomerToResetPassword(customer);
+                                    setNewClientPassword("");
+                                  }}
+                                >
+                                  <KeyRound size={14} />
+                                  Redefinir senha
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 variant="destructive"
@@ -1128,6 +1164,62 @@ export function CustomersPage() {
                 }
               >
                 {savingSub ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Salvando</> : "Criar plano"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(customerToResetPassword)}
+        onOpenChange={(open) => {
+          if (!open && !resettingPassword) {
+            setCustomerToResetPassword(null);
+            setNewClientPassword("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <form onSubmit={handleResetClientPassword}>
+            <DialogHeader>
+              <DialogTitle>Redefinir senha do cliente</DialogTitle>
+              <DialogDescription>
+                Defina uma nova senha para{" "}
+                <span className="font-medium text-foreground">
+                  {customerToResetPassword?.name}
+                </span>
+                . O cliente poderá usá-la imediatamente no próximo login.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 py-5">
+              <Label htmlFor="new-client-password">Nova senha</Label>
+              <Input
+                id="new-client-password"
+                type="password"
+                value={newClientPassword}
+                onChange={(event) => setNewClientPassword(event.target.value)}
+                minLength={6}
+                maxLength={128}
+                autoComplete="new-password"
+                placeholder="Mínimo de 6 caracteres"
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={resettingPassword}
+                onClick={() => {
+                  setCustomerToResetPassword(null);
+                  setNewClientPassword("");
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={resettingPassword || newClientPassword.length < 6}>
+                {resettingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Redefinir senha
               </Button>
             </DialogFooter>
           </form>
