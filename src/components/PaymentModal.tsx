@@ -67,6 +67,13 @@ function onlyNumbers(value: unknown): string {
   return String(value || "").replace(/\D/g, "");
 }
 
+function getPaymentErrorMessage(error: unknown, fallback: string) {
+  const apiMessage = (error as { response?: { data?: { message?: unknown } } })
+    ?.response?.data?.message;
+  if (typeof apiMessage === "string" && apiMessage.trim()) return apiMessage;
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 type ScreenState = "form" | "pix" | "processing" | "rejected";
 
 export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: PaymentModalProps) {
@@ -169,6 +176,14 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
       toast.error("Informe o nome do titular do cartao.");
       return;
     }
+    if (onlyNumbers(cardForm.document).length !== 11) {
+      toast.error("Informe um CPF valido para o pagador.");
+      return;
+    }
+    if (onlyNumbers(cardForm.phone).length < 10) {
+      toast.error("Informe um telefone valido para o pagador.");
+      return;
+    }
 
     setProcessing(true);
     setScreen("processing");
@@ -198,11 +213,12 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
       onClose();
       onSuccess();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro ao processar pagamento.";
-      toast.error(msg);
+      toast.error(getPaymentErrorMessage(err, "Erro ao processar pagamento."));
       await rollback();
       setProcessing(false);
-      setScreen("form");
+      // O rollback remove/cancela o agendamento. Mantemos a tela de erro para que
+      // o fechamento não dispare a mensagem de um agendamento que já não existe.
+      setScreen("rejected");
     }
   }
 
@@ -224,8 +240,7 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
       setPixQrCodeUrl(result.pixQrCodeUrl ?? "");
       startPixPolling(result.orderId ?? "");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro ao gerar PIX.";
-      toast.error(msg);
+      toast.error(getPaymentErrorMessage(err, "Erro ao gerar PIX."));
     } finally {
       setProcessing(false);
     }
@@ -310,9 +325,6 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={onClose}>Fechar</Button>
-              <Button onClick={() => setScreen(method === "pix" ? "pix" : "form")}>
-                Tentar novamente
-              </Button>
             </div>
           </div>
         )}
