@@ -4,6 +4,7 @@ import type { Appointment } from "@/service/appointmentService";
 import type { SalonProfile } from "@/service/salonProfileService";
 
 export interface WhatsAppMessageData {
+  appointmentStatus?: Appointment["status"];
   clientName: string;
   salonName: string;
   professionalName: string;
@@ -49,6 +50,11 @@ function formatDateTimeBR(isoString: string): { date: string; time: string } {
 }
 
 export function buildWhatsAppMessage(data: WhatsAppMessageData): string {
+  const confirmed = data.appointmentStatus === "confirmed" || data.appointmentStatus === "completed";
+  const title = confirmed ? "*AGENDAMENTO CONFIRMADO*" : "*AGENDAMENTO REALIZADO*";
+  const statusMessage = confirmed
+    ? "Seu agendamento foi confirmado com sucesso."
+    : "Seu agendamento foi realizado e aguarda confirmacao do salao.";
   const serviceList = data.services.map((s) => `  - ${s}`).join("\n");
   const productLines = (data.products ?? []).map((product) =>
     `  - ${product.quantity}x ${product.name}${
@@ -68,11 +74,11 @@ export function buildWhatsAppMessage(data: WhatsAppMessageData): string {
     : [];
 
   return [
-    `*AGENDAMENTO CONFIRMADO*`,
+    title,
     ``,
     `Ola, ${data.clientName}!`,
     ``,
-    `Seu agendamento foi confirmado com sucesso.`,
+    statusMessage,
     ``,
     `*Salão:* ${data.salonName}`,
     `*Profissional:* ${data.professionalName}`,

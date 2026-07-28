@@ -480,7 +480,7 @@ export function ClientBookingsPage() {
         products: selectedProducts.map((product) => ({ id: product.id, name: product.name, price: product.price, quantity: product.quantity })),
       });
 
-      // Registro de pagamento é secundário — agendamento já confirmado
+      // O agendamento permanece aguardando confirmação enquanto o pagamento é local e pendente.
       try {
         await createAppointmentPayment({
           appointmentId: appt.id,
@@ -494,6 +494,7 @@ export function ClientBookingsPage() {
       }
 
       setWhatsAppData({
+        appointmentStatus: appt.status,
         clientName: bookingForDependent ? `${bookingForDependent.name} (Dependente de ${user?.name})` : (user?.name ?? ""),
         salonName: salonProfile?.name || "Salão",
         professionalName: professionals.find((b) => b.id === form.professionalId)?.displayName ?? "",
@@ -550,6 +551,7 @@ export function ClientBookingsPage() {
       }
 
       setWhatsAppData({
+        appointmentStatus: "confirmed",
         clientName: bookingForDependent ? `${bookingForDependent.name} (Dependente de ${user?.name})` : (user?.name ?? ""),
         salonName: salonProfile?.name || "Salão",
         professionalName: professionals.find((b) => b.id === form.professionalId)?.displayName ?? "",
@@ -604,8 +606,9 @@ export function ClientBookingsPage() {
         });
         paymentId = payment.id;
       } catch {
-        // Se falhar o registro de pagamento, confirma como agendamento sem pagamento online
+        // Se o pagamento falhar, mantém o agendamento criado aguardando confirmação.
         setWhatsAppData({
+          appointmentStatus: appt.status,
           clientName: bookingForDependent ? `${bookingForDependent.name} (Dependente de ${user?.name})` : (user?.name ?? ""),
           salonName: salonProfile?.name || "Salão",
           professionalName: professionals.find((b) => b.id === form.professionalId)?.displayName ?? "",
@@ -653,6 +656,7 @@ export function ClientBookingsPage() {
   // Callback de sucesso do PaymentModal
   async function handlePaymentSuccess() {
     setWhatsAppData({
+      appointmentStatus: "confirmed",
       clientName: user?.name ?? "",
       salonName: salonProfile?.name || "Salão",
       professionalName: professionals.find((b) => b.id === form.professionalId)?.displayName ?? "",
@@ -1195,7 +1199,7 @@ export function ClientBookingsPage() {
             setPendingPaymentData(null);
             setBookingOpen(false);
             setForm({ ...emptyForm, date: dateToDateString(new Date()) });
-            toast.info("Agendamento confirmado! O pagamento nao foi concluido. Realize o pagamento no local.");
+            toast.info("Agendamento realizado. O pagamento nao foi concluido e o agendamento aguarda confirmacao.");
             void loadAppointments();
           }}
           data={{
@@ -1218,10 +1222,16 @@ export function ClientBookingsPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-emerald-600">
-              ✅ Agendamento Confirmado!
+              {whatsAppData?.appointmentStatus === "confirmed" ||
+              whatsAppData?.appointmentStatus === "completed"
+                ? "✅ Agendamento confirmado!"
+                : "✅ Agendamento realizado!"}
             </DialogTitle>
             <DialogDescription>
-              Seu agendamento foi realizado com sucesso.
+              {whatsAppData?.appointmentStatus === "confirmed" ||
+              whatsAppData?.appointmentStatus === "completed"
+                ? "Seu agendamento foi confirmado com sucesso."
+                : "Seu agendamento aguarda confirmação do salão."}
             </DialogDescription>
           </DialogHeader>
 

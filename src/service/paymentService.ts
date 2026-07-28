@@ -1,7 +1,14 @@
 import api from "./api";
 
 export type PaymentMethod = "pix" | "debito" | "credito" | "dinheiro" | "local" | "subscription";
-export type PaymentStatus = "pending" | "approved" | "paid" | "failed" | "refunded" | "covered";
+export type PaymentStatus =
+  | "pending"
+  | "approved"
+  | "paid"
+  | "failed"
+  | "cancelled"
+  | "refunded"
+  | "covered";
 export type PaymentType = "appointment" | "subscription";
 
 export interface PaymentRecord {
