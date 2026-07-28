@@ -54,9 +54,40 @@ interface BackendRecord {
   notes?: string | null;
   photos?: RecordPhoto[];
   custom_answers?: RecordAnswer[];
+  customAnswers?: RecordAnswer[] | string;
   created_at: string;
   updated_at: string;
   clients: ClientRecord["client"];
+}
+
+function normalizeAnswers(value: unknown): RecordAnswer[] {
+  let parsed = value;
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const answer = item as {
+      questionId?: unknown;
+      question_id?: unknown;
+      label?: unknown;
+      values?: unknown;
+      value?: unknown;
+    };
+    const questionId = String(answer.questionId ?? answer.question_id ?? "").trim();
+    const label = String(answer.label ?? "").trim();
+    const values = Array.isArray(answer.values)
+      ? answer.values.map(String).map((value) => value.trim()).filter(Boolean)
+      : typeof answer.value === "string" && answer.value.trim()
+        ? [answer.value.trim()]
+        : [];
+    return questionId && label && values.length ? [{ questionId, label, values }] : [];
+  });
 }
 
 const mapRecord = (item: BackendRecord): ClientRecord => ({
@@ -68,7 +99,7 @@ const mapRecord = (item: BackendRecord): ClientRecord => ({
   productsUsed: item.products_used,
   notes: item.notes,
   photos: Array.isArray(item.photos) ? item.photos : [],
-  customAnswers: Array.isArray(item.custom_answers) ? item.custom_answers : [],
+  customAnswers: normalizeAnswers(item.custom_answers ?? item.customAnswers),
   createdAt: item.created_at,
   updatedAt: item.updated_at,
   client: item.clients,
