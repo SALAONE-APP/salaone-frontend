@@ -641,27 +641,26 @@ export function ClientRecordsPage() {
                                 </p>
                               </div>
                             )}
-                            {record.customAnswers.map((answer) => (
-                              <div
-                                key={answer.questionId}
-                                className="rounded-xl bg-purple-50/70 p-4 sm:col-span-2"
-                              >
-                                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-purple-700">
-                                  {answer.label}
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                  {answer.values.map((value) => (
-                                    <Badge
-                                      key={value}
-                                      variant="secondary"
-                                      className="bg-white"
-                                    >
-                                      {value}
-                                    </Badge>
+                            {record.customAnswers.length > 0 && (
+                              <div className="rounded-xl border border-purple-100 bg-purple-50/70 p-4 sm:col-span-2">
+                                <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-purple-700">
+                                  <ListChecks className="h-4 w-4" />
+                                  Respostas do questionário
+                                </div>
+                                <div className="divide-y divide-purple-100">
+                                  {record.customAnswers.map((answer) => (
+                                    <div key={answer.questionId} className="py-3 first:pt-0 last:pb-0">
+                                      <p className="text-sm font-medium text-slate-700">
+                                        {answer.label}
+                                      </p>
+                                      <p className="mt-1 whitespace-pre-line text-sm text-slate-600">
+                                        {answer.values.join(", ")}
+                                      </p>
+                                    </div>
                                   ))}
                                 </div>
                               </div>
-                            ))}
+                            )}
                           </div>
                           <div>
                             {record.photos.length ? (
