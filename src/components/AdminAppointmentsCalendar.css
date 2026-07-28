@@ -149,7 +149,7 @@
 }
 
 .calendar-grid-row.past-slot .calendar-time-cell {
-  opacity: 0.22;
+  opacity: 0.8;
 }
 
 /* ── Time cell (sticky left) ── */
@@ -165,7 +165,7 @@
   font-size: 10px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.75);
+  color: #050505;
   border-right: 1px solid hsl(var(--border));
   position: sticky;
   left: 0;
@@ -174,14 +174,14 @@
 }
 
 .calendar-time-cell.time-half {
-  color: rgba(255, 255, 255, 0.55);
-  font-weight: 500;
+  color: #050505;
+  font-weight: 600;
 }
 
 .calendar-time-cell.time-ten {
   font-size: 9px;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.32);
+  font-weight: 600;
+  color: #050505;
 }
 
 .calendar-time-cell.time-five {

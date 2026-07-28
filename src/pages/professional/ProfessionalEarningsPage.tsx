@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ArrowLeft,
   ChevronLeft,
   ChevronRight,
   Loader2,
@@ -15,11 +16,13 @@ import { Button } from "@/components/ui/button";
 import { useMyProfessional } from "@/hooks/useMyProfessional";
 import { listAppointments, type Appointment } from "@/service/appointmentService";
 import {
+  getEmployeePayrollSummary,
   getMyPayrollSummary,
   type EmployeePayment,
   type EmployeePayrollRow,
 } from "@/service/employeePayrollService";
 import { getHomeInfo } from "@/service/homeInfoService";
+import type { Professional } from "@/service/professionalService";
 
 /* ─── types ─── */
 
@@ -194,7 +197,15 @@ interface EarningsStats {
 
 /* ─── component ─── */
 
-export function ProfessionalEarningsPage() {
+interface ProfessionalEarningsPageProps {
+  professionalOverride?: Professional;
+  onBack?: () => void;
+}
+
+export function ProfessionalEarningsPage({
+  professionalOverride,
+  onBack,
+}: ProfessionalEarningsPageProps = {}) {
   const [frequency, setFrequency] = useState<PaymentFrequency>("monthly");
   const [periodStart, setPeriodStart] = useState<Date>(() => {
     const now = new Date();
@@ -204,7 +215,11 @@ export function ProfessionalEarningsPage() {
   const [row, setRow] = useState<EmployeePayrollRow | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const { professional, loading: professionalLoading } = useMyProfessional();
+  const {
+    professional: ownProfessional,
+    loading: professionalLoading,
+  } = useMyProfessional(!professionalOverride);
+  const professional = professionalOverride ?? ownProfessional;
 
   const periodEnd = getPeriodEnd(periodStart, frequency);
   const periodStartStr = dateToStr(periodStart);
@@ -232,7 +247,13 @@ export function ProfessionalEarningsPage() {
           allAppointments: true,
           limit: 100,
         }),
-        getMyPayrollSummary({ periodStart: periodStartStr, periodEnd: periodEndStr }),
+        professionalOverride
+          ? getEmployeePayrollSummary({
+              employeeId: professional.id,
+              periodStart: periodStartStr,
+              periodEnd: periodEndStr,
+            })
+          : getMyPayrollSummary({ periodStart: periodStartStr, periodEnd: periodEndStr }),
       ]);
       setAppointments(appointmentsRes.items);
       setRow(summaryRes.items[0] ?? null);
@@ -241,7 +262,7 @@ export function ProfessionalEarningsPage() {
     } finally {
       setLoading(false);
     }
-  }, [professional, periodStartStr, periodEndStr]);
+  }, [professional, professionalOverride, periodStartStr, periodEndStr]);
 
   useEffect(() => {
     void load();
@@ -355,10 +376,32 @@ export function ProfessionalEarningsPage() {
     stats.payrollPayments.length > 0 ||
     (row?.vales?.length ?? 0) > 0;
 
-  const isPageLoading = professionalLoading || loading;
+  const isPageLoading = (!professionalOverride && professionalLoading) || loading;
 
   return (
     <div className="space-y-6">
+      {professionalOverride && (
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={onBack}
+            aria-label="Voltar para funcionários"
+          >
+            <ArrowLeft size={18} />
+          </Button>
+          <div>
+            <p className="font-semibold text-foreground">
+              {professionalOverride.displayName}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Histórico de ganhos do profissional
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Navegação de período */}
       <div className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4">
         <div>

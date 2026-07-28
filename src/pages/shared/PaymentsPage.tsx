@@ -7,6 +7,7 @@ import {
   Filter,
   Loader2,
   MoreHorizontal,
+  Pencil,
   RefreshCcw,
   Search,
   XCircle,
@@ -55,6 +56,7 @@ const statusLabels: Record<PaymentStatus, string> = {
   approved: "Aprovado",
   paid: "Pago",
   failed: "Falhou",
+  cancelled: "Cancelado",
   refunded: "Reembolsado",
   covered: "Coberto",
 };
@@ -64,6 +66,7 @@ const statusStyles: Record<PaymentStatus, string> = {
   approved: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
   paid: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
   failed: "bg-red-500/10 text-red-600 border-red-500/20",
+  cancelled: "bg-slate-500/10 text-slate-600 border-slate-500/20",
   refunded: "bg-blue-500/10 text-blue-600 border-blue-500/20",
   covered: "bg-slate-500/10 text-slate-600 border-slate-500/20",
 };
@@ -145,6 +148,14 @@ function shouldShowInPaymentsPage(payment: ApiPaymentWithType): payment is Payme
   return false;
 }
 
+function normalizeCancelledAppointmentPayment(payment: ApiPaymentWithType): ApiPaymentWithType {
+  if (payment.paymentType === "appointment" && payment.appointment?.status === "cancelled") {
+    return { ...payment, status: "cancelled" };
+  }
+
+  return payment;
+}
+
 function downloadCsv(payments: PaymentWithType[]) {
   const header = ["ID", "Cliente", "Tipo", "Descricao", "Valor", "Metodo", "Status", "Data"];
   const rows = payments.map((payment) => [
@@ -184,6 +195,8 @@ export function PaymentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [localPaymentDialog, setLocalPaymentDialog] = useState<PaymentWithType | null>(null);
   const [selectedLocalMethod, setSelectedLocalMethod] = useState<PaymentMethod>("dinheiro");
+  const [methodPaymentDialog, setMethodPaymentDialog] = useState<PaymentWithType | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>("dinheiro");
 
   const limit = 20;
 
@@ -198,7 +211,9 @@ export function PaymentsPage() {
         limit,
       });
 
-      const visibleItems = result.items.filter(shouldShowInPaymentsPage);
+      const visibleItems = result.items
+        .map(normalizeCancelledAppointmentPayment)
+        .filter(shouldShowInPaymentsPage);
 
       setPayments(visibleItems);
       setTotal(result.total);
@@ -313,6 +328,31 @@ export function PaymentsPage() {
     }
   }
 
+  function openMethodDialog(payment: PaymentWithType) {
+    setSelectedPaymentMethod(payment.method);
+    setMethodPaymentDialog(payment);
+  }
+
+  async function confirmPaymentMethod() {
+    if (!methodPaymentDialog || selectedPaymentMethod === methodPaymentDialog.method) {
+      setMethodPaymentDialog(null);
+      return;
+    }
+
+    const payment = methodPaymentDialog;
+    setMethodPaymentDialog(null);
+    setUpdatingId(payment.id);
+    try {
+      await updatePayment(payment, { method: selectedPaymentMethod });
+      toast.success("Método de pagamento atualizado.");
+      await loadPayments();
+    } catch (err) {
+      toast.error(getApiMessage(err));
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -371,6 +411,7 @@ export function PaymentsPage() {
                   <DropdownMenuRadioItem value="approved">Aprovados</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="paid">Pagos</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="failed">Falharam</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="cancelled">Cancelados</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="refunded">Reembolsados</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="covered">Cobertos</DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
@@ -534,6 +575,11 @@ export function PaymentsPage() {
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openMethodDialog(payment)}>
+                              <Pencil size={14} />
+                              Alterar método de pagamento
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
                               disabled={payment.status === "paid"}
                               onClick={() => changePaymentStatus(payment, "paid")}
@@ -639,6 +685,50 @@ export function PaymentsPage() {
             </Button>
             <Button onClick={confirmLocalPayment}>
               Confirmar pagamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={Boolean(methodPaymentDialog)}
+        onOpenChange={(open) => { if (!open) setMethodPaymentDialog(null); }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Alterar método de pagamento</DialogTitle>
+            <DialogDescription>
+              Selecione o novo método para o pagamento de{" "}
+              <span className="font-medium text-foreground">
+                {methodPaymentDialog?.user?.name ?? "este cliente"}
+              </span>
+              .
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 py-2">
+            {(Object.entries(methodLabels) as [PaymentMethod, string][]).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setSelectedPaymentMethod(value)}
+                className={`rounded-lg border px-4 py-3 text-sm font-medium transition-colors ${
+                  selectedPaymentMethod === value
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-card text-foreground hover:bg-secondary/50"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMethodPaymentDialog(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmPaymentMethod}
+              disabled={selectedPaymentMethod === methodPaymentDialog?.method}
+            >
+              Salvar método
             </Button>
           </DialogFooter>
         </DialogContent>
