@@ -342,9 +342,9 @@ export function ServicesPage() {
     }
     if (
       commissionPercent !== null &&
-      (!Number.isFinite(commissionPercent) || commissionPercent < 0 || commissionPercent > 100)
+      (!Number.isFinite(commissionPercent) || commissionPercent <= 0 || commissionPercent > 100)
     ) {
-      return "A comissao deve estar entre 0 e 100.";
+      return "A comissao própria deve ser maior que zero e menor ou igual a 100. Deixe em branco para usar a comissão do funcionário.";
     }
     if (!Number.isFinite(promotionalPrice) || promotionalPrice < 0) {
       return "Informe um preco promocional valido.";
