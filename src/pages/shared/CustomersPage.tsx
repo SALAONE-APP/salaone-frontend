@@ -534,6 +534,10 @@ export function CustomersPage() {
   function validateForm() {
     if (!form.name.trim()) return "Informe o nome do cliente.";
     if (form.email.trim() && !/^\S+@\S+\.\S+$/.test(form.email.trim())) return "Informe um e-mail valido.";
+    if (!editingCustomer && !form.email.trim()) return "Informe o e-mail para criar o acesso do cliente.";
+    if (!editingCustomer && form.password.length < 6) {
+      return "A senha inicial deve ter pelo menos 6 caracteres.";
+    }
 
     const phone = onlyDigits(form.phone);
     if (!phone || phone.length < 10 || phone.length > 15) {
@@ -575,6 +579,7 @@ export function CustomersPage() {
       cpf: onlyDigits(form.cpf) || null,
       birthDate: form.birthDate || null,
       photoUrl: null,
+      ...(!editingCustomer ? { password: form.password } : {}),
     };
 
     setSaving(true);
@@ -1019,6 +1024,7 @@ export function CustomersPage() {
                       type="email"
                       value={form.email}
                       onChange={(event) => setField("email", event.target.value)}
+                      required={!editingCustomer}
                     />
                   </div>
                   <div className="space-y-2">
@@ -1053,6 +1059,25 @@ export function CustomersPage() {
                       className="h-9 rounded-md"
                     />
                   </div>
+                  {!editingCustomer && (
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="customer-password">Senha inicial</Label>
+                      <Input
+                        id="customer-password"
+                        type="password"
+                        value={form.password}
+                        onChange={(event) => setField("password", event.target.value)}
+                        minLength={6}
+                        maxLength={128}
+                        autoComplete="new-password"
+                        placeholder="Mínimo de 6 caracteres"
+                        required
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        O cliente usará o e-mail e esta senha para acessar o sistema.
+                      </p>
+                    </div>
+                  )}
               </>
             </div>
 
