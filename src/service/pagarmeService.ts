@@ -51,6 +51,7 @@ export interface PagarmeOrderResult {
   pixQrCodeUrl?: string;
   cardBrand?: string;
   cardLastDigits?: string;
+  failureReason?: string;
 }
 
 export async function createPagarmeCardToken(card: CardFormData): Promise<string> {
