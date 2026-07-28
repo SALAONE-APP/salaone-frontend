@@ -137,10 +137,15 @@ function isCancelledStatus(status: string): boolean {
   return status === "cancelled" || status === "no_show";
 }
 
+function isScheduledStatus(status: string): boolean {
+  return status === "scheduled" || status === "in_service";
+}
+
 function statusLabel(status: string): string {
   switch (status) {
     case "scheduled":   return "Agendado";
     case "confirmed":   return "Confirmado";
+    case "in_service":  return "Em andamento";
     case "completed":   return "Finalizado";
     case "cancelled":   return "Cancelado";
     case "no_show":     return "Não compareceu";
@@ -268,15 +273,11 @@ export function ProfessionalEarningsPage({
     void load();
   }, [load]);
 
-  const isCurrentPeriod =
-    dateToStr(periodStart) === dateToStr(getInitialPeriodStart(frequency));
-
   function prevPeriod() {
     setPeriodStart((prev) => goPrevPeriod(prev, frequency));
   }
 
   function nextPeriod() {
-    if (isCurrentPeriod) return;
     setPeriodStart((prev) => goNextPeriod(prev, frequency));
   }
 
@@ -342,9 +343,15 @@ export function ProfessionalEarningsPage({
       ? `Seus Ganhos (${Number(row?.subscriptionParticipationPercent || 0).toFixed(2)}% do pote)`
       : `Seus Ganhos (${commissionPercent}%)`;
 
-    // Tabela: exibe atendimentos realizados e cancelados (não exibe agendados futuros)
+    // Agendamentos futuros aparecem no histórico, mas não entram nos ganhos
+    // enquanto não forem confirmados ou finalizados.
     const filteredAppointments = [...appointments]
-      .filter((apt) => isPaidStatus(apt.status) || isCancelledStatus(apt.status))
+      .filter(
+        (apt) =>
+          isPaidStatus(apt.status) ||
+          isCancelledStatus(apt.status) ||
+          isScheduledStatus(apt.status),
+      )
       .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
 
     return {
@@ -370,6 +377,7 @@ export function ProfessionalEarningsPage({
   }, [appointments, row, professional]);
 
   const hasData =
+    stats.filteredAppointments.length > 0 ||
     stats.appointmentsCount > 0 ||
     stats.cancelledCount > 0 ||
     stats.extraPayments.length > 0 ||
@@ -422,7 +430,6 @@ export function ProfessionalEarningsPage({
             variant="outline"
             size="sm"
             onClick={nextPeriod}
-            disabled={isCurrentPeriod}
           >
             <ChevronRight size={16} />
           </Button>
@@ -575,7 +582,7 @@ export function ProfessionalEarningsPage({
                 <div className="flex items-center gap-2">
                   <Scissors size={18} className="text-primary" />
                   <h3 className="text-base font-semibold text-foreground">
-                    Atendimentos do período
+                    Agendamentos e atendimentos do período
                   </h3>
                 </div>
               </div>
@@ -598,6 +605,7 @@ export function ProfessionalEarningsPage({
                       const commission = apt.commissionAmount ?? 0;
                       const paid = isPaidStatus(apt.status);
                       const cancelled = isCancelledStatus(apt.status);
+                      const scheduled = isScheduledStatus(apt.status);
                       const serviceNames = apt.services.map((s) => s.serviceName).join(", ");
 
                       return (
@@ -647,10 +655,14 @@ export function ProfessionalEarningsPage({
                                 ? "text-muted-foreground"
                                 : paid
                                   ? "text-emerald-500"
-                                  : "text-red-500"
+                                  : "text-blue-500"
                             }`}
                           >
-                            {cancelled ? "-" : formatCurrency(commission)}
+                            {cancelled
+                              ? "-"
+                              : scheduled
+                                ? `Previsto: ${formatCurrency(commission)}`
+                                : formatCurrency(commission)}
                           </td>
                         </tr>
                       );

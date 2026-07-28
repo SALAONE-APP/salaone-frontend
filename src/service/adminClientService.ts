@@ -51,3 +51,10 @@ export async function updateAdminClient(id: string, data: { name?: string; email
 export async function deleteAdminClient(id: string) {
   await api.delete(`/clients/${id}`);
 }
+
+export async function resetAdminClientPassword(id: string, newPassword: string) {
+  const response = await api.patch<{ message: string }>(`/clients/${id}/password`, {
+    newPassword,
+  });
+  return response.data;
+}
