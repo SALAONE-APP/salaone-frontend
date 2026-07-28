@@ -38,7 +38,7 @@ export async function listAdminClients(params: { q?: string; page?: number; limi
   return { items: items.slice((page - 1) * limit, page * limit), total, page, limit };
 }
 
-export async function createAdminClient(data: { name: string; email?: string | null; phone: string; cpf?: string | null; birthDate?: string | null }) {
+export async function createAdminClient(data: { name: string; email?: string | null; phone: string; cpf?: string | null; birthDate?: string | null; password?: string }) {
   const response = await api.post<{ client: BackendClient }>("/clients", data);
   return mapClient(response.data.client);
 }
