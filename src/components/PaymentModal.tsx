@@ -83,6 +83,7 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
   const [pixOrderId, setPixOrderId] = useState("");
   const [pixCopied, setPixCopied] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
   const pixPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const method = data.paymentMethod;
@@ -97,6 +98,7 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
       setPixOrderId("");
       setPixCopied(false);
       setProcessing(false);
+      setRejectionReason("");
     }
   }, [isOpen, method]);
 
@@ -195,6 +197,7 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
       }
 
       if (isFailedOrder(result)) {
+        setRejectionReason(result.failureReason || "O pagamento foi recusado pela operadora do cartao.");
         await rollback();
         setProcessing(false);
         setScreen("rejected");
@@ -208,7 +211,9 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
       setProcessing(false);
       startOrderPolling(result.orderId, "card");
     } catch (err) {
-      toast.error(getPaymentErrorMessage(err, "Erro ao processar pagamento."));
+      const reason = getPaymentErrorMessage(err, "Erro ao processar pagamento.");
+      setRejectionReason(reason);
+      toast.error(reason);
       await rollback();
       setProcessing(false);
       // O rollback remove/cancela o agendamento. Mantemos a tela de erro para que
@@ -259,6 +264,9 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
 
         if (isFailedOrder(latest)) {
           clearPixPolling();
+          setRejectionReason(
+            latest.failureReason || "O pagamento foi recusado pela operadora do cartao.",
+          );
           await rollback();
           setPixOrderId("");
           setPixQrCode("");
@@ -315,7 +323,7 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
             <div>
               <p className="font-semibold text-foreground">Pagamento recusado</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Verifique os dados e tente novamente.
+                {rejectionReason || "Verifique os dados e tente novamente."}
               </p>
             </div>
             <div className="flex gap-2">
