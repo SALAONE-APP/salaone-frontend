@@ -454,6 +454,13 @@ export function ProfessionalSchedulePage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
+                                disabled={appt.status === "in_service"}
+                                onClick={() => changeStatus(appt, "in_service")}
+                              >
+                                <Scissors size={14} />
+                                Iniciar atendimento
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
                                 disabled={appt.status === "confirmed"}
                                 onClick={() => changeStatus(appt, "confirmed")}
                               >

@@ -17,6 +17,7 @@ import { PaymentsPage } from "../pages/shared/PaymentsPage";
 import { ReviewsPage } from "../pages/shared/ReviewsPage";
 import { SchedulesPage } from "../pages/shared/SchedulesPage";
 import { ServicesPage } from "../pages/shared/ServicesPage";
+import { ServiceTabsPage } from "../pages/shared/ServiceTabsPage";
 import { StockPage } from "../pages/admin/StockPage";
 import { UsersPage } from "../pages/shared/UsersPage";
 import type { AppRoute } from "./types";
@@ -57,6 +58,12 @@ export const adminRoutes: AppRoute[] = [
     title: "Pagamentos",
     breadcrumbs: ["Financeiro", "Pagamentos"],
     Component: PaymentsPage,
+  },
+  {
+    path: "/service-tabs",
+    title: "Comandas",
+    breadcrumbs: ["Operacao", "Comandas"],
+    Component: ServiceTabsPage,
   },
   {
     path: "/cash-closing",
