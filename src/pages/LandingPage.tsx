@@ -168,7 +168,7 @@ function formatPhone(v: string) {
 }
 
 const inputClass =
-  "w-full mt-1 px-3 py-2.5 bg-neutral-900 border border-neutral-700 rounded-lg !text-white caret-white text-sm placeholder:text-neutral-500 [-webkit-text-fill-color:white] [color-scheme:dark] focus:outline-none focus:border-primary disabled:opacity-50 transition-colors";
+  "w-full mt-1 px-3 py-2.5 !bg-white border border-neutral-300 rounded-lg !text-black caret-black text-sm placeholder:!text-neutral-500 [-webkit-text-fill-color:black] [color-scheme:light] focus:outline-none focus:border-primary disabled:opacity-50 transition-colors";
 
 // ─── Static content ───────────────────────────────────────────────────────────
 
