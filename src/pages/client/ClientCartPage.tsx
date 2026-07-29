@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Minus, Package, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { Clock3, Loader2, Minus, Package, Plus, ReceiptText, ShoppingCart, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import {
   clearCart,
   getCart,
@@ -10,7 +12,9 @@ import {
   updateCartItemQuantity,
   type CartItem,
 } from "@/service/cartService";
-import { checkoutProductCart, listProducts } from "@/service/productService";
+import { checkoutProductCart, listProductOrders, listProducts, type ProductOrder } from "@/service/productService";
+import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
+import { buildProductOrderWhatsAppMessage, openWhatsApp } from "@/utils/whatsapp";
 
 function currency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -24,6 +28,10 @@ function apiMessage(error: unknown) {
 export function ClientCartPage() {
   const [items, setItems] = useState<CartItem[]>(() => getCart());
   const [checkingOut, setCheckingOut] = useState(false);
+  const [orders, setOrders] = useState<ProductOrder[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [salonProfile, setSalonProfile] = useState<SalonProfile | null>(null);
+  const [completedOrder, setCompletedOrder] = useState<ProductOrder | null>(null);
   const total = useMemo(() => items.reduce((sum, item) => sum + item.price * item.quantity, 0), [items]);
 
   useEffect(() => {
@@ -52,6 +60,30 @@ export function ClientCartPage() {
     void refresh();
   }, []);
 
+  async function loadOrders() {
+    setLoadingOrders(true);
+    try {
+      setOrders(await listProductOrders());
+    } catch (error) {
+      toast.error(apiMessage(error));
+    } finally {
+      setLoadingOrders(false);
+    }
+  }
+
+  useEffect(() => { void loadOrders(); }, []);
+
+  useEffect(() => {
+    getSalonProfile().then(setSalonProfile).catch(() => setSalonProfile(null));
+  }, []);
+
+  function sendOrderWhatsApp(order: ProductOrder) {
+    openWhatsApp(
+      salonProfile?.phone,
+      buildProductOrderWhatsAppMessage(order, salonProfile?.name || "Salão"),
+    );
+  }
+
   async function checkout() {
     if (!items.length || checkingOut) return;
     setCheckingOut(true);
@@ -62,6 +94,20 @@ export function ClientCartPage() {
       })));
       clearCart();
       setItems([]);
+      await loadOrders();
+      setCompletedOrder({
+        orderId: order.orderId,
+        status: "open",
+        total: order.total,
+        createdAt: new Date().toISOString(),
+        payment: {
+          id: order.paymentId,
+          method: "local",
+          status: order.status,
+          paidAt: null,
+        },
+        items: order.items,
+      });
       toast.success(`Pedido ${order.orderId.slice(0, 8).toUpperCase()} de ${currency(order.total)} realizado. Faça o pagamento na retirada.`);
     } catch (error) {
       toast.error(apiMessage(error));
@@ -130,6 +176,99 @@ export function ClientCartPage() {
           </aside>
         </div>
       )}
+
+      <section className="space-y-4">
+        <div className="flex items-center gap-3">
+          <ReceiptText className="text-primary" size={22} />
+          <div>
+            <h2 className="text-lg font-semibold">Histórico de compras</h2>
+            <p className="text-sm text-muted-foreground">Acompanhe seus pedidos e pagamentos.</p>
+          </div>
+        </div>
+
+        {loadingOrders ? (
+          <div className="grid min-h-32 place-items-center rounded-xl border bg-card"><Loader2 className="animate-spin text-primary" /></div>
+        ) : orders.length === 0 ? (
+          <div className="rounded-xl border border-dashed bg-card p-8 text-center text-sm text-muted-foreground">
+            Nenhuma compra realizada.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {orders.map((order) => {
+              const paid = order.payment?.status === "paid" || order.payment?.status === "approved";
+              return (
+                <article key={order.orderId} className="rounded-xl border bg-card">
+                  <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <strong>Pedido #{order.orderId.slice(0, 8).toUpperCase()}</strong>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${paid ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-700"}`}>
+                          {paid ? "Pago" : "Pagamento pendente"}
+                        </span>
+                      </div>
+                      <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock3 size={12} /> {new Date(order.createdAt).toLocaleString("pt-BR")}
+                      </p>
+                    </div>
+                    <strong className="text-lg">{currency(order.total)}</strong>
+                  </div>
+                  <div className="divide-y">
+                    {order.items.map((item) => (
+                      <div key={`${order.orderId}-${item.productId}`} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                        <span>{item.quantity}× {item.name}</span>
+                        <span className="font-medium">{currency(item.total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border-t p-4">
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2 border-[#25D366]/40 text-[#159447] hover:bg-[#25D366]/10 hover:text-[#159447]"
+                      onClick={() => sendOrderWhatsApp(order)}
+                    >
+                      <WhatsAppIcon size={17} />
+                      Enviar comprovante no WhatsApp
+                    </Button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <Dialog open={Boolean(completedOrder)} onOpenChange={(open) => { if (!open) setCompletedOrder(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-emerald-600">Pedido realizado!</DialogTitle>
+            <DialogDescription>
+              Envie o comprovante do pedido para o WhatsApp do salão.
+            </DialogDescription>
+          </DialogHeader>
+          {completedOrder && (
+            <div className="space-y-2 rounded-lg border bg-secondary/30 p-4 text-sm">
+              <p><span className="font-medium">Pedido:</span> #{completedOrder.orderId.slice(0, 8).toUpperCase()}</p>
+              <p><span className="font-medium">Itens:</span> {completedOrder.items.reduce((sum, item) => sum + item.quantity, 0)}</p>
+              <p><span className="font-medium">Total:</span> {currency(completedOrder.total)}</p>
+            </div>
+          )}
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <Button
+              className="w-full gap-2 bg-[#25D366] text-white hover:bg-[#1ebe5a]"
+              onClick={() => {
+                if (completedOrder) sendOrderWhatsApp(completedOrder);
+                setCompletedOrder(null);
+              }}
+            >
+              <WhatsAppIcon size={18} />
+              Enviar comprovante no WhatsApp
+            </Button>
+            <Button variant="outline" className="w-full" onClick={() => setCompletedOrder(null)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

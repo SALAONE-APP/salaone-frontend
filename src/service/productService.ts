@@ -160,3 +160,42 @@ export async function checkoutProductCart(
   }>("/products/cart/checkout", { items });
   return response.data;
 }
+
+export interface ProductOrder {
+  orderId: string;
+  status: string;
+  total: number;
+  createdAt: string;
+  payment: {
+    id: string;
+    method: string;
+    status: string;
+    paidAt?: string | null;
+  } | null;
+  items: Array<{
+    productId: string;
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }>;
+}
+
+export async function listProductOrders() {
+  const response = await api.get<ProductOrder[]>("/products/orders");
+  return response.data;
+}
+
+export interface SalonProductOrder extends ProductOrder {
+  client: {
+    id: string;
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+  } | null;
+}
+
+export async function listSalonProductOrders() {
+  const response = await api.get<SalonProductOrder[]>("/products/orders/admin");
+  return response.data;
+}
