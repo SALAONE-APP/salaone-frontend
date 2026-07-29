@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AppCalendar } from "@/components/AppCalendar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -143,6 +144,11 @@ interface BlockedDateFormState {
   allDay: boolean;
   startTime: string;
   endTime: string;
+  recurrenceType: "none" | "daily" | "weekly" | "monthly";
+  recurrenceInterval: string;
+  recurrenceWeekdays: number[];
+  recurrenceMonthDay: string;
+  recurrenceEndDate: string;
 }
 
 const emptyBlockedDateForm: BlockedDateFormState = {
@@ -153,6 +159,11 @@ const emptyBlockedDateForm: BlockedDateFormState = {
   allDay: true,
   startTime: "09:00",
   endTime: "18:00",
+  recurrenceType: "none",
+  recurrenceInterval: "1",
+  recurrenceWeekdays: [new Date().getDay()],
+  recurrenceMonthDay: String(new Date().getDate()),
+  recurrenceEndDate: "",
 };
 
 function blockedDateToForm(item: BlockedDate): BlockedDateFormState {
@@ -164,6 +175,11 @@ function blockedDateToForm(item: BlockedDate): BlockedDateFormState {
     allDay: !item.startTime || !item.endTime,
     startTime: item.startTime ?? "09:00",
     endTime: item.endTime ?? "18:00",
+    recurrenceType: item.recurrenceType ?? "none",
+    recurrenceInterval: String(item.recurrenceInterval ?? 1),
+    recurrenceWeekdays: item.recurrenceWeekdays ?? [],
+    recurrenceMonthDay: String(item.recurrenceMonthDay ?? Number(item.date.slice(8, 10))),
+    recurrenceEndDate: item.recurrenceEndDate ?? "",
   };
 }
 
@@ -174,7 +190,44 @@ function buildPayload(form: BlockedDateFormState): BlockedDatePayload {
     professionalId: form.blockType === "professional" ? form.professionalId : null,
     startTime: form.allDay ? null : form.startTime,
     endTime: form.allDay ? null : form.endTime,
+    recurrenceType: form.recurrenceType,
+    recurrenceInterval: Number(form.recurrenceInterval || 1),
+    recurrenceWeekdays: form.recurrenceType === "weekly" ? form.recurrenceWeekdays : [],
+    recurrenceMonthDay: form.recurrenceType === "monthly" ? Number(form.recurrenceMonthDay) : null,
+    recurrenceEndDate: form.recurrenceType === "none" ? null : form.recurrenceEndDate || null,
   };
+}
+
+function dateStringToDate(value?: string | null) {
+  if (!value) return undefined;
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return undefined;
+  return new Date(year, month - 1, day);
+}
+
+const RECURRENCE_WEEKDAYS = [
+  { value: 0, label: "Dom" },
+  { value: 1, label: "Seg" },
+  { value: 2, label: "Ter" },
+  { value: 3, label: "Qua" },
+  { value: 4, label: "Qui" },
+  { value: 5, label: "Sex" },
+  { value: 6, label: "Sab" },
+];
+
+function recurrenceLabel(item: BlockedDate) {
+  const interval = Math.max(1, item.recurrenceInterval ?? 1);
+  if (!item.recurrenceType || item.recurrenceType === "none") return "Nao se repete";
+  if (item.recurrenceType === "daily") return interval === 1 ? "Todos os dias" : `A cada ${interval} dias`;
+  if (item.recurrenceType === "weekly") {
+    const days = (item.recurrenceWeekdays ?? [])
+      .map((day) => RECURRENCE_WEEKDAYS.find((option) => option.value === day)?.label)
+      .filter(Boolean)
+      .join(", ");
+    return `${interval === 1 ? "Toda semana" : `A cada ${interval} semanas`}${days ? `: ${days}` : ""}`;
+  }
+  const day = item.recurrenceMonthDay ?? Number(item.date.slice(8, 10));
+  return interval === 1 ? `Todo mes no dia ${day}` : `A cada ${interval} meses no dia ${day}`;
 }
 
 /* ─── week days config ─── */
@@ -331,6 +384,7 @@ export function SchedulesPage() {
         item.reason ?? "",
         item.professional?.displayName ?? "Todos",
         item.startTime && item.endTime ? `${item.startTime} ${item.endTime}` : "Dia inteiro",
+        recurrenceLabel(item),
       ];
       return values.some((value) => normalizeText(value).includes(term));
     });
@@ -378,6 +432,25 @@ export function SchedulesPage() {
     }
     if (!form.allDay && (!form.startTime || !form.endTime || form.startTime >= form.endTime)) {
       toast.error("Informe um intervalo de horario valido.");
+      return;
+    }
+    if (form.recurrenceType !== "none" && Number(form.recurrenceInterval) < 1) {
+      toast.error("Informe um intervalo de repeticao valido.");
+      return;
+    }
+    if (form.recurrenceType === "weekly" && form.recurrenceWeekdays.length === 0) {
+      toast.error("Selecione pelo menos um dia da semana.");
+      return;
+    }
+    if (
+      form.recurrenceType === "monthly" &&
+      (Number(form.recurrenceMonthDay) < 1 || Number(form.recurrenceMonthDay) > 31)
+    ) {
+      toast.error("Informe um dia do mes entre 1 e 31.");
+      return;
+    }
+    if (form.recurrenceEndDate && form.recurrenceEndDate < form.date) {
+      toast.error("A data final nao pode ser anterior a data inicial.");
       return;
     }
 
@@ -690,6 +763,7 @@ export function SchedulesPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Tipo</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Funcionario</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Horario</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Repeticao</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
                 <th className="w-10 px-4 py-3" />
               </tr>
@@ -697,7 +771,7 @@ export function SchedulesPage() {
             <tbody>
               {loadingBlockedDates ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     <span className="inline-flex items-center gap-2">
                       <Loader2 size={16} className="animate-spin" />
                       Carregando datas bloqueadas...
@@ -706,7 +780,7 @@ export function SchedulesPage() {
                 </tr>
               ) : filteredBlockedDates.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     Nenhuma data bloqueada encontrada.
                   </td>
                 </tr>
@@ -726,6 +800,14 @@ export function SchedulesPage() {
                           <Clock size={14} className="text-muted-foreground" />
                           {isAllDay ? "Dia inteiro" : `${item.startTime} - ${item.endTime}`}
                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-foreground">
+                        <div>{recurrenceLabel(item)}</div>
+                        {item.recurrenceEndDate && item.recurrenceType !== "none" && (
+                          <div className="text-xs text-muted-foreground">
+                            Ate {formatDate(item.recurrenceEndDate)}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/20 text-xs px-2 py-0.5 rounded-full">
@@ -770,13 +852,16 @@ export function SchedulesPage() {
           <form className="space-y-4" onSubmit={handleSubmitBlockedDate}>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="blocked-date">Data</Label>
-                <Input
-                  id="blocked-date"
-                  type="date"
-                  value={form.date}
-                  onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
-                  required
+                <Label>Data inicial</Label>
+                <AppCalendar
+                  value={dateStringToDate(form.date)}
+                  onChange={(date) =>
+                    setForm((current) => ({ ...current, date: dateToDateString(date) }))
+                  }
+                  placeholder="Selecionar data inicial"
+                  fromYear={new Date().getFullYear() - 5}
+                  toYear={new Date().getFullYear() + 10}
+                  className="w-full"
                 />
               </div>
               <div className="space-y-2">
@@ -822,6 +907,157 @@ export function SchedulesPage() {
                 </Select>
               </div>
             )}
+
+            <div className="rounded-lg border border-border bg-secondary/30 p-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Repeticao</Label>
+                  <Select
+                    value={form.recurrenceType}
+                    onValueChange={(value: BlockedDateFormState["recurrenceType"]) =>
+                      setForm((current) => {
+                        const selectedDate = new Date(`${current.date}T00:00:00`);
+                        return {
+                          ...current,
+                          recurrenceType: value,
+                          recurrenceWeekdays: value === "weekly" && current.recurrenceWeekdays.length === 0
+                            ? [selectedDate.getDay()]
+                            : current.recurrenceWeekdays,
+                          recurrenceMonthDay: value === "monthly"
+                            ? String(selectedDate.getDate())
+                            : current.recurrenceMonthDay,
+                        };
+                      })
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nao repetir</SelectItem>
+                      <SelectItem value="daily">Diariamente</SelectItem>
+                      <SelectItem value="weekly">Semanalmente</SelectItem>
+                      <SelectItem value="monthly">Mensalmente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {form.recurrenceType !== "none" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="blocked-recurrence-interval">
+                      Repetir a cada
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="blocked-recurrence-interval"
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={form.recurrenceInterval}
+                        onChange={(event) =>
+                          setForm((current) => ({ ...current, recurrenceInterval: event.target.value }))
+                        }
+                        className="w-24"
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        {form.recurrenceType === "daily"
+                          ? "dia(s)"
+                          : form.recurrenceType === "weekly"
+                            ? "semana(s)"
+                            : "mes(es)"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {form.recurrenceType === "weekly" && (
+                <div className="mt-4 space-y-2">
+                  <Label>Dias da semana</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {RECURRENCE_WEEKDAYS.map((day) => {
+                      const selected = form.recurrenceWeekdays.includes(day.value);
+                      return (
+                        <button
+                          key={day.value}
+                          type="button"
+                          onClick={() =>
+                            setForm((current) => ({
+                              ...current,
+                              recurrenceWeekdays: selected
+                                ? current.recurrenceWeekdays.filter((value) => value !== day.value)
+                                : [...current.recurrenceWeekdays, day.value].sort(),
+                            }))
+                          }
+                          className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                            selected
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-background text-foreground hover:bg-secondary"
+                          }`}
+                        >
+                          {day.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {form.recurrenceType === "monthly" && (
+                <div className="mt-4 space-y-2">
+                  <Label htmlFor="blocked-month-day">Dia do mes</Label>
+                  <Input
+                    id="blocked-month-day"
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={form.recurrenceMonthDay}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, recurrenceMonthDay: event.target.value }))
+                    }
+                    className="w-28"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Meses sem esse dia serao ignorados.
+                  </p>
+                </div>
+              )}
+
+              {form.recurrenceType !== "none" && (
+                <div className="mt-4 space-y-2">
+                  <Label>Repetir ate (opcional)</Label>
+                  <div className="flex flex-col gap-2 sm:max-w-md sm:flex-row">
+                    <AppCalendar
+                      value={dateStringToDate(form.recurrenceEndDate)}
+                      onChange={(date) =>
+                        setForm((current) => ({
+                          ...current,
+                          recurrenceEndDate: dateToDateString(date),
+                        }))
+                      }
+                      placeholder="Sem data final"
+                      fromYear={new Date().getFullYear()}
+                      toYear={new Date().getFullYear() + 10}
+                      className="w-full"
+                    />
+                    {form.recurrenceEndDate && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          setForm((current) => ({ ...current, recurrenceEndDate: "" }))
+                        }
+                      >
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Deixe vazio para manter a regra sem data final.
+                  </p>
+                </div>
+              )}
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="blocked-reason">Motivo</Label>
