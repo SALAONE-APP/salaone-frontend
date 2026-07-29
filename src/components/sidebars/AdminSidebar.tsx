@@ -62,7 +62,7 @@ function buildSections(): SidebarSection[] {
           icon: Scissors,
           label: "Gerenciar",
           children: [
-            { icon: Scissors, label: "Servicos", href: "/services" },
+            { icon: Scissors, label: "Serviços", href: "/services" },
             { icon: Package, label: "Produtos", href: "/products" },
             { icon: Boxes, label: "Estoque", href: "/stock" },
             { icon: Image, label: "Galeria", href: "/gallery" },

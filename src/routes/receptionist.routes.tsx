@@ -68,8 +68,8 @@ export const receptionistRoutes: AppRoute[] = [
   /* Visualização sem permissão — ações de edição são bloqueadas dentro das páginas */
   {
     path: "/services",
-    title: "Servicos",
-    breadcrumbs: ["Catalogo", "Servicos"],
+    title: "Serviços",
+    breadcrumbs: ["Catalogo", "Serviços"],
     Component: ServicesPage,
   },
   {

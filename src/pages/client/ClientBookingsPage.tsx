@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import {
   Calendar,
   Clock,
+  CreditCard,
   Filter,
   Info,
   Lock,
@@ -71,7 +72,11 @@ import {
 } from "@/service/subscriptionService";
 import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
 import { getSettings, type BookingPaymentMethod, type SubscriptionProfessionalRule } from "@/service/settingsService";
-import { createAppointmentPayment } from "@/service/paymentService";
+import {
+  createAppointmentPayment,
+  listAppointmentPayments,
+  type PaymentRecord,
+} from "@/service/paymentService";
 import { createReview } from "@/service/reviewService";
 import { listServices, type Service } from "@/service/serviceService";
 import { listProducts, type Product } from "@/service/productService";
@@ -115,6 +120,73 @@ const statusStyles: Record<AppointmentStatus, string> = {
   cancelled: "bg-red-500/10 text-red-600 border-red-500/20",
   no_show: "bg-gray-500/10 text-gray-500 border-gray-500/20",
 };
+
+const paymentMethodLabels: Record<PaymentRecord["method"], string> = {
+  pix: "PIX",
+  credito: "Cartão de crédito",
+  debito: "Cartão de débito",
+  dinheiro: "Local",
+  local: "Local",
+  subscription: "Plano",
+};
+
+function getPaymentDisplay(payment?: PaymentRecord) {
+  if (!payment) {
+    return {
+      label: "Não informado",
+      className: "bg-gray-500/10 text-gray-500 border-gray-500/20",
+    };
+  }
+
+  if (payment.status === "covered" || payment.method === "subscription") {
+    return {
+      label: "Coberto pelo plano",
+      className: "bg-violet-500/10 text-violet-600 border-violet-500/20",
+    };
+  }
+
+  const isPaid = payment.status === "paid" || payment.status === "approved";
+  const isLocal = payment.method === "local" || payment.method === "dinheiro";
+  const method = paymentMethodLabels[payment.method] ?? payment.method;
+
+  if (isLocal) {
+    return isPaid
+      ? {
+          label: "Local",
+          className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+        }
+      : {
+          label: "Pagamento no local",
+          className: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+        };
+  }
+
+  if (isPaid) {
+    return {
+      label: method,
+      className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+    };
+  }
+
+  if (payment.status === "refunded") {
+    return {
+      label: `Estornado · ${method}`,
+      className: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+    };
+  }
+
+  if (payment.status === "failed" || payment.status === "cancelled") {
+    return {
+      label: `Não pago · ${method}`,
+      className: "bg-red-500/10 text-red-600 border-red-500/20",
+    };
+  }
+
+  return {
+    label: `Pendente online · ${method}`,
+    className: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+  };
+}
 
 function dateToDateString(date?: Date) {
   if (!date) return "";
@@ -220,6 +292,9 @@ export function ClientBookingsPage() {
 
   // Lista de agendamentos
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [paymentsByAppointment, setPaymentsByAppointment] = useState<
+    Map<string, PaymentRecord>
+  >(new Map());
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
@@ -274,15 +349,25 @@ export function ClientBookingsPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await listAppointments({
-        clientId: user.id,
-        status: statusFilter === "all" ? undefined : statusFilter,
-        page,
-        limit,
-      });
+      const [result, paymentsResult] = await Promise.all([
+        listAppointments({
+          clientId: user.id,
+          status: statusFilter === "all" ? undefined : statusFilter,
+          page,
+          limit,
+        }),
+        listAppointmentPayments({ page: 1, limit: 100 }),
+      ]);
       result.items.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
       setAppointments(result.items);
       setTotal(result.total);
+      setPaymentsByAppointment(
+        new Map(
+          paymentsResult.items.flatMap((payment) =>
+            payment.appointmentId ? [[payment.appointmentId, payment] as const] : [],
+          ),
+        ),
+      );
     } catch (err) {
       setError(getApiMessage(err));
     } finally {
@@ -784,7 +869,7 @@ export function ClientBookingsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  {["Serviço / Produtos", "Data e Hora", "Profissional", "Valor", "Status"].map((col) => (
+                  {["Serviço / Produtos", "Data e Hora", "Profissional", "Valor", "Pagamento", "Status"].map((col) => (
                     <th key={col} className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">{col}</th>
                   ))}
                   <th className="w-10 px-4 py-3" />
@@ -792,9 +877,9 @@ export function ClientBookingsPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={6} className="p-8 text-center text-sm text-muted-foreground"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />Carregando agendamentos...</td></tr>
+                  <tr><td colSpan={7} className="p-8 text-center text-sm text-muted-foreground"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />Carregando agendamentos...</td></tr>
                 ) : filteredAppointments.length === 0 ? (
-                  <tr><td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">Nenhum agendamento encontrado.</td></tr>
+                  <tr><td colSpan={7} className="p-8 text-center text-sm text-muted-foreground">Nenhum agendamento encontrado.</td></tr>
                 ) : (
                   filteredAppointments.map((appt) => {
                     const start = formatDateTime(appt.startAt);
@@ -802,6 +887,7 @@ export function ClientBookingsPage() {
                     const professionalName = appt.professional?.displayName || "Sem profissional";
                     const canCancel = appt.status === "scheduled" || appt.status === "confirmed";
                     const canReview = appt.status === "completed";
+                    const paymentDisplay = getPaymentDisplay(paymentsByAppointment.get(appt.id));
 
                     return (
                       <tr key={appt.id} className="border-b border-border transition-colors last:border-b-0 hover:bg-secondary/30">
@@ -840,6 +926,12 @@ export function ClientBookingsPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-foreground">{formatCurrency(appt.totalAmount)}</td>
+                        <td className="px-4 py-3">
+                          <Badge variant="outline" className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs ${paymentDisplay.className}`}>
+                            <CreditCard size={11} className="mr-1" />
+                            {paymentDisplay.label}
+                          </Badge>
+                        </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <Badge variant="outline" className={`rounded-full px-2 py-0.5 text-xs ${statusStyles[appt.status]}`}>{statusLabels[appt.status]}</Badge>

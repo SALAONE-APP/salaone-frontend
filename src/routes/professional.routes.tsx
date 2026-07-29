@@ -44,8 +44,8 @@ export const professionalRoutes: AppRoute[] = [
   },
   {
     path: "/services",
-    title: "Servicos",
-    breadcrumbs: ["Profissional", "Servicos"],
+    title: "Serviços",
+    breadcrumbs: ["Profissional", "Serviços"],
     Component: ServicesPage,
     requiredPermission: "manageServices",
   },

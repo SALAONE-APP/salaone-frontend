@@ -23,7 +23,7 @@ const sections: SidebarSection[] = [
         icon: Scissors,
         label: "Catalogo",
         children: [
-          { icon: Scissors, label: "Servicos", href: "/services" },
+          { icon: Scissors, label: "Serviços", href: "/services" },
           { icon: Package, label: "Produtos", href: "/products" },
         ],
       },
