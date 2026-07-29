@@ -359,16 +359,28 @@ export default function AdminAppointmentsCalendar({
                                 height: `${eventHeight}px`,
                                 left: '4px',
                                 right: hasOverlap ? '0' : '4px',
-                                zIndex: 2,
+                                zIndex: 30,
                                 backgroundColor: appointment.color.cardBg,
                                 color: appointment.color.cardText,
                                 borderColor: appointment.color.border,
                                 borderLeftColor: appointment.color.accent,
                                 boxShadow: `0 4px 14px rgba(0,0,0,0.24), inset 0 1px 0 ${appointment.color.border}`,
                               }}
+                              role="button"
+                              tabIndex={0}
+                              onPointerDown={(e) => {
+                                e.stopPropagation();
+                                setAptModal({ appointment, professional, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
+                              }}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setAptModal({ appointment, professional, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setAptModal({ appointment, professional, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
+                                }
                               }}
                             >
                               {eventHeight <= 28 ? (
@@ -423,16 +435,28 @@ export default function AdminAppointmentsCalendar({
                               style={{
                                 top: `${eventTop}px`,
                                 height: `${eventHeight}px`,
-                                zIndex: 3,
+                                zIndex: 31,
                                 backgroundColor: appointment.color.cardBg,
                                 color: appointment.color.cardText,
                                 borderColor: appointment.color.border,
                                 borderLeftColor: appointment.color.accent,
                                 boxShadow: `0 4px 14px rgba(0,0,0,0.24), inset 0 1px 0 ${appointment.color.border}`,
                               }}
+                              role="button"
+                              tabIndex={0}
+                              onPointerDown={(e) => {
+                                e.stopPropagation();
+                                setAptModal({ appointment, professional, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
+                              }}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setAptModal({ appointment, professional, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setAptModal({ appointment, professional, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
+                                }
                               }}
                             >
                               {eventHeight <= 28 ? (
