@@ -1639,59 +1639,6 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
             </div>
           </div>
 
-          {isAdmin && (
-            <div className="bg-card rounded-xl border border-border p-6">
-              <h3 className="text-lg font-medium text-foreground mb-1">Regra de Profissional para Assinantes</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Define como clientes com plano ativo escolhem o profissional ao agendar.
-              </p>
-              <div className="space-y-3">
-                <label className="flex items-start gap-3 cursor-pointer group">
-                  <input
-                    type="radio"
-                    name="subscriptionProfessionalRule"
-                    value="fixed"
-                    checked={subscriptionProfessionalRule === 'fixed'}
-                    onChange={() => setSubscriptionProfessionalRule('fixed')}
-                    className="mt-1 accent-primary"
-                  />
-                  <div>
-                    <span className="text-sm font-medium text-foreground">Profissional fixo</span>
-                    <p className="text-xs text-muted-foreground">
-                      O cliente fica vinculado ao profissional escolhido no primeiro agendamento após assinar. Pode trocar somente na renovação mensal ou após 30 dias.
-                    </p>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer group">
-                  <input
-                    type="radio"
-                    name="subscriptionProfessionalRule"
-                    value="free_choice"
-                    checked={subscriptionProfessionalRule === 'free_choice'}
-                    onChange={() => setSubscriptionProfessionalRule('free_choice')}
-                    className="mt-1 accent-primary"
-                  />
-                  <div>
-                    <span className="text-sm font-medium text-foreground">Livre escolha</span>
-                    <p className="text-xs text-muted-foreground">
-                      O cliente pode escolher qualquer profissional disponível no horário e data desejados, desde que o profissional realize o serviço solicitado.
-                    </p>
-                  </div>
-                </label>
-              </div>
-              <div className="mt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={saveProfessionalRuleSettings}
-                  disabled={isSavingProfessionalRule}
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSavingProfessionalRule ? 'Salvando...' : 'Salvar regra'}
-                </button>
-              </div>
-            </div>
-          )}
-
           <div className="bg-card rounded-xl border border-border p-6">
             <h3 className="text-lg font-medium text-foreground mb-4">Sobre Nos</h3>
             <div className="grid grid-cols-1 gap-4">

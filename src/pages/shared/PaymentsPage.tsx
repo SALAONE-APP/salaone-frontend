@@ -83,6 +83,7 @@ const methodLabels: Record<PaymentMethod, string> = {
 const typeLabels: Record<PaymentType, string> = {
   appointment: "Agendamento",
   subscription: "Assinatura",
+  service_tab: "Comanda",
 };
 
 function formatCurrency(value: number) {
@@ -133,6 +134,9 @@ function getPaymentDescription(payment: PaymentWithType) {
   if (payment.paymentType === "subscription") {
     return payment.subscription?.plan?.name || "Assinatura";
   }
+  if (payment.paymentType === "service_tab") {
+    return `Comanda #${payment.serviceTab?.code || payment.id.slice(0, 8).toUpperCase()}`;
+  }
 
   const serviceNames = payment.appointment?.services
     ?.map((service) => service.serviceName)
@@ -145,6 +149,7 @@ function getPaymentDescription(payment: PaymentWithType) {
 function shouldShowInPaymentsPage(payment: ApiPaymentWithType): payment is PaymentWithType {
   if (payment.paymentType === "appointment") return Boolean(payment.appointmentId);
   if (payment.paymentType === "subscription") return Boolean(payment.subscriptionId);
+  if (payment.paymentType === "service_tab") return Boolean(payment.serviceTab?.id);
   return false;
 }
 
@@ -433,6 +438,7 @@ export function PaymentsPage() {
                   <DropdownMenuRadioItem value="all">Todos</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="appointment">Agendamentos</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="subscription">Assinaturas</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="service_tab">Comandas</DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -532,6 +538,16 @@ export function PaymentsPage() {
                               ? ` - ${payment.appointment.professional.displayName}`
                               : ""}
                           </p>
+                          {payment.paymentType === "service_tab" && payment.serviceTab?.items.length ? (
+                            <div className="mt-2 space-y-1 rounded-md border bg-secondary/30 p-2">
+                              {payment.serviceTab.items.map((item) => (
+                                <div key={item.id} className="flex justify-between gap-3 text-xs">
+                                  <span>{item.quantity}× {item.name}</span>
+                                  <span className="whitespace-nowrap font-medium">{formatCurrency(item.total)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm font-medium text-foreground">

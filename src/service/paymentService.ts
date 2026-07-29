@@ -9,7 +9,7 @@ export type PaymentStatus =
   | "cancelled"
   | "refunded"
   | "covered";
-export type PaymentType = "appointment" | "subscription";
+export type PaymentType = "appointment" | "subscription" | "service_tab";
 
 export interface PaymentRecord {
   id: string;
@@ -47,6 +47,19 @@ export interface PaymentRecord {
       id: string;
       name: string;
     } | null;
+  } | null;
+  serviceTab?: {
+    id: string;
+    code: string;
+    status: string;
+    items: Array<{
+      id: string;
+      type: "service" | "product" | "consumption";
+      name: string;
+      unitPrice: number;
+      quantity: number;
+      total: number;
+    }>;
   } | null;
   amount: number;
   method: PaymentMethod;
