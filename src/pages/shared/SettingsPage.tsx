@@ -22,6 +22,7 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { PlatformSubscriptionTab } from '@/components/PlatformSubscriptionTab';
+import { BannerImageEditor } from '@/components/BannerImageEditor';
 import { toast } from 'sonner';
 import { PasswordInput } from '@/components/PasswordInput';
 import { Button } from '@/components/ui/button';
@@ -188,9 +189,11 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     hero_subtitle: '',
     hero_images: [] as string[],
     hero_image_public_ids: [] as string[],
+    hero_image_links: [] as string[],
   });
   const [heroImageUrl, setHeroImageUrl] = useState('');
   const [isUploadingHeroImage, setIsUploadingHeroImage] = useState(false);
+  const [heroImageToEdit, setHeroImageToEdit] = useState<File | null>(null);
   const heroImageFileInputRef = useRef<HTMLInputElement | null>(null);
   const [workingHoursForm, setWorkingHoursForm] = useState({
     schedule_title: '',
@@ -426,6 +429,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
           hero_subtitle: data.hero_subtitle ?? '',
           hero_images: getHeroImages(data),
           hero_image_public_ids: data.hero_image_public_ids ?? [],
+          hero_image_links: data.hero_image_links ?? [],
         });
         setHeroImageUrl('');
         setWorkingHoursForm({
@@ -685,6 +689,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       ...current,
       hero_images: [...current.hero_images, trimmedUrl],
       hero_image_public_ids: [...current.hero_image_public_ids, ''],
+      hero_image_links: [...current.hero_image_links, ''],
     }));
     setHeroImageUrl('');
   }
@@ -714,6 +719,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
           ...current,
           hero_images: [...current.hero_images, image.secure_url].slice(0, MAX_HERO_IMAGES),
           hero_image_public_ids: [...current.hero_image_public_ids, image.public_id].slice(0, MAX_HERO_IMAGES),
+          hero_image_links: [...current.hero_image_links, ''].slice(0, MAX_HERO_IMAGES),
         };
       });
 
@@ -736,7 +742,25 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       return;
     }
 
-    void uploadHeroImageFile(file);
+    if (!file.type.startsWith('image/')) {
+      toast.error('Selecione apenas arquivos de imagem.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('A imagem deve ter no maximo 5MB.');
+      return;
+    }
+
+    if (heroForm.hero_images.length >= MAX_HERO_IMAGES) {
+      toast.error('O banner pode ter no maximo 5 imagens.');
+      return;
+    }
+
+    setHeroImageToEdit(file);
+    if (heroImageFileInputRef.current) {
+      heroImageFileInputRef.current.value = '';
+    }
   }
 
   async function saveBusinessLogo(logoUrl: string, logoPublicId: string | null, successMessage: string) {
@@ -891,6 +915,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       ...current,
       hero_images: current.hero_images.filter((image) => image !== imageUrl),
       hero_image_public_ids: current.hero_image_public_ids.filter((_, index) => current.hero_images[index] !== imageUrl),
+      hero_image_links: current.hero_image_links.filter((_, index) => current.hero_images[index] !== imageUrl),
     }));
   }
 
@@ -1076,6 +1101,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       hero_image: trimmedHeroImages[0] ?? '',
       hero_images: trimmedHeroImages,
       hero_image_public_ids: heroForm.hero_image_public_ids,
+      hero_image_links: heroForm.hero_image_links,
     };
     const trimmedAboutForm = {
       about_title: aboutForm.about_title.trim(),
@@ -1154,6 +1180,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         hero_subtitle: updatedHomeInfo.hero_subtitle ?? '',
         hero_images: getHeroImages(updatedHomeInfo),
         hero_image_public_ids: updatedHomeInfo.hero_image_public_ids ?? [],
+        hero_image_links: updatedHomeInfo.hero_image_links ?? [],
       });
       setHeroImageUrl('');
       setWorkingHoursForm({
@@ -1194,6 +1221,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       hero_image: trimmedHeroImages[0] ?? '',
       hero_images: trimmedHeroImages,
       hero_image_public_ids: heroForm.hero_image_public_ids,
+      hero_image_links: heroForm.hero_image_links,
     };
 
     setIsSavingGeneralSettings(true);
@@ -1233,6 +1261,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         hero_subtitle: updatedHomeInfo.hero_subtitle ?? '',
         hero_images: getHeroImages(updatedHomeInfo),
         hero_image_public_ids: updatedHomeInfo.hero_image_public_ids ?? [],
+        hero_image_links: updatedHomeInfo.hero_image_links ?? [],
       });
       setHeroImageUrl('');
       toast.success('Aparencia salva com sucesso.');
@@ -2691,6 +2720,33 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
                       <p className="truncate px-3 py-2 text-xs text-muted-foreground">
                         {imageUrl}
                       </p>
+                      <div className="space-y-1 px-3 pb-3">
+                        <label
+                          htmlFor={`hero-image-link-${index}`}
+                          className="text-xs font-medium text-foreground"
+                        >
+                          Link ao clicar (opcional)
+                        </label>
+                        <input
+                          id={`hero-image-link-${index}`}
+                          type="text"
+                          value={heroForm.hero_image_links[index] ?? ''}
+                          onChange={(event) =>
+                            setHeroForm((current) => {
+                              const links = [...current.hero_image_links];
+                              links[index] = event.target.value;
+                              return { ...current, hero_image_links: links };
+                            })
+                          }
+                          disabled={
+                            isLoadingHomeInfo ||
+                            isSavingGeneralSettings ||
+                            isUploadingHeroImage
+                          }
+                          placeholder="/agendamentos ou https://..."
+                          className="h-9 w-full rounded-md border border-border bg-background px-3 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -2728,6 +2784,18 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
           </TabsContent>
         )}
       </Tabs>
+
+      {heroImageToEdit && (
+        <BannerImageEditor
+          file={heroImageToEdit}
+          saving={isUploadingHeroImage}
+          onCancel={() => setHeroImageToEdit(null)}
+          onConfirm={async (adjustedFile) => {
+            await uploadHeroImageFile(adjustedFile);
+            setHeroImageToEdit(null);
+          }}
+        />
+      )}
     </div>
   );
 }
