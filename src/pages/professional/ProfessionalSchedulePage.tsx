@@ -7,6 +7,7 @@ import {
   Clock,
   Loader2,
   MoreHorizontal,
+  Scissors,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
