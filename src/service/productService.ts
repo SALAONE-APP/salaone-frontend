@@ -141,3 +141,22 @@ export async function purchaseProduct(productId: string, quantity: number) {
   }>("/products/purchase", { productId, quantity });
   return response.data;
 }
+
+export async function checkoutProductCart(
+  items: Array<{ productId: string; quantity: number }>,
+) {
+  const response = await api.post<{
+    orderId: string;
+    paymentId: string;
+    total: number;
+    status: string;
+    items: Array<{
+      productId: string;
+      name: string;
+      quantity: number;
+      unitPrice: number;
+      total: number;
+    }>;
+  }>("/products/cart/checkout", { items });
+  return response.data;
+}
