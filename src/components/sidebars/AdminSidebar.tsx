@@ -40,6 +40,7 @@ function buildSections(): SidebarSection[] {
             { icon: Zap, label: "Agenda", href: "/encaixe" },
             { icon: Calendar, label: "Calendario", href: "/schedules" },
             { icon: ReceiptText, label: "Comandas", href: "/service-tabs" },
+            { icon: History, label: "Histórico de comandas", href: "/service-tab-history" },
           ],
         },
       ],
