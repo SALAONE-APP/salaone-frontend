@@ -266,7 +266,7 @@ function RegisterModal({ plan, onClose, onRegistered }: {
     if (form.slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug)) {
       setFormError("Slug inválido. Use apenas letras minúsculas, números e hífen."); return;
     }
-    if (form.password.length < 4) { setFormError("A senha deve ter no mínimo 4 caracteres."); return; }
+    if (form.password.length < 6) { setFormError("A senha deve ter no mínimo 6 caracteres."); return; }
     if (form.password !== form.confirmPassword) { setFormError("Senha e confirmação de senha não conferem."); return; }
 
     try {
@@ -357,7 +357,7 @@ function RegisterModal({ plan, onClose, onRegistered }: {
               <div className="grid grid-cols-2 gap-3">
                 <label className="block text-neutral-400 text-sm">
                   Senha *
-                  <PasswordInput className={inputClass} value={form.password} onChange={(e) => set("password", e.target.value)} placeholder="Mínimo 4 caracteres" required disabled={submitting} />
+                  <PasswordInput className={inputClass} value={form.password} onChange={(e) => set("password", e.target.value)} placeholder="Mínimo 6 caracteres" required disabled={submitting} />
                 </label>
                 <label className="block text-neutral-400 text-sm">
                   Confirmar senha *
