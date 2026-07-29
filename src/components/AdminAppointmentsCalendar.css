@@ -205,7 +205,7 @@
   left: 0;
   right: 0;
   z-index: 20;
-  pointer-events: none;
+  pointer-events: auto;
   display: grid;
 }
 
@@ -213,6 +213,7 @@
   width: 64px;
   min-width: 64px;
   flex-shrink: 0;
+  pointer-events: none;
 }
 
 .calendar-appointments-column {
@@ -227,8 +228,8 @@
   right: 0;
   height: 2px;
   background: hsl(var(--primary));
-  z-index: 10;
-  pointer-events: none;
+  z-index: 1;
+  pointer-events: none !important;
   box-shadow: 0 0 8px hsl(var(--primary) / 0.55);
 }
 
@@ -242,7 +243,7 @@
   border-radius: 50%;
   background: hsl(var(--primary));
   box-shadow: 0 0 10px hsl(var(--primary) / 0.65);
-  pointer-events: none;
+  pointer-events: none !important;
 }
 
 /* ── Free fit slot ── */
@@ -298,8 +299,9 @@
   font-size: 11px;
   box-sizing: border-box;
   transition: filter 0.12s;
-  z-index: 3;
-  pointer-events: auto;
+  z-index: 30;
+  pointer-events: auto !important;
+  touch-action: manipulation;
   isolation: isolate;
 }
 
