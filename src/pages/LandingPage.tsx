@@ -168,7 +168,7 @@ function formatPhone(v: string) {
 }
 
 const inputClass =
-  "w-full mt-1 px-3 py-2.5 bg-neutral-900 border border-neutral-700 rounded-lg text-white text-sm placeholder-neutral-500 focus:outline-none focus:border-primary disabled:opacity-50 transition-colors";
+  "w-full mt-1 px-3 py-2.5 bg-neutral-900 border border-neutral-700 rounded-lg !text-white caret-white text-sm placeholder:text-neutral-500 [-webkit-text-fill-color:white] [color-scheme:dark] focus:outline-none focus:border-primary disabled:opacity-50 transition-colors";
 
 // ─── Static content ───────────────────────────────────────────────────────────
 
@@ -334,42 +334,6 @@ function RegisterModal({ plan, onClose, onRegistered }: {
                   <input type="tel" className={inputClass} value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="(11) 99999-9999" disabled={submitting} />
                 </label>
               </div>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="text-white font-semibold text-sm mb-3 pb-2 border-b border-neutral-800">Regra de Profissional para Assinantes</h4>
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className={`block cursor-pointer rounded-xl border p-4 transition-colors ${form.subscriptionProfessionalRule === "fixed" ? "border-primary bg-primary/10" : "border-neutral-800 bg-neutral-900/50 hover:border-neutral-700"}`}>
-                <input
-                  type="radio"
-                  name="subscriptionProfessionalRule"
-                  value="fixed"
-                  className="sr-only"
-                  checked={form.subscriptionProfessionalRule === "fixed"}
-                  onChange={() => set("subscriptionProfessionalRule", "fixed")}
-                  disabled={submitting}
-                />
-                <span className="block text-sm font-semibold text-white">Profissional fixo</span>
-                <span className="mt-1 block text-xs leading-5 text-neutral-400">
-                  Cliente com plano fica vinculado ao profissional escolhido no primeiro agendamento e troca apenas na renovacao mensal ou apos 30 dias.
-                </span>
-              </label>
-              <label className={`block cursor-pointer rounded-xl border p-4 transition-colors ${form.subscriptionProfessionalRule === "free_choice" ? "border-primary bg-primary/10" : "border-neutral-800 bg-neutral-900/50 hover:border-neutral-700"}`}>
-                <input
-                  type="radio"
-                  name="subscriptionProfessionalRule"
-                  value="free_choice"
-                  className="sr-only"
-                  checked={form.subscriptionProfessionalRule === "free_choice"}
-                  onChange={() => set("subscriptionProfessionalRule", "free_choice")}
-                  disabled={submitting}
-                />
-                <span className="block text-sm font-semibold text-white">Livre escolha</span>
-                <span className="mt-1 block text-xs leading-5 text-neutral-400">
-                  Cliente com plano escolhe qualquer profissional disponivel na data e horario, desde que realize o servico solicitado.
-                </span>
-              </label>
             </div>
           </div>
 
