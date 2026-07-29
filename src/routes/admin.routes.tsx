@@ -5,6 +5,7 @@ import { EmployeeAppointmentHistoryPage } from "../pages/admin/EmployeeAppointme
 import { ExtraPaymentsPage } from "../pages/admin/ExtraPaymentsPage";
 import { GalleryPage } from "../pages/admin/GalleryPage";
 import { ProductsPage } from "../pages/admin/ProductsPage";
+import { ProductOrdersPage } from "../pages/admin/ProductOrdersPage";
 import { PromotionsPage } from "../pages/admin/PromotionsPage";
 import { BookingsPage } from "../pages/shared/BookingsPage";
 import { CashClosingPage } from "../pages/shared/CashClosingPage";
@@ -58,6 +59,12 @@ export const adminRoutes: AppRoute[] = [
     title: "Pagamentos",
     breadcrumbs: ["Financeiro", "Pagamentos"],
     Component: PaymentsPage,
+  },
+  {
+    path: "/product-orders",
+    title: "Pedidos de produtos",
+    breadcrumbs: ["Financeiro", "Pedidos de produtos"],
+    Component: ProductOrdersPage,
   },
   {
     path: "/service-tabs",

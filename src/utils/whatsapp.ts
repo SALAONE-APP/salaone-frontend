@@ -2,6 +2,7 @@ import { toast } from "sonner";
 
 import type { Appointment } from "@/service/appointmentService";
 import type { SalonProfile } from "@/service/salonProfileService";
+import type { ProductOrder } from "@/service/productService";
 
 export interface WhatsAppMessageData {
   appointmentStatus?: Appointment["status"];
@@ -97,6 +98,28 @@ export function buildWhatsAppMessage(data: WhatsAppMessageData): string {
     .replace(/\n{3,}/g, "\n\n");
 }
 
+export function buildProductOrderWhatsAppMessage(order: ProductOrder, salonName: string): string {
+  const paid = order.payment?.status === "paid" || order.payment?.status === "approved";
+  const itemLines = order.items.map((item) =>
+    `  - ${item.quantity}x ${item.name} - ${formatCurrencyBR(item.total)}`,
+  );
+  return [
+    "*COMPROVANTE DO PEDIDO*",
+    "",
+    `Olá, ${salonName}!`,
+    "",
+    `*Pedido:* #${order.orderId.slice(0, 8).toUpperCase()}`,
+    `*Data:* ${new Date(order.createdAt).toLocaleString("pt-BR")}`,
+    "*Produtos:*",
+    ...itemLines,
+    "",
+    `*Total:* ${formatCurrencyBR(order.total)}`,
+    `*Pagamento:* ${paid ? "Pago" : "Pendente - pagamento na retirada"}`,
+    "",
+    "Segue a confirmação da minha compra realizada pelo SalaOne.",
+  ].join("\n");
+}
+
 export function openWhatsApp(phone: string | null | undefined, message: string): void {
   const rawPhone = phone ?? "";
   const cleanPhone = rawPhone.replace(/\D/g, "");
@@ -108,7 +131,7 @@ export function openWhatsApp(phone: string | null | undefined, message: string):
 
   if (!formattedPhone) {
     console.warn("[WhatsApp] Nenhum numero valido - abertura cancelada.");
-    toast.error("Nao foi possivel enviar: o cliente nao possui telefone valido cadastrado.");
+    toast.error("Nao foi possivel enviar: nao ha um numero de WhatsApp valido configurado.");
     return;
   }
 

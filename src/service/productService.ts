@@ -141,3 +141,61 @@ export async function purchaseProduct(productId: string, quantity: number) {
   }>("/products/purchase", { productId, quantity });
   return response.data;
 }
+
+export async function checkoutProductCart(
+  items: Array<{ productId: string; quantity: number }>,
+) {
+  const response = await api.post<{
+    orderId: string;
+    paymentId: string;
+    total: number;
+    status: string;
+    items: Array<{
+      productId: string;
+      name: string;
+      quantity: number;
+      unitPrice: number;
+      total: number;
+    }>;
+  }>("/products/cart/checkout", { items });
+  return response.data;
+}
+
+export interface ProductOrder {
+  orderId: string;
+  status: string;
+  total: number;
+  createdAt: string;
+  payment: {
+    id: string;
+    method: string;
+    status: string;
+    paidAt?: string | null;
+  } | null;
+  items: Array<{
+    productId: string;
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }>;
+}
+
+export async function listProductOrders() {
+  const response = await api.get<ProductOrder[]>("/products/orders");
+  return response.data;
+}
+
+export interface SalonProductOrder extends ProductOrder {
+  client: {
+    id: string;
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+  } | null;
+}
+
+export async function listSalonProductOrders() {
+  const response = await api.get<SalonProductOrder[]>("/products/orders/admin");
+  return response.data;
+}

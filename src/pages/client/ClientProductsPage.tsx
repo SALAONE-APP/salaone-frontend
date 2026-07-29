@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Package, Search, ShoppingBag } from "lucide-react";
+import { Loader2, Package, Search, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { listProducts, purchaseProduct, type Product } from "@/service/productService";
+import { addProductToCart } from "@/service/cartService";
+import { listProducts, type Product } from "@/service/productService";
 
 function currency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -18,7 +19,6 @@ export function ClientProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [buyingId, setBuyingId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -42,20 +42,10 @@ export function ClientProductsPage() {
       : products;
   }, [products, search]);
 
-  async function buy(product: Product) {
-    if (product.stock <= 0 || buyingId) return;
-    setBuyingId(product.id);
-    try {
-      const result = await purchaseProduct(product.id, 1);
-      setProducts((current) => current.map((item) =>
-        item.id === product.id ? { ...item, stock: result.stock } : item));
-      toast.success(`Pedido realizado. Pague ${currency(result.total)} no salao.`);
-    } catch (error) {
-      toast.error(apiMessage(error));
-      await load();
-    } finally {
-      setBuyingId(null);
-    }
+  function addToCart(product: Product) {
+    if (product.stock <= 0) return;
+    addProductToCart(product);
+    toast.success(`${product.name} adicionado ao carrinho.`);
   }
 
   return (
@@ -91,9 +81,9 @@ export function ClientProductsPage() {
                 {product.description ? <p className="line-clamp-2 text-sm text-muted-foreground">{product.description}</p> : null}
                 <div className="flex items-end justify-between gap-3">
                   <div><p className="text-lg font-semibold text-primary">{currency(product.price)}</p><p className="text-xs text-muted-foreground">{product.stock > 0 ? `${product.stock} disponível(is)` : "Sem estoque"}</p></div>
-                  <Button onClick={() => void buy(product)} disabled={product.stock <= 0 || buyingId !== null} className="gap-2">
-                    {buyingId === product.id ? <Loader2 size={15} className="animate-spin" /> : <ShoppingBag size={15} />}
-                    Comprar
+                  <Button onClick={() => addToCart(product)} disabled={product.stock <= 0} className="gap-2">
+                    <ShoppingCart size={15} />
+                    Adicionar
                   </Button>
                 </div>
               </div>
