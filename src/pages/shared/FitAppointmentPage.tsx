@@ -30,6 +30,7 @@ import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import {
   createAppointment,
   listAppointments,
+  updateAppointment,
   type Appointment,
 } from "@/service/appointmentService";
 import { listProfessionals, type Professional } from "@/service/professionalService";
@@ -750,6 +751,17 @@ export function FitAppointmentPage() {
             startMinutes={CALENDAR_START_MINUTES}
             nowMinutes={nowMinutes}
             onFreeFitBooking={handleFreeFitBooking}
+            onStartAttendance={async (appointmentId) => {
+              try {
+                await updateAppointment(appointmentId, { status: "in_service" });
+                toast.success("Atendimento iniciado.");
+                await loadAppointments();
+              } catch (error) {
+                const apiMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+                toast.error(apiMessage || "Não foi possível iniciar o atendimento.");
+                throw error;
+              }
+            }}
             getAppointmentStartDate={getAppointmentStartDate}
           />
         )}

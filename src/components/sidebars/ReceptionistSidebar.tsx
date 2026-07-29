@@ -1,4 +1,4 @@
-import { Calendar, CircleDollarSign, ClipboardPlus, CreditCard, Home, LayoutList, Package, Scissors, Settings, UserCheck, Zap } from "lucide-react";
+import { Calendar, CircleDollarSign, ClipboardPlus, CreditCard, Home, LayoutList, Package, ReceiptText, Scissors, Settings, UserCheck, Zap } from "lucide-react";
 
 import { ProfileSidebar } from "../shared/ProfileSidebar";
 import type { SidebarSection } from "../shared/ProfileSidebar";
@@ -16,6 +16,7 @@ const sections: SidebarSection[] = [
           { icon: Calendar, label: "Agendamentos", href: "/bookings" },
           { icon: Zap, label: "Agenda", href: "/encaixe" },
           { icon: Calendar, label: "Agenda", href: "/schedules", requiredPermission: "manageBlockedDates" },
+          { icon: ReceiptText, label: "Comandas", href: "/service-tabs", requiredPermission: "managePayments" },
         ],
       },
     ],

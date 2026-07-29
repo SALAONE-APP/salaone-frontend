@@ -9,6 +9,7 @@ import { PaymentsPage } from "../pages/shared/PaymentsPage";
 import { ProductsPage } from "../pages/admin/ProductsPage";
 import { SchedulesPage } from "../pages/shared/SchedulesPage";
 import { ServicesPage } from "../pages/shared/ServicesPage";
+import { ServiceTabsPage } from "../pages/shared/ServiceTabsPage";
 import type { AppRoute } from "./types";
 
 export const receptionistRoutes: AppRoute[] = [
@@ -42,6 +43,13 @@ export const receptionistRoutes: AppRoute[] = [
     title: "Pagamentos",
     breadcrumbs: ["Financeiro", "Pagamentos"],
     Component: PaymentsPage,
+    requiredPermission: "managePayments",
+  },
+  {
+    path: "/service-tabs",
+    title: "Comandas",
+    breadcrumbs: ["Operacao", "Comandas"],
+    Component: ServiceTabsPage,
     requiredPermission: "managePayments",
   },
   {

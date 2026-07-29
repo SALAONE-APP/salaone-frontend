@@ -60,6 +60,7 @@ interface Props {
   startMinutes: number;
   nowMinutes?: number | null;
   onFreeFitBooking: (professionalId: string, date: Date, startMinutes: number, durationMinutes: number) => void;
+  onStartAttendance: (appointmentId: string) => Promise<void>;
   getAppointmentStartDate: (appointment: Appointment) => Date | null;
 }
 
@@ -78,9 +79,11 @@ export default function AdminAppointmentsCalendar({
   startMinutes,
   nowMinutes,
   onFreeFitBooking,
+  onStartAttendance,
   getAppointmentStartDate,
 }: Props) {
   const [aptModal, setAptModal] = useState<AptModalState | null>(null);
+  const [startingAttendance, setStartingAttendance] = useState(false);
   const statusLegend = [
     APPOINTMENT_CLIENT_STATUS_CONFIG.no_show,
     APPOINTMENT_CLIENT_STATUS_CONFIG.no_plan,
@@ -556,6 +559,23 @@ export default function AdminAppointmentsCalendar({
                     ))}
                   </div>
                 </details>
+                {(appointment.status === 'scheduled' || appointment.status === 'confirmed') && (
+                  <button
+                    className="apt-detail-btn-close"
+                    disabled={startingAttendance}
+                    onClick={async () => {
+                      setStartingAttendance(true);
+                      try {
+                        await onStartAttendance(appointment.id);
+                        setAptModal(null);
+                      } finally {
+                        setStartingAttendance(false);
+                      }
+                    }}
+                  >
+                    {startingAttendance ? 'Iniciando...' : 'Iniciar atendimento'}
+                  </button>
+                )}
                 <button className="apt-detail-btn-close" onClick={() => setAptModal(null)}>Fechar</button>
               </div>
             </div>
