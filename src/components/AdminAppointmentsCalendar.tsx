@@ -337,7 +337,10 @@ export default function AdminAppointmentsCalendar({
                           const eventHeight = Math.max(14, (appointment.duration / minutesPerSlot) * slotHeight);
 
                           const aptDate = getAppointmentStartDate(appointment);
-                          const isAptPast = aptDate ? aptDate < new Date() : false;
+                          const aptEndDate = aptDate
+                            ? new Date(aptDate.getTime() + Number(appointment.duration || 0) * 60_000)
+                            : null;
+                          const isAptPast = aptEndDate ? aptEndDate < new Date() : false;
 
                           const servicesNames = Array.isArray(appointment.services)
                             ? appointment.services.map((s) => (s as any).serviceName || (s as any).name).join(', ')
@@ -365,7 +368,7 @@ export default function AdminAppointmentsCalendar({
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (!isAptPast) setAptModal({ appointment, professional, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
+                                setAptModal({ appointment, professional, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
                               }}
                             >
                               {eventHeight <= 28 ? (
@@ -402,7 +405,10 @@ export default function AdminAppointmentsCalendar({
                           const eventHeight = Math.max(14, (appointment.duration / minutesPerSlot) * slotHeight);
 
                           const aptDate = getAppointmentStartDate(appointment);
-                          const isAptPast = aptDate ? aptDate < new Date() : false;
+                          const aptEndDate = aptDate
+                            ? new Date(aptDate.getTime() + Number(appointment.duration || 0) * 60_000)
+                            : null;
+                          const isAptPast = aptEndDate ? aptEndDate < new Date() : false;
 
                           const servicesNames = Array.isArray(appointment.services)
                             ? appointment.services.map((s) => (s as any).serviceName || (s as any).name).join(', ')
@@ -426,7 +432,7 @@ export default function AdminAppointmentsCalendar({
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (!isAptPast) setAptModal({ appointment, professional, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
+                                setAptModal({ appointment, professional, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
                               }}
                             >
                               {eventHeight <= 28 ? (
