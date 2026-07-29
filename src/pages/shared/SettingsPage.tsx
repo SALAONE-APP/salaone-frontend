@@ -264,7 +264,6 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   const [isSavingPaymentSettings, setIsSavingPaymentSettings] = useState(false);
   const [subscriptionProfessionalRule, setSubscriptionProfessionalRule] = useState<SubscriptionProfessionalRule>('fixed');
   const [hasLoadedProfessionalRule, setHasLoadedProfessionalRule] = useState(false);
-  const [isSavingProfessionalRule, setIsSavingProfessionalRule] = useState(false);
   const salon = useMemo(() => getStoredSalon(), []);
   const canManageSecurityDocuments = user?.role === 'admin' || user?.isAdmin === true;
   const isAdmin = user?.role === 'admin' || user?.isAdmin === true;
@@ -1446,32 +1445,6 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       toast.error(message || 'Erro ao salvar configuracoes de pagamento.');
     } finally {
       setIsSavingPaymentSettings(false);
-    }
-  }
-
-  async function saveProfessionalRuleSettings() {
-    if (isSavingProfessionalRule) return;
-
-    setIsSavingProfessionalRule(true);
-
-    try {
-      const currentSettings = settings ?? await getSettings();
-      const updatedSettings = await updateSettings({
-        pixKey: currentSettings.pixKey ?? '',
-        termsDocumentUrl: currentSettings.termsDocumentUrl ?? '',
-        termsDocumentName: currentSettings.termsDocumentName ?? '',
-        hiddenBookingPaymentMethods: currentSettings.hiddenBookingPaymentMethods ?? [],
-        subscriptionProfessionalRule,
-      });
-
-      setSettings(updatedSettings);
-      window.dispatchEvent(new Event('salon:updated'));
-      toast.success('Regras de profissional salvas com sucesso.');
-    } catch (error) {
-      const message = getApiErrorMessage(error);
-      toast.error(message || 'Erro ao salvar regra de profissional.');
-    } finally {
-      setIsSavingProfessionalRule(false);
     }
   }
 
