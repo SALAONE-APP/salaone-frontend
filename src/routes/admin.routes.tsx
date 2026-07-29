@@ -20,6 +20,7 @@ import { SchedulesPage } from "../pages/shared/SchedulesPage";
 import { ServicesPage } from "../pages/shared/ServicesPage";
 import { ServiceTabsPage } from "../pages/shared/ServiceTabsPage";
 import { StockPage } from "../pages/admin/StockPage";
+import { ServiceTabHistoryPage } from "../pages/admin/ServiceTabHistoryPage";
 import { UsersPage } from "../pages/shared/UsersPage";
 import type { AppRoute } from "./types";
 
@@ -71,6 +72,12 @@ export const adminRoutes: AppRoute[] = [
     title: "Comandas",
     breadcrumbs: ["Operacao", "Comandas"],
     Component: ServiceTabsPage,
+  },
+  {
+    path: "/service-tab-history",
+    title: "Histórico de comandas",
+    breadcrumbs: ["Operação", "Histórico de comandas"],
+    Component: ServiceTabHistoryPage,
   },
   {
     path: "/cash-closing",
