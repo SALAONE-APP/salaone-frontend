@@ -20,7 +20,6 @@ import {
   RotateCcw,
   Scissors,
   Search,
-  ShieldCheck,
   Trash2,
   Upload,
   X,
@@ -71,18 +70,10 @@ import {
   updateService,
   type Service,
 } from "@/service/serviceService";
-import { getMyActiveSubscription, type Subscription } from "@/service/subscriptionService";
 import { uploadImage } from "@/service/uploadService";
 import { getSettings, type SubscriptionProfessionalRule } from "@/service/settingsService";
 
-const normalizeText = (value: string) => {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-};
-
-type ServiceFilter = "all" | "active" | "inactive" | "covered";
+type ServiceFilter = "all" | "active" | "inactive";
 
 interface ServiceFormState {
   name: string;
@@ -190,78 +181,43 @@ export function ServicesPage() {
 
   const isFreeChoice = subscriptionProfessionalRule === "free_choice" && user?.role !== "client";
 
-  const [mySubscription, setMySubscription] = useState<Subscription | null>(null);
-
-  const isServiceCovered = useCallback(
-    (service: Service) => {
-      if (
-        user?.role === "client" &&
-        mySubscription &&
-        (mySubscription.status === "active" || mySubscription.status === "paused")
-      ) {
-        if (mySubscription.plan?.features) {
-          const normService = normalizeText(service.name || "");
-          const isFeatured = mySubscription.plan.features.some((f: string) => {
-            const normFeature = normalizeText(f);
-            return (
-              normFeature === normService ||
-              normFeature.includes(normService) ||
-              normService.includes(normFeature)
-            );
-          });
-          if (isFeatured) return true;
-        }
-      }
-      return service.covered_by_plan === true;
-    },
-    [user?.role, mySubscription],
-  );
-
   const filteredServices = useMemo(() => {
     return services.filter((service) => {
       if (filter === "active" && !service.active) return false;
       if (filter === "inactive" && service.active) return false;
-      if (filter === "covered" && !isServiceCovered(service)) return false;
       return true;
     });
-  }, [filter, services, isServiceCovered]);
+  }, [filter, services]);
 
 
 
   const stats = useMemo(() => {
     const active = services.filter((service) => service.active).length;
     const inactive = services.filter((service) => !service.active).length;
-    const covered = services.filter((service) => isServiceCovered(service)).length;
-
     return {
       total: services.length,
       active,
       inactive,
-      covered,
     };
-  }, [services, isServiceCovered]);
+  }, [services]);
 
   const loadServices = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const [result, sub] = await Promise.all([
-        listServices({
-          q: search.trim() || undefined,
-          includeInactive: isAdmin ? true : undefined,
-          limit: 100,
-        }),
-        user?.role === "client" ? getMyActiveSubscription().catch(() => null) : Promise.resolve(null),
-      ]);
+      const result = await listServices({
+        q: search.trim() || undefined,
+        includeInactive: isAdmin ? true : undefined,
+        limit: 100,
+      });
       setServices(result.items);
-      setMySubscription(sub);
     } catch (err) {
       setError(getApiMessage(err));
     } finally {
       setLoading(false);
     }
-  }, [isAdmin, search, user?.role]);
+  }, [isAdmin, search]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -422,7 +378,7 @@ export function ServicesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="mb-1 text-sm text-muted-foreground">Serviços cadastrados</p>
           <h3 className="text-2xl font-semibold text-foreground">{stats.total}</h3>
@@ -430,10 +386,6 @@ export function ServicesPage() {
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="mb-1 text-sm text-muted-foreground">Ativos</p>
           <h3 className="text-2xl font-semibold text-foreground">{stats.active}</h3>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-5">
-          <p className="mb-1 text-sm text-muted-foreground">Cobertos pelo plano</p>
-          <h3 className="text-2xl font-semibold text-foreground">{stats.covered}</h3>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="mb-1 text-sm text-muted-foreground">Inativos</p>
@@ -474,7 +426,6 @@ export function ServicesPage() {
                   {canManage ? (
                     <DropdownMenuRadioItem value="inactive">Inativos</DropdownMenuRadioItem>
                   ) : null}
-                  <DropdownMenuRadioItem value="covered">Cobertos pelo plano</DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -515,9 +466,6 @@ export function ServicesPage() {
                     </th>
                   ) : null}
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Plano
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Status
                   </th>
                   {canManage ? <th className="w-10 px-4 py-3" /> : null}
@@ -527,7 +475,7 @@ export function ServicesPage() {
                 {loading ? (
                   <tr>
                     <td
-                      colSpan={(isAdmin ? 8 : canManage ? 7 : 6) - (isFreeChoice ? 0 : 1)}
+                      colSpan={4 + (isFreeChoice ? 1 : 0) + (isAdmin ? 1 : 0) + (canManage ? 1 : 0)}
                       className="p-8 text-center text-sm text-muted-foreground"
                     >
                       <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
@@ -537,7 +485,7 @@ export function ServicesPage() {
                 ) : filteredServices.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={(isAdmin ? 8 : canManage ? 7 : 6) - (isFreeChoice ? 0 : 1)}
+                      colSpan={4 + (isFreeChoice ? 1 : 0) + (isAdmin ? 1 : 0) + (canManage ? 1 : 0)}
                       className="p-8 text-center text-sm text-muted-foreground"
                     >
                       Nenhum serviço encontrado.
@@ -597,19 +545,6 @@ export function ServicesPage() {
                             {commission == null ? "-" : `${commission}%`}
                           </td>
                         ) : null}
-                        <td className="px-4 py-3">
-                          {isServiceCovered(service) ? (
-                            <Badge
-                              variant="outline"
-                              className="gap-1 border-primary/20 bg-primary/10 text-primary"
-                            >
-                              <ShieldCheck size={12} />
-                              Incluso
-                            </Badge>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">Avulso</span>
-                          )}
-                        </td>
                         <td className="px-4 py-3">
                           <Badge
                             variant="outline"
