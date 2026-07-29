@@ -27,8 +27,8 @@ export const clientRoutes: AppRoute[] = [
   },
   {
     path: "/services",
-    title: "Servicos",
-    breadcrumbs: ["Cliente", "Servicos"],
+    title: "Serviços",
+    breadcrumbs: ["Cliente", "Serviços"],
     Component: ServicesPage,
   },
   {

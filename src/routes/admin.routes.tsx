@@ -96,8 +96,8 @@ export const adminRoutes: AppRoute[] = [
   },
   {
     path: "/services",
-    title: "Servicos",
-    breadcrumbs: ["Gerenciar", "Servicos"],
+    title: "Serviços",
+    breadcrumbs: ["Gerenciar", "Serviços"],
     Component: ServicesPage,
   },
   {

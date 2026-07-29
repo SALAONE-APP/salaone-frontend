@@ -21,7 +21,6 @@ import {
   Scissors,
   Search,
   ShieldCheck,
-  Tag,
   Trash2,
   Upload,
   X,
@@ -94,7 +93,6 @@ interface ServiceFormState {
   promotionalPrice: string;
   imageUrl: string;
   imagePublicId: string | null;
-  coveredByPlan: boolean;
   active: boolean;
 }
 
@@ -107,7 +105,6 @@ const emptyForm: ServiceFormState = {
   promotionalPrice: "0",
   imageUrl: "",
   imagePublicId: null,
-  coveredByPlan: false,
   active: true,
 };
 
@@ -161,7 +158,6 @@ function serviceToForm(service: Service): ServiceFormState {
     promotionalPrice: String(service.promotionalPrice ?? 0),
     imageUrl: service.imageUrl ?? "",
     imagePublicId: service.imagePublicId ?? service.image_public_id ?? null,
-    coveredByPlan: service.covered_by_plan === true,
     active: service.active !== false,
   };
 }
@@ -309,7 +305,7 @@ export function ServicesPage() {
     try {
       const image = await uploadImage(file, "services");
       setForm((current) => ({ ...current, imageUrl: image.secure_url, imagePublicId: image.public_id }));
-      toast.success("Imagem do servico enviada.");
+      toast.success("Imagem do serviço enviada.");
     } catch (err) {
       toast.error(getApiMessage(err));
     } finally {
@@ -332,13 +328,13 @@ export function ServicesPage() {
       : null;
     const promotionalPrice = parseCurrencyInput(form.promotionalPrice || "0");
 
-    if (!form.name.trim()) return "Informe o nome do servico.";
+    if (!form.name.trim()) return "Informe o nome do serviço.";
     if (!Number.isFinite(basePrice) || basePrice <= 0) return "Informe um preco maior que zero.";
     if (!Number.isInteger(durationMinutes) || durationMinutes < 1) {
       return "Informe uma duracao valida.";
     }
     if (!Number.isInteger(servicePoints) || servicePoints < 1) {
-      return "Informe uma pontuacao valida para o servico.";
+      return "Informe uma pontuação válida para o serviço.";
     }
     if (
       commissionPercent !== null &&
@@ -373,7 +369,6 @@ export function ServicesPage() {
       servicePoints: Number(form.servicePoints),
       commissionPercent,
       promotionalPrice: parseCurrencyInput(form.promotionalPrice || "0"),
-      covered_by_plan: form.coveredByPlan,
       imageUrl: form.imageUrl || null,
       imagePublicId: form.imagePublicId,
       active: form.active,
@@ -384,10 +379,10 @@ export function ServicesPage() {
     try {
       if (editingService) {
         await updateService(editingService.id, payload);
-        toast.success("Servico atualizado.");
+        toast.success("Serviço atualizado.");
       } else {
         await createService(payload);
-        toast.success("Servico cadastrado.");
+        toast.success("Serviço cadastrado.");
       }
 
       setDialogOpen(false);
@@ -404,7 +399,7 @@ export function ServicesPage() {
 
     try {
       await deleteService(serviceToDeactivate.id);
-      toast.success("Servico desativado.");
+      toast.success("Serviço desativado.");
       setServiceToDeactivate(null);
       await loadServices();
     } catch (err) {
@@ -417,7 +412,7 @@ export function ServicesPage() {
 
     try {
       await reactivateService(serviceToReactivate.id);
-      toast.success("Servico reativado.");
+      toast.success("Serviço reativado.");
       setServiceToReactivate(null);
       await loadServices();
     } catch (err) {
@@ -429,7 +424,7 @@ export function ServicesPage() {
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <div className="rounded-xl border border-border bg-card p-5">
-          <p className="mb-1 text-sm text-muted-foreground">Servicos cadastrados</p>
+          <p className="mb-1 text-sm text-muted-foreground">Serviços cadastrados</p>
           <h3 className="text-2xl font-semibold text-foreground">{stats.total}</h3>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
@@ -448,7 +443,7 @@ export function ServicesPage() {
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
-          <h3 className="text-base font-medium text-foreground">Servicos</h3>
+          <h3 className="text-base font-medium text-foreground">Serviços</h3>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative">
               <Search
@@ -458,7 +453,7 @@ export function ServicesPage() {
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar servicos..."
+                placeholder="Buscar serviços..."
                 className="h-9 w-full bg-secondary pl-9 text-sm sm:w-60"
               />
             </div>
@@ -486,7 +481,7 @@ export function ServicesPage() {
             {canManage ? (
               <Button size="sm" className="gap-2" onClick={openCreateDialog}>
                 <Plus size={14} />
-                Adicionar Servico
+                Adicionar Serviço
               </Button>
             ) : null}
           </div>
@@ -501,7 +496,7 @@ export function ServicesPage() {
                 <tr className="border-b border-border">
 
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Servico
+                    Serviço
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Duracao
@@ -536,7 +531,7 @@ export function ServicesPage() {
                       className="p-8 text-center text-sm text-muted-foreground"
                     >
                       <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
-                      Carregando servicos...
+                      Carregando serviços...
                     </td>
                   </tr>
                 ) : filteredServices.length === 0 ? (
@@ -545,7 +540,7 @@ export function ServicesPage() {
                       colSpan={(isAdmin ? 8 : canManage ? 7 : 6) - (isFreeChoice ? 0 : 1)}
                       className="p-8 text-center text-sm text-muted-foreground"
                     >
-                      Nenhum servico encontrado.
+                      Nenhum serviço encontrado.
                     </td>
                   </tr>
                 ) : (
@@ -677,10 +672,10 @@ export function ServicesPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <DialogHeader>
               <DialogTitle>
-                {editingService ? "Editar Servico" : "Adicionar Servico"}
+                {editingService ? "Editar Serviço" : "Adicionar Serviço"}
               </DialogTitle>
               <DialogDescription>
-                Configure preco, duracao, comissao e exibicao do servico.
+                Configure preço, duração, comissão e exibição do serviço.
               </DialogDescription>
             </DialogHeader>
 
@@ -730,7 +725,7 @@ export function ServicesPage() {
               </div>
               {isFreeChoice && (
                 <div className="space-y-2">
-                  <Label htmlFor="service-points">Pontos do servico</Label>
+                  <Label htmlFor="service-points">Pontos do serviço</Label>
                   <Input
                     id="service-points"
                     type="number"
@@ -756,7 +751,7 @@ export function ServicesPage() {
                 />
               </div>
               <div className="space-y-3 md:col-span-2">
-                <Label htmlFor="service-image-file">Imagem do servico</Label>
+                <Label htmlFor="service-image-file">Imagem do serviço</Label>
                 <input
                   ref={imageInputRef}
                   id="service-image-file"
@@ -770,7 +765,7 @@ export function ServicesPage() {
                     {form.imageUrl ? (
                       <img
                         src={form.imageUrl}
-                        alt="Imagem do servico"
+                        alt="Imagem do serviço"
                         className="h-full w-full object-cover"
                       />
                     ) : (
@@ -809,18 +804,10 @@ export function ServicesPage() {
               </div>
               <label className="flex items-center gap-2 rounded-md border border-border p-3 text-sm">
                 <Checkbox
-                  checked={form.coveredByPlan}
-                  onCheckedChange={(checked) => setField("coveredByPlan", checked === true)}
-                />
-                <Tag className="h-4 w-4 text-muted-foreground" />
-                Coberto pelo plano
-              </label>
-              <label className="flex items-center gap-2 rounded-md border border-border p-3 text-sm">
-                <Checkbox
                   checked={form.active}
                   onCheckedChange={(checked) => setField("active", checked === true)}
                 />
-                Servico ativo
+                Serviço ativo
               </label>
             </div>
 
@@ -861,9 +848,9 @@ export function ServicesPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Desativar servico?</AlertDialogTitle>
+            <AlertDialogTitle>Desativar serviço?</AlertDialogTitle>
             <AlertDialogDescription>
-              O servico {serviceToDeactivate?.name} ficara inativo, mas o historico sera
+              O serviço {serviceToDeactivate?.name} ficará inativo, mas o histórico será
               mantido.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -888,9 +875,9 @@ export function ServicesPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reativar servico?</AlertDialogTitle>
+            <AlertDialogTitle>Reativar serviço?</AlertDialogTitle>
             <AlertDialogDescription>
-              O servico {serviceToReactivate?.name} voltara a aparecer como ativo.
+              O serviço {serviceToReactivate?.name} voltará a aparecer como ativo.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
