@@ -305,7 +305,7 @@
 
 .calendar-appointment-card.past-appointment {
   opacity: 0.4;
-  cursor: default;
+  cursor: pointer;
   filter: grayscale(0.3);
 }
 
