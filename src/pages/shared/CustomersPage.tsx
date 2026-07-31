@@ -30,6 +30,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 
 import { AppCalendar } from "@/components/AppCalendar";
 import {
@@ -69,7 +70,9 @@ import {
 } from "@/service/subscriptionService";
 import type { Plan } from "@/service/planService";
 import type { BookingPaymentMethod } from "@/service/settingsService";
+import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
 import { downloadClientImportTemplate, downloadCsvReport, downloadPdfReport, type ReportColumn } from "@/utils/reportExport";
+import { hasWhatsAppPhone, openWhatsApp } from "@/utils/whatsapp";
 
 type CustomerStatus = "active" | "inactive" | "new";
 type CustomerFilter = "all" | CustomerStatus | "missing-phone";
@@ -91,6 +94,17 @@ const emptyForm: CustomerFormState = {
   birthDate: "",
   password: "",
 };
+
+function birthdayWhatsAppMessage(customerName: string, salonName: string) {
+  const firstName = customerName.trim().split(/\s+/)[0] || customerName;
+  return [
+    `Olá, ${firstName}!`,
+    "",
+    `A equipe do ${salonName} deseja a você um feliz aniversário, cheio de alegria e momentos especiais!`,
+    "",
+    "Parabéns!",
+  ].join("\n");
+}
 
 function onlyDigits(value: string) {
   return value.replace(/\D/g, "");
@@ -395,6 +409,7 @@ export function CustomersPage() {
   const [subForm, setSubForm] = useState({ planId: "", paymentMethod: "credito", amount: "" });
   const [hiddenPaymentMethods] = useState<BookingPaymentMethod[]>([]);
   const [savingSub, setSavingSub] = useState(false);
+  const [salonProfile, setSalonProfile] = useState<SalonProfile | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [importRows, setImportRows] = useState<ClientImportRow[]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
@@ -404,6 +419,21 @@ export function CustomersPage() {
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const limit = 20;
+
+  useEffect(() => {
+    getSalonProfile().then(setSalonProfile).catch(() => setSalonProfile(null));
+  }, []);
+
+  function sendBirthdayWhatsApp(customer: UserProfile) {
+    if (!hasWhatsAppPhone(customer.phone)) {
+      toast.error(`${customer.name} não possui um WhatsApp válido cadastrado.`);
+      return;
+    }
+    openWhatsApp(
+      customer.phone,
+      birthdayWhatsAppMessage(customer.name, salonProfile?.name || "nosso salão"),
+    );
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1052,9 +1082,13 @@ export function CustomersPage() {
                             <DropdownMenuContent align="end">
                               {isBirthdayToday(customer.birthDate ?? customer.birth_date) && (
                                 <>
-                                  <DropdownMenuItem className="text-pink-600 focus:text-pink-600" disabled>
-                                    <Cake size={14} />
-                                    Aniversário hoje!
+                                  <DropdownMenuItem
+                                    className="text-emerald-600 focus:text-emerald-600"
+                                    disabled={!hasWhatsAppPhone(customer.phone)}
+                                    onClick={() => sendBirthdayWhatsApp(customer)}
+                                  >
+                                    <WhatsAppIcon size={14} />
+                                    Enviar parabéns no WhatsApp
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                 </>
