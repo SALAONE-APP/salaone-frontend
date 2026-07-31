@@ -28,6 +28,7 @@ const sections: SidebarSection[] = [
         label: "Financeiro",
         children: [
           { icon: CreditCard, label: "Pagamentos", href: "/payments", requiredPermission: "managePayments" },
+          { icon: ReceiptText, label: "Pedidos de produtos", href: "/product-orders", requiredPermission: "managePayments" },
           { icon: CircleDollarSign, label: "Fechamento de caixa", href: "/cash-closing", requiredPermission: "managePayments" },
         ],
       },
