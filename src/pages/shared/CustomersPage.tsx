@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   Calendar,
   Cake,
@@ -13,6 +13,7 @@ import {
   Plus,
   Search,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -61,14 +62,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 
 import type { UserProfile } from "@/service/userService";
-import { createAdminClient, deleteAdminClient, listAdminClients, resetAdminClientPassword, updateAdminClient } from "@/service/adminClientService";
+import { createAdminClient, deleteAdminClient, importAdminClients, listAdminClients, resetAdminClientPassword, updateAdminClient, type ClientImportRow } from "@/service/adminClientService";
 import {
   createSubscription,
   type Subscription,
 } from "@/service/subscriptionService";
 import type { Plan } from "@/service/planService";
 import type { BookingPaymentMethod } from "@/service/settingsService";
-import { downloadCsvReport, downloadPdfReport, type ReportColumn } from "@/utils/reportExport";
+import { downloadClientImportTemplate, downloadCsvReport, downloadPdfReport, type ReportColumn } from "@/utils/reportExport";
 
 type CustomerStatus = "active" | "inactive" | "new";
 type CustomerFilter = "all" | CustomerStatus | "missing-phone";
@@ -309,6 +310,64 @@ function getApiMessage(error: unknown) {
   return "Nao foi possivel concluir a operacao.";
 }
 
+function parseCsvLine(line: string, delimiter: string) {
+  const values: string[] = [];
+  let value = "";
+  let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (character === '"' && quoted && line[index + 1] === '"') {
+      value += '"';
+      index += 1;
+    } else if (character === '"') {
+      quoted = !quoted;
+    } else if (character === delimiter && !quoted) {
+      values.push(value.trim());
+      value = "";
+    } else {
+      value += character;
+    }
+  }
+  values.push(value.trim());
+  return values;
+}
+
+function parseClientCsv(content: string) {
+  const lines = content.replace(/^\uFEFF/, "").split(/\r?\n/).filter((line) => line.trim());
+  if (lines.length < 2) throw new Error("O arquivo CSV não possui contatos para importar.");
+  const delimiter = lines[0].split(";").length >= lines[0].split(",").length ? ";" : ",";
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const headers = parseCsvLine(lines[0], delimiter).map(normalize);
+  const column = (...names: string[]) => headers.findIndex((header) => names.includes(header));
+  const indexes = {
+    name: column("nome", "name"),
+    phone: column("telefone", "phone", "celular", "whatsapp"),
+    email: column("email", "e-mail"),
+    cpf: column("cpf"),
+    birthDate: column("data_nascimento", "data de nascimento", "nascimento", "birthdate"),
+  };
+  if (indexes.name < 0 || indexes.phone < 0) throw new Error("O CSV deve possuir as colunas nome e telefone.");
+
+  const rows: ClientImportRow[] = [];
+  const errors: string[] = [];
+  lines.slice(1).forEach((line, rowIndex) => {
+    const values = parseCsvLine(line, delimiter);
+    const name = values[indexes.name]?.trim() ?? "";
+    const phone = onlyDigits(values[indexes.phone] ?? "");
+    const cpf = indexes.cpf >= 0 ? onlyDigits(values[indexes.cpf] ?? "") : "";
+    const email = indexes.email >= 0 ? values[indexes.email]?.trim() : "";
+    let birthDate = indexes.birthDate >= 0 ? values[indexes.birthDate]?.trim() : "";
+    const brDate = birthDate?.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (brDate) birthDate = `${brDate[3]}-${brDate[2]}-${brDate[1]}`;
+    if (name.length < 2 || phone.length < 8 || (cpf && cpf.length !== 11)) {
+      errors.push(`Linha ${rowIndex + 2}: verifique nome, telefone e CPF.`);
+      return;
+    }
+    rows.push({ name, phone, email: email || null, cpf: cpf || null, birthDate: birthDate || null });
+  });
+  return { rows, errors };
+}
+
 export function CustomersPage() {
   const { user } = useAuth();
   const { can, isAdmin } = usePermissions();
@@ -336,6 +395,13 @@ export function CustomersPage() {
   const [subForm, setSubForm] = useState({ planId: "", paymentMethod: "credito", amount: "" });
   const [hiddenPaymentMethods] = useState<BookingPaymentMethod[]>([]);
   const [savingSub, setSavingSub] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [importRows, setImportRows] = useState<ClientImportRow[]>([]);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const limit = 20;
 
@@ -371,7 +437,7 @@ export function CustomersPage() {
       controller.abort();
       window.clearTimeout(timeout);
     };
-  }, [page, search]);
+  }, [page, search, refreshKey]);
 
   async function handleCreateSubscription(e: FormEvent) {
     e.preventDefault();
@@ -495,13 +561,68 @@ export function CustomersPage() {
     );
   }
 
-  function handleExportCsv() {
-    if (!ensureReportRows()) return;
-    downloadCsvReport(
-      `clientes-${reportTimestamp()}.csv`,
-      reportColumns,
-      filteredCustomers,
-    );
+  async function handleExportCsv() {
+    setExporting(true);
+    try {
+      const result = await listAdminClients({ limit: 100000 });
+      if (!result.items.length) {
+        toast.error("Não há clientes para exportar.");
+        return;
+      }
+      const columns: ReportColumn<UserProfile>[] = [
+        { header: "nome", getValue: (client) => client.name },
+        { header: "telefone", getValue: (client) => client.phone ?? "" },
+        { header: "email", getValue: (client) => client.email ?? "" },
+        { header: "cpf", getValue: (client) => onlyDigits(client.cpf ?? "") },
+        { header: "data_nascimento", getValue: (client) => String(client.birthDate ?? client.birth_date ?? "").slice(0, 10) },
+        { header: "status", getValue: (client) => getCustomerStatus(client) === "inactive" ? "inativo" : "ativo" },
+      ];
+      downloadCsvReport(`contatos-clientes-${reportTimestamp()}.csv`, columns, result.items);
+      toast.success(`${result.items.length} contato(s) exportado(s).`);
+    } catch (error) {
+      toast.error(getApiMessage(error));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      toast.error("Selecione um arquivo no formato CSV.");
+      return;
+    }
+    try {
+      const parsed = parseClientCsv(await file.text());
+      setImportRows(parsed.rows);
+      setImportErrors(parsed.errors);
+      setImportDialogOpen(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível ler o CSV.");
+    }
+  }
+
+  async function confirmImport() {
+    if (!importRows.length) return;
+    setImporting(true);
+    try {
+      const result = await importAdminClients(importRows);
+      const failureMessages = result.failures.map((failure) => `Linha ${failure.row} (${failure.name}): ${failure.message}`);
+      setImportErrors((current) => [...current, ...failureMessages]);
+      if (result.imported) {
+        toast.success(`${result.imported} contato(s) importado(s) ou atualizado(s).`);
+        setRefreshKey((value) => value + 1);
+      }
+      if (!result.failures.length) {
+        setImportDialogOpen(false);
+        setImportRows([]);
+        setImportErrors([]);
+      }
+    } finally {
+      setImporting(false);
+    }
   }
 
 
@@ -713,15 +834,22 @@ export function CustomersPage() {
               <Download size={14} />
               PDF
             </Button>
-            <Button variant="outline" size="sm" className="gap-2" onClick={handleExportCsv}>
-              <Download size={14} />
-              CSV
+            <Button variant="outline" size="sm" className="gap-2" disabled={exporting} onClick={() => void handleExportCsv()}>
+              {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              Exportar contatos
             </Button>
             {canEdit && (
-              <Button size="sm" className="gap-2" onClick={openCreateDialog}>
-                <Plus size={14} />
-                Adicionar Cliente
-              </Button>
+              <>
+                <input ref={importInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => void handleImportFile(event)} />
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => importInputRef.current?.click()}>
+                  <Upload size={14} />
+                  Importar contatos
+                </Button>
+                <Button size="sm" className="gap-2" onClick={openCreateDialog}>
+                  <Plus size={14} />
+                  Adicionar Cliente
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -1161,7 +1289,7 @@ export function CustomersPage() {
                 <Label>Forma de pagamento</Label>
                 <Select
                   value={subForm.paymentMethod}
-                  onValueChange={(val: any) => setSubForm(f => ({ ...f, paymentMethod: val }))}
+                  onValueChange={(val: string) => setSubForm(f => ({ ...f, paymentMethod: val }))}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -1275,6 +1403,35 @@ export function CustomersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={importDialogOpen} onOpenChange={(open) => { if (!importing) setImportDialogOpen(open); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Importar contatos</DialogTitle>
+            <DialogDescription>
+              Foram encontrados {importRows.length} contato(s) válido(s). Contatos com o mesmo telefone serão atualizados.
+            </DialogDescription>
+          </DialogHeader>
+          {importErrors.length > 0 && (
+            <div className="max-h-40 overflow-y-auto rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+              <p className="mb-2 font-medium">Linhas que precisam de atenção:</p>
+              <ul className="list-disc space-y-1 pl-5">
+                {importErrors.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
+              </ul>
+            </div>
+          )}
+          <button type="button" className="w-fit text-sm text-primary underline underline-offset-4" onClick={downloadClientImportTemplate}>
+            Baixar modelo de CSV
+          </button>
+          <DialogFooter>
+            <Button variant="outline" disabled={importing} onClick={() => setImportDialogOpen(false)}>Cancelar</Button>
+            <Button disabled={importing || importRows.length === 0} onClick={() => void confirmImport()}>
+              {importing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Importar {importRows.length} contato(s)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

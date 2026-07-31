@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Clock3, Loader2, PackageCheck, ReceiptText } from "lucide-react";
+import { Ban, CheckCircle2, Clock3, Loader2, PackageCheck, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { listSalonProductOrders, type SalonProductOrder } from "@/service/productService";
-import { updatePayment, type PaymentMethod } from "@/service/paymentService";
+import { cancelPayment, updatePayment, type PaymentMethod } from "@/service/paymentService";
 
 function currency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -23,6 +23,7 @@ export function ProductOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<SalonProductOrder | null>(null);
+  const [cancelOrder, setCancelOrder] = useState<SalonProductOrder | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<Extract<PaymentMethod, "dinheiro" | "pix" | "debito" | "credito">>("dinheiro");
 
   const load = useCallback(async () => {
@@ -58,6 +59,22 @@ export function ProductOrdersPage() {
     }
   }
 
+  async function cancelPurchase() {
+    const order = cancelOrder;
+    if (!order?.payment) return;
+    setUpdatingId(order.orderId);
+    try {
+      await cancelPayment(order.payment.id);
+      toast.success("Compra cancelada.");
+      setCancelOrder(null);
+      await load();
+    } catch (error) {
+      toast.error(message(error));
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border bg-card p-6">
@@ -78,14 +95,15 @@ export function ProductOrdersPage() {
         <div className="space-y-4">
           {orders.map((order) => {
             const paid = order.payment?.status === "paid" || order.payment?.status === "approved";
+            const cancelled = order.payment?.status === "failed" || order.payment?.status === "cancelled";
             return (
               <article key={order.orderId} className="rounded-xl border bg-card">
                 <div className="flex flex-col gap-4 border-b p-5 md:flex-row md:items-center md:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-semibold">Pedido #{order.orderId.slice(0, 8).toUpperCase()}</h3>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${paid ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-700"}`}>
-                        {paid ? "Pago" : "Pendente"}
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${paid ? "bg-emerald-500/10 text-emerald-600" : cancelled ? "bg-red-500/10 text-red-600" : "bg-amber-500/10 text-amber-700"}`}>
+                        {paid ? "Pago" : cancelled ? "Cancelado" : "Pendente"}
                       </span>
                     </div>
                     <p className="mt-1 text-sm">{order.client?.name || "Cliente"}</p>
@@ -93,17 +111,27 @@ export function ProductOrdersPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <strong className="text-xl">{currency(order.total)}</strong>
-                    {!paid && order.payment && (
-                      <Button
-                        disabled={updatingId === order.orderId}
-                        onClick={() => {
-                          setPaymentMethod("dinheiro");
-                          setPaymentOrder(order);
-                        }}
-                      >
-                        {updatingId === order.orderId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                        Confirmar pagamento
-                      </Button>
+                    {!paid && !cancelled && order.payment && (
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          disabled={updatingId === order.orderId}
+                          onClick={() => {
+                            setPaymentMethod("dinheiro");
+                            setPaymentOrder(order);
+                          }}
+                        >
+                          {updatingId === order.orderId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                          Confirmar pagamento
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          disabled={updatingId === order.orderId}
+                          onClick={() => setCancelOrder(order)}
+                        >
+                          <Ban className="mr-2 h-4 w-4" />
+                          Cancelar compra
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -152,6 +180,28 @@ export function ProductOrdersPage() {
             <Button disabled={Boolean(updatingId)} onClick={() => void markAsPaid()}>
               {updatingId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Confirmar recebimento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(cancelOrder)} onOpenChange={(open) => { if (!open && !updatingId) setCancelOrder(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancelar compra</DialogTitle>
+            <DialogDescription>
+              Confirma o cancelamento do pedido #{cancelOrder?.orderId.slice(0, 8).toUpperCase()} de {cancelOrder?.client?.name || "Cliente"}? Essa ação não poderá ser desfeita nesta tela.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border bg-secondary/30 p-4">
+            <p className="text-sm text-muted-foreground">Valor da compra</p>
+            <strong className="text-2xl">{currency(cancelOrder?.total ?? 0)}</strong>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={Boolean(updatingId)} onClick={() => setCancelOrder(null)}>Voltar</Button>
+            <Button variant="destructive" disabled={Boolean(updatingId)} onClick={() => void cancelPurchase()}>
+              {updatingId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Cancelar compra
             </Button>
           </DialogFooter>
         </DialogContent>

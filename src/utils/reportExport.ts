@@ -20,6 +20,11 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+export function downloadClientImportTemplate() {
+  const csv = "nome;telefone;email;cpf;data_nascimento\nMaria Silva;(11) 99999-9999;maria@exemplo.com;12345678901;1990-05-20\n";
+  downloadBlob(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }), "modelo-importacao-clientes.csv");
+}
+
 function sanitizePdfText(value: unknown) {
   return String(value ?? "")
     .normalize("NFD")
@@ -89,7 +94,7 @@ export function downloadCsvReport<TRow>(
     .map((line) => line.map(escapeCsv).join(";"))
     .join("\n");
 
-  downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), filename);
+  downloadBlob(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }), filename);
 }
 
 async function createPdfReportBlob<TRow>(params: {

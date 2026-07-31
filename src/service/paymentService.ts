@@ -167,6 +167,11 @@ export async function updatePayment(
   return response.data;
 }
 
+export async function cancelPayment(paymentId: string) {
+  const response = await api.patch<PaymentRecord>(`/payments/${paymentId}/cancel`);
+  return response.data;
+}
+
 /* ═══════ Extra Payments ═══════ */
 
 export interface ExtraPaymentRecord extends PaymentRecord {

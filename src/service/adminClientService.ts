@@ -58,3 +58,39 @@ export async function resetAdminClientPassword(id: string, newPassword: string) 
   });
   return response.data;
 }
+
+export interface ClientImportRow {
+  name: string;
+  phone: string;
+  email?: string | null;
+  cpf?: string | null;
+  birthDate?: string | null;
+}
+
+export interface ClientImportFailure {
+  row: number;
+  name: string;
+  message: string;
+}
+
+export async function importAdminClients(rows: ClientImportRow[]) {
+  const failures: ClientImportFailure[] = [];
+  let imported = 0;
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    try {
+      await createAdminClient(row);
+      imported += 1;
+    } catch (error) {
+      const value = (error as { response?: { data?: { message?: unknown } } })?.response?.data?.message;
+      failures.push({
+        row: index + 2,
+        name: row.name,
+        message: typeof value === "string" ? value : "Não foi possível importar este contato.",
+      });
+    }
+  }
+
+  return { imported, failures };
+}
