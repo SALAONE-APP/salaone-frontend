@@ -173,6 +173,7 @@ function getCashPaymentDescription(payment: CashClosingPayment) {
     return description ? `Saida: ${label} - ${description}` : `Saida: ${label}`;
   }
   if (payment.type === "subscription") return payment.subscriptionPlanName || "Assinatura";
+  if (payment.type === "service_tab") return payment.description || "PAGAMENTO DE COMANDA";
   if (payment.type === "product_order") return payment.description || "Pedido de produtos";
   if (payment.type === "extra") return "Pagamento extra";
   return "Agendamento";
@@ -231,6 +232,7 @@ function getCashPaymentClientLabel(payment: CashClosingPayment) {
 function getCashPaymentTypeLabel(payment: CashClosingPayment) {
   if (payment.type === "cash_out") return "Saida";
   if (payment.type === "subscription") return "Assinatura";
+  if (payment.type === "service_tab") return "Comanda";
   if (payment.type === "product_order") return "Pedido de produto";
   if (payment.type === "extra") return "Extra";
   return "Agendamento";
@@ -244,6 +246,7 @@ function getCashPaymentCategoryLabel(payment: CashClosingPayment) {
 function getCashPaymentDetailLabel(payment: CashClosingPayment) {
   if (payment.type === "cash_out") return getValidCashOutDescription(payment) || "-";
   if (payment.type === "subscription") return payment.subscriptionPlanName || "Assinatura";
+  if (payment.type === "service_tab") return payment.description || "PAGAMENTO DE COMANDA";
   if (payment.type === "product_order") return payment.description || "Pedido de produtos";
   if (payment.type === "extra") return payment.description || "Pagamento extra";
   return payment.appointmentStartAt ? `Agendamento em ${formatReportDateTime(payment.appointmentStartAt)}` : "Agendamento";
