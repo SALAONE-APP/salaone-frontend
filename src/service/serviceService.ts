@@ -3,7 +3,6 @@ import api from "./api";
 export interface Service {
   id: string;
   name: string;
-  description?: string | null;
   basePrice: number;
   durationMinutes: number;
   servicePoints?: number;
@@ -39,7 +38,6 @@ export interface ListServicesResponse {
 
 export interface ServicePayload {
   name: string;
-  description?: string | null;
   basePrice: number;
   durationMinutes: number;
   servicePoints?: number;
@@ -54,7 +52,6 @@ export interface ServicePayload {
 interface BackendService {
   id: string;
   name: string;
-  description?: string | null;
   price?: number | string;
   basePrice?: number;
   duration_minutes?: number;
@@ -79,7 +76,6 @@ function normalizeService(service: BackendService): Service {
   return {
     id: service.id,
     name: service.name,
-    description: service.description ?? null,
     basePrice: Number(service.basePrice ?? service.price ?? 0),
     durationMinutes: Number(service.durationMinutes ?? service.duration_minutes ?? 0),
     commissionPercent:
@@ -122,7 +118,7 @@ export async function listServices(params: ListServicesParams = {}) {
 
 export async function createService(data: ServicePayload) {
   const response = await api.post<{ service: BackendService }>("/services", {
-    name: data.name, description: data.description, price: data.basePrice, durationMinutes: data.durationMinutes,
+    name: data.name, price: data.basePrice, durationMinutes: data.durationMinutes,
     servicePoints: data.servicePoints, commissionType: "percentage", commissionValue: data.commissionPercent,
     promotionalPrice: data.promotionalPrice, coveredByPlan: data.covered_by_plan,
     imageUrl: data.imageUrl, imagePublicId: data.imagePublicId, active: data.active,
@@ -133,7 +129,6 @@ export async function createService(data: ServicePayload) {
 export async function updateService(serviceId: string, data: Partial<ServicePayload>) {
   const response = await api.patch<{ service: BackendService }>(`/services/${serviceId}`, {
     ...(data.name !== undefined ? { name: data.name } : {}),
-    ...(data.description !== undefined ? { description: data.description } : {}),
     ...(data.basePrice !== undefined ? { price: data.basePrice } : {}),
     ...(data.durationMinutes !== undefined ? { durationMinutes: data.durationMinutes } : {}),
     ...(data.servicePoints !== undefined ? { servicePoints: data.servicePoints } : {}),
