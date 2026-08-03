@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 
@@ -77,6 +78,7 @@ type ServiceFilter = "all" | "active" | "inactive";
 
 interface ServiceFormState {
   name: string;
+  description: string;
   basePrice: string;
   durationMinutes: string;
   servicePoints: string;
@@ -89,6 +91,7 @@ interface ServiceFormState {
 
 const emptyForm: ServiceFormState = {
   name: "",
+  description: "",
   basePrice: "",
   durationMinutes: "30",
   servicePoints: "1",
@@ -142,6 +145,7 @@ function getCommission(service: Service) {
 function serviceToForm(service: Service): ServiceFormState {
   return {
     name: service.name ?? "",
+    description: service.description ?? "",
     basePrice: String(service.basePrice ?? ""),
     durationMinutes: String(service.durationMinutes ?? 30),
     servicePoints: String(service.servicePoints ?? service.service_points ?? 1),
@@ -285,7 +289,7 @@ export function ServicesPage() {
     const promotionalPrice = parseCurrencyInput(form.promotionalPrice || "0");
 
     if (!form.name.trim()) return "Informe o nome do serviço.";
-    if (!Number.isFinite(basePrice) || basePrice <= 0) return "Informe um preco maior que zero.";
+    if (!Number.isFinite(basePrice) || basePrice < 0) return "Informe um preco valido, igual ou maior que zero.";
     if (!Number.isInteger(durationMinutes) || durationMinutes < 1) {
       return "Informe uma duracao valida.";
     }
@@ -320,6 +324,7 @@ export function ServicesPage() {
 
     const payload = {
       name: form.name.trim(),
+      description: form.description.trim() || null,
       basePrice: parseCurrencyInput(form.basePrice),
       durationMinutes: Number(form.durationMinutes),
       servicePoints: Number(form.servicePoints),
@@ -518,6 +523,11 @@ export function ServicesPage() {
                               <p className="truncate text-sm font-medium text-foreground">
                                 {service.name}
                               </p>
+                              {service.description ? (
+                                <p className="max-w-72 truncate text-xs text-muted-foreground">
+                                  {service.description}
+                                </p>
+                              ) : null}
                               {service.promotionalPrice && service.promotionalPrice > 0 ? (
                                 <p className="text-xs text-muted-foreground">
                                   Promocional: {formatCurrency(service.promotionalPrice)}
@@ -538,7 +548,7 @@ export function ServicesPage() {
                           </td>
                         )}
                         <td className="px-4 py-3 text-sm font-medium text-foreground">
-                          {formatCurrency(service.basePrice)}
+                          {service.basePrice === 0 ? "Sem valor" : formatCurrency(service.basePrice)}
                         </td>
                         {isAdmin ? (
                           <td className="px-4 py-3 text-sm text-muted-foreground">
@@ -625,16 +635,27 @@ export function ServicesPage() {
                   required
                 />
               </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="service-description">Descricao</Label>
+                <Textarea
+                  id="service-description"
+                  value={form.description}
+                  onChange={(event) => setField("description", event.target.value)}
+                  placeholder="Descreva o servico"
+                  rows={3}
+                />
+              </div>
               <div className="space-y-2">
-                <Label htmlFor="service-price">Preco base</Label>
+                <Label htmlFor="service-price">Preco base (R$)</Label>
                 <Input
                   id="service-price"
                   value={form.basePrice}
                   onChange={(event) => setField("basePrice", event.target.value)}
-                  placeholder="50,00"
+                  placeholder="0,00"
                   inputMode="decimal"
-                  required
+                  min={0}
                 />
+                <p className="text-xs text-muted-foreground">Deixe em branco ou informe 0 para cadastrar um servico sem valor.</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="service-promotional-price">Preco promocional</Label>
