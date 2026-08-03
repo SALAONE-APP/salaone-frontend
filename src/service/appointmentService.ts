@@ -135,7 +135,7 @@ export async function createAppointment(data: CreateAppointmentPayload) {
 
 export async function updateAppointment(
   appointmentId: string,
-  data: { status?: AppointmentStatus; notes?: string | null; professionalId?: string },
+  data: { status?: AppointmentStatus; notes?: string | null; professionalId?: string; date?: string; time?: string },
 ) {
   const response = await api.patch<Appointment>(`/appointments/${appointmentId}`, data);
 
@@ -150,6 +150,7 @@ export async function cancelAppointment(appointmentId: string) {
 
 export async function getAvailableSlots(params: {
   professionalId: string;
+  appointmentId?: string;
   date: string;
   duration: number;
 }) {

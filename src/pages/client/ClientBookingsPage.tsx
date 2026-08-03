@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Calendar,
+  CalendarClock,
   Clock,
   CreditCard,
   Filter,
@@ -62,6 +63,7 @@ import {
   createAppointment,
   getAvailableSlots,
   listAppointments,
+  updateAppointment,
   type Appointment,
   type AppointmentStatus,
 } from "@/service/appointmentService";
@@ -341,6 +343,12 @@ export function ClientBookingsPage() {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
   const [savingReview, setSavingReview] = useState(false);
+  const [rescheduleAppointment, setRescheduleAppointment] = useState<Appointment | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
+  const [rescheduleSlots, setRescheduleSlots] = useState<string[]>([]);
+  const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false);
+  const [rescheduling, setRescheduling] = useState(false);
 
   const limit = 20;
 
@@ -482,6 +490,33 @@ export function ClientBookingsPage() {
       .finally(() => { if (active) setSlotsLoading(false); });
     return () => { active = false; };
   }, [bookingOpen, form.professionalId, form.date, totalDuration]);
+
+  useEffect(() => {
+    if (!rescheduleAppointment || !rescheduleDate) {
+      setRescheduleSlots([]);
+      return;
+    }
+    let active = true;
+    const duration = Math.max(
+      1,
+      Math.round((new Date(rescheduleAppointment.endAt).getTime() - new Date(rescheduleAppointment.startAt).getTime()) / 60000),
+    );
+    setRescheduleSlotsLoading(true);
+    getAvailableSlots({
+      professionalId: rescheduleAppointment.professionalId,
+      appointmentId: rescheduleAppointment.id,
+      date: rescheduleDate,
+      duration,
+    })
+      .then((available) => {
+        if (!active) return;
+        setRescheduleSlots(available);
+        setRescheduleTime((current) => available.includes(current) ? current : "");
+      })
+      .catch((err) => { if (active) toast.error(getApiMessage(err)); })
+      .finally(() => { if (active) setRescheduleSlotsLoading(false); });
+    return () => { active = false; };
+  }, [rescheduleAppointment, rescheduleDate]);
 
   const filteredAppointments = useMemo(() => {
     const term = normalizeText(search.trim());
@@ -770,6 +805,32 @@ export function ClientBookingsPage() {
     }
   }
 
+  function openRescheduleDialog(appointment: Appointment) {
+    const start = new Date(appointment.startAt);
+    setRescheduleAppointment(appointment);
+    setRescheduleDate(dateToDateString(start));
+    setRescheduleTime(start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false }));
+    setRescheduleSlots([]);
+  }
+
+  async function handleReschedule() {
+    if (!rescheduleAppointment || !rescheduleDate || !rescheduleTime) return;
+    setRescheduling(true);
+    try {
+      await updateAppointment(rescheduleAppointment.id, {
+        date: rescheduleDate,
+        time: rescheduleTime,
+      });
+      toast.success("Agendamento alterado com sucesso.");
+      setRescheduleAppointment(null);
+      await loadAppointments();
+    } catch (err) {
+      toast.error(getApiMessage(err));
+    } finally {
+      setRescheduling(false);
+    }
+  }
+
   function openReviewDialog(appointment: Appointment) {
     setReviewAppointment(appointment);
     setReviewRating(5);
@@ -885,7 +946,10 @@ export function ClientBookingsPage() {
                     const start = formatDateTime(appt.startAt);
                     const serviceText = appt.services.map((s) => s.serviceName).join(", ") || "Sem servico";
                     const professionalName = appt.professional?.displayName || "Sem profissional";
-                    const canCancel = appt.status === "scheduled" || appt.status === "confirmed";
+                    const activeAppointment = appt.status === "scheduled" || appt.status === "confirmed";
+                    const beforeChangeDeadline = new Date(appt.startAt).getTime() - Date.now() >= 60 * 60 * 1000;
+                    const canCancel = activeAppointment && beforeChangeDeadline;
+                    const canReschedule = activeAppointment && beforeChangeDeadline;
                     const canReview = appt.status === "completed";
                     const paymentDisplay = getPaymentDisplay(paymentsByAppointment.get(appt.id));
 
@@ -943,7 +1007,7 @@ export function ClientBookingsPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          {(canCancel || canReview) && (
+                          {(activeAppointment || canReview) && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <button className="p-1 text-muted-foreground transition-colors hover:text-foreground"><MoreHorizontal size={16} /></button>
@@ -957,10 +1021,20 @@ export function ClientBookingsPage() {
                                 {canCancel && (
                                   <>
                                     {canReview && <DropdownMenuSeparator />}
+                                    {canReschedule && (
+                                      <DropdownMenuItem onClick={() => openRescheduleDialog(appt)}>
+                                        <CalendarClock size={14} />Alterar data ou horário
+                                      </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuItem variant="destructive" onClick={() => handleCancel(appt)}>
                                       <XCircle size={14} />Cancelar agendamento
                                     </DropdownMenuItem>
                                   </>
+                                )}
+                                {activeAppointment && !beforeChangeDeadline && (
+                                  <DropdownMenuItem disabled>
+                                    <Info size={14} />Entre em contato com o salão
+                                  </DropdownMenuItem>
                                 )}
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -983,6 +1057,52 @@ export function ClientBookingsPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={Boolean(rescheduleAppointment)} onOpenChange={(open) => { if (!open && !rescheduling) setRescheduleAppointment(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Alterar agendamento</DialogTitle>
+            <DialogDescription>
+              Escolha uma nova data e horário. Alterações são permitidas até 1 hora antes do atendimento.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-secondary/30 p-3 text-sm">
+              <p className="font-medium">{rescheduleAppointment?.services.map((service) => service.serviceName).join(", ")}</p>
+              <p className="text-muted-foreground">Profissional: {rescheduleAppointment?.professional?.displayName || "Não informado"}</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Nova data</Label>
+              <AppCalendar
+                value={dateStringToDate(rescheduleDate)}
+                onChange={(date) => setRescheduleDate(dateToDateString(date))}
+                fromYear={new Date().getFullYear()}
+                toYear={new Date().getFullYear() + 1}
+                className="h-9 rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Novo horário</Label>
+              <Select value={rescheduleTime} onValueChange={setRescheduleTime} disabled={!rescheduleDate || rescheduleSlotsLoading}>
+                <SelectTrigger><SelectValue placeholder={rescheduleSlotsLoading ? "Carregando horários..." : "Selecione um horário"} /></SelectTrigger>
+                <SelectContent>
+                  {rescheduleSlots.map((slot) => <SelectItem key={slot} value={slot}>{slot}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {!rescheduleSlotsLoading && rescheduleDate && rescheduleSlots.length === 0 && (
+                <p className="text-xs text-amber-600">Não há horários disponíveis nesta data.</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={rescheduling} onClick={() => setRescheduleAppointment(null)}>Cancelar</Button>
+            <Button disabled={rescheduling || !rescheduleTime} onClick={() => void handleReschedule()}>
+              {rescheduling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirmar alteração
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Passo 1 — Formulário */}
       <Dialog open={bookingOpen} onOpenChange={(open) => { if (!open && !savingLocal) { setBookingOpen(false); setBookingForDependent(null); } }}>
@@ -1114,7 +1234,12 @@ export function ClientBookingsPage() {
                                 </Badge>
                               )}
                             </span>
-                            <span className="block text-xs text-muted-foreground">{getServiceDuration(s)} min — {formatCurrency(getServicePrice(s))}</span>
+                            {s.description ? (
+                              <span className="block text-xs text-muted-foreground">{s.description}</span>
+                            ) : null}
+                            <span className="block text-xs text-muted-foreground">
+                              {getServiceDuration(s)} min — {getServicePrice(s) === 0 ? "Sem valor" : formatCurrency(getServicePrice(s))}
+                            </span>
                           </span>
                         </label>
                       );
