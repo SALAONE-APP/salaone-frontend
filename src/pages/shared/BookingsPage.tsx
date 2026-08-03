@@ -8,6 +8,7 @@ import {
 import {
   ArrowLeftRight,
   Calendar,
+  CalendarClock,
   CheckCircle2,
   Clock,
   Filter,
@@ -238,6 +239,13 @@ export function BookingsPage() {
     useState<Appointment | null>(null);
   const [transferProfessionalId, setTransferProfessionalId] = useState("");
   const [transferSaving, setTransferSaving] = useState(false);
+  const [rescheduleAppointment, setRescheduleAppointment] =
+    useState<Appointment | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
+  const [rescheduleSlots, setRescheduleSlots] = useState<string[]>([]);
+  const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false);
+  const [rescheduling, setRescheduling] = useState(false);
   const [blockedDateWarning, setBlockedDateWarning] =
     useState<BlockedDate | null>(null);
   const [salonProfile, setSalonProfile] = useState<SalonProfile | null>(null);
@@ -325,6 +333,48 @@ export function BookingsPage() {
       .then((result) => setProfessionals(result.items))
       .catch((err) => toast.error(getApiMessage(err)));
   }, [transferDialogOpen]);
+
+  useEffect(() => {
+    if (!rescheduleAppointment || !rescheduleDate) {
+      setRescheduleSlots([]);
+      return;
+    }
+
+    let active = true;
+    const duration = Math.max(
+      1,
+      Math.round(
+        (new Date(rescheduleAppointment.endAt).getTime() -
+          new Date(rescheduleAppointment.startAt).getTime()) /
+          60000,
+      ),
+    );
+
+    setRescheduleSlotsLoading(true);
+    getAvailableSlots({
+      professionalId: rescheduleAppointment.professionalId,
+      appointmentId: rescheduleAppointment.id,
+      date: rescheduleDate,
+      duration,
+    })
+      .then((available) => {
+        if (!active) return;
+        setRescheduleSlots(available);
+        setRescheduleTime((current) =>
+          available.includes(current) ? current : "",
+        );
+      })
+      .catch((err) => {
+        if (active) toast.error(getApiMessage(err));
+      })
+      .finally(() => {
+        if (active) setRescheduleSlotsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [rescheduleAppointment, rescheduleDate]);
 
   const selectedServices = useMemo(
     () => services.filter((service) => form.serviceIds.includes(service.id)),
@@ -644,6 +694,39 @@ export function BookingsPage() {
     }
   }
 
+  function openRescheduleDialog(appointment: Appointment) {
+    const start = new Date(appointment.startAt);
+    setRescheduleAppointment(appointment);
+    setRescheduleDate(dateToDateString(start));
+    setRescheduleTime(
+      start.toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }),
+    );
+    setRescheduleSlots([]);
+  }
+
+  async function handleReschedule() {
+    if (!rescheduleAppointment || !rescheduleDate || !rescheduleTime) return;
+
+    setRescheduling(true);
+    try {
+      await updateAppointment(rescheduleAppointment.id, {
+        date: rescheduleDate,
+        time: rescheduleTime,
+      });
+      toast.success("Agendamento alterado com sucesso.");
+      setRescheduleAppointment(null);
+      await loadAppointments();
+    } catch (err) {
+      toast.error(getApiMessage(err));
+    } finally {
+      setRescheduling(false);
+    }
+  }
+
   function openTransferDialog(appointment: Appointment) {
     setAppointmentToTransfer(appointment);
     setTransferProfessionalId(appointment.professional?.id ?? "");
@@ -868,6 +951,20 @@ export function BookingsPage() {
                     const professionalName =
                       appointment.professional?.displayName ||
                       "Sem profissional";
+                    const activeAppointment =
+                      appointment.status === "scheduled" ||
+                      appointment.status === "confirmed";
+                    const beforeChangeDeadline =
+                      new Date(appointment.startAt).getTime() - Date.now() >=
+                      60 * 60 * 1000;
+                    const canAdminReschedule =
+                      (user?.role === "admin" || user?.isAdmin === true) &&
+                      activeAppointment &&
+                      beforeChangeDeadline;
+                    const adminChangeDeadlinePassed =
+                      (user?.role === "admin" || user?.isAdmin === true) &&
+                      activeAppointment &&
+                      !beforeChangeDeadline;
 
                     return (
                       <tr
@@ -1005,6 +1102,22 @@ export function BookingsPage() {
                                 appointment.status === "confirmed") && (
                                 <>
                                   <DropdownMenuSeparator />
+                                  {canAdminReschedule && (
+                                    <DropdownMenuItem
+                                      onClick={() =>
+                                        openRescheduleDialog(appointment)
+                                      }
+                                    >
+                                      <CalendarClock size={14} />
+                                      Alterar data ou horario
+                                    </DropdownMenuItem>
+                                  )}
+                                  {adminChangeDeadlinePassed && (
+                                    <DropdownMenuItem disabled>
+                                      <CalendarClock size={14} />
+                                      Alteracao indisponivel (menos de 1 hora)
+                                    </DropdownMenuItem>
+                                  )}
                                   <DropdownMenuItem
                                     onClick={() =>
                                       openTransferDialog(appointment)
@@ -1076,6 +1189,91 @@ export function BookingsPage() {
           </div>
         </div>
       </div>
+
+      <Dialog
+        open={Boolean(rescheduleAppointment)}
+        onOpenChange={(open) => {
+          if (!open && !rescheduling) setRescheduleAppointment(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Alterar agendamento</DialogTitle>
+            <DialogDescription>
+              Escolha uma nova data ou horario. Alteracoes sao permitidas ate 1
+              hora antes do atendimento.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-secondary/30 p-3 text-sm">
+              <p className="font-medium">
+                {rescheduleAppointment?.client?.name || "Cliente"}
+              </p>
+              <p className="text-muted-foreground">
+                Profissional: {rescheduleAppointment?.professional?.displayName || "Nao informado"}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Nova data</Label>
+              <AppCalendar
+                value={dateStringToDate(rescheduleDate)}
+                onChange={(date) => setRescheduleDate(dateToDateString(date))}
+                fromYear={new Date().getFullYear()}
+                toYear={new Date().getFullYear() + 1}
+                className="h-9 rounded-md"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Novo horario</Label>
+              <Select
+                value={rescheduleTime}
+                onValueChange={setRescheduleTime}
+                disabled={!rescheduleDate || rescheduleSlotsLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      rescheduleSlotsLoading
+                        ? "Carregando horarios..."
+                        : "Selecione um horario"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {rescheduleSlots.map((slot) => (
+                    <SelectItem key={slot} value={slot}>
+                      {slot}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!rescheduleSlotsLoading &&
+                rescheduleDate &&
+                rescheduleSlots.length === 0 && (
+                  <p className="text-xs text-amber-600">
+                    Nao ha horarios disponiveis nesta data.
+                  </p>
+                )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={rescheduling}
+              onClick={() => setRescheduleAppointment(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={rescheduling || !rescheduleTime}
+              onClick={() => void handleReschedule()}
+            >
+              {rescheduling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirmar alteracao
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog de transferência de profissional */}
       <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
