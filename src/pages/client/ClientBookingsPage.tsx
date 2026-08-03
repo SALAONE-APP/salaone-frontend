@@ -508,7 +508,11 @@ export function ClientBookingsPage() {
       date: rescheduleDate,
       duration,
     })
-      .then((available) => { if (active) setRescheduleSlots(available); })
+      .then((available) => {
+        if (!active) return;
+        setRescheduleSlots(available);
+        setRescheduleTime((current) => available.includes(current) ? current : "");
+      })
       .catch((err) => { if (active) toast.error(getApiMessage(err)); })
       .finally(() => { if (active) setRescheduleSlotsLoading(false); });
     return () => { active = false; };
@@ -805,7 +809,7 @@ export function ClientBookingsPage() {
     const start = new Date(appointment.startAt);
     setRescheduleAppointment(appointment);
     setRescheduleDate(dateToDateString(start));
-    setRescheduleTime("");
+    setRescheduleTime(start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false }));
     setRescheduleSlots([]);
   }
 
@@ -1071,7 +1075,7 @@ export function ClientBookingsPage() {
               <Label>Nova data</Label>
               <AppCalendar
                 value={dateStringToDate(rescheduleDate)}
-                onChange={(date) => { setRescheduleDate(dateToDateString(date)); setRescheduleTime(""); }}
+                onChange={(date) => setRescheduleDate(dateToDateString(date))}
                 fromYear={new Date().getFullYear()}
                 toYear={new Date().getFullYear() + 1}
                 className="h-9 rounded-md"
@@ -1230,7 +1234,12 @@ export function ClientBookingsPage() {
                                 </Badge>
                               )}
                             </span>
-                            <span className="block text-xs text-muted-foreground">{getServiceDuration(s)} min — {formatCurrency(getServicePrice(s))}</span>
+                            {s.description ? (
+                              <span className="block text-xs text-muted-foreground">{s.description}</span>
+                            ) : null}
+                            <span className="block text-xs text-muted-foreground">
+                              {getServiceDuration(s)} min — {getServicePrice(s) === 0 ? "Sem valor" : formatCurrency(getServicePrice(s))}
+                            </span>
                           </span>
                         </label>
                       );
