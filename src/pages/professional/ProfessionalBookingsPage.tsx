@@ -524,6 +524,7 @@ export function ProfessionalBookingsPage() {
               ) : (
                 filteredAppointments.map((appt) => {
                   const start = formatDateTime(appt.startAt);
+                  const end = formatDateTime(appt.endAt);
                   const serviceText =
                     appt.services.map((s) => s.serviceName).join(", ") || "Sem servico";
                   const clientName = appt.dependent?.name || appt.client?.name || "Cliente";
@@ -564,7 +565,7 @@ export function ProfessionalBookingsPage() {
                           </div>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Clock size={14} />
-                            {start.time}
+                            {start.time} – {end.time}
                           </div>
                         </div>
                       </td>

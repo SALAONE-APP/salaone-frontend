@@ -162,6 +162,7 @@ export function ServicesPage() {
   const { can } = usePermissions();
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const isAdmin = user?.role === "admin" || user?.isAdmin === true;
+  const isClient = user?.role === "client";
   const canManage = isAdmin || can("manageServices");
   const [services, setServices] = useState<Service[]>([]);
   const [search, setSearch] = useState("");
@@ -454,9 +455,11 @@ export function ServicesPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Serviço
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Duracao
-                  </th>
+                  {!isClient && (
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Duracao
+                    </th>
+                  )}
                   {isFreeChoice && (
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       Pontos
@@ -480,7 +483,7 @@ export function ServicesPage() {
                 {loading ? (
                   <tr>
                     <td
-                      colSpan={4 + (isFreeChoice ? 1 : 0) + (isAdmin ? 1 : 0) + (canManage ? 1 : 0)}
+                      colSpan={3 + (!isClient ? 1 : 0) + (isFreeChoice ? 1 : 0) + (isAdmin ? 1 : 0) + (canManage ? 1 : 0)}
                       className="p-8 text-center text-sm text-muted-foreground"
                     >
                       <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
@@ -490,7 +493,7 @@ export function ServicesPage() {
                 ) : filteredServices.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={4 + (isFreeChoice ? 1 : 0) + (isAdmin ? 1 : 0) + (canManage ? 1 : 0)}
+                      colSpan={3 + (!isClient ? 1 : 0) + (isFreeChoice ? 1 : 0) + (isAdmin ? 1 : 0) + (canManage ? 1 : 0)}
                       className="p-8 text-center text-sm text-muted-foreground"
                     >
                       Nenhum serviço encontrado.
@@ -536,12 +539,14 @@ export function ServicesPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2 text-sm text-foreground">
-                            <Clock size={14} className="text-muted-foreground" />
-                            {service.durationMinutes} min
-                          </div>
-                        </td>
+                        {!isClient && (
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2 text-sm text-foreground">
+                              <Clock size={14} className="text-muted-foreground" />
+                              {service.durationMinutes} min
+                            </div>
+                          </td>
+                        )}
                         {isFreeChoice && (
                           <td className="px-4 py-3 text-sm font-medium text-foreground">
                             {service.servicePoints ?? service.service_points ?? 1}

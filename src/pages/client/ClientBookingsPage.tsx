@@ -1238,7 +1238,7 @@ export function ClientBookingsPage() {
                               <span className="block text-xs text-muted-foreground">{s.description}</span>
                             ) : null}
                             <span className="block text-xs text-muted-foreground">
-                              {getServiceDuration(s)} min — {getServicePrice(s) === 0 ? "Sem valor" : formatCurrency(getServicePrice(s))}
+                              {getServicePrice(s) === 0 ? "Sem valor" : formatCurrency(getServicePrice(s))}
                             </span>
                           </span>
                         </label>
@@ -1306,7 +1306,7 @@ export function ClientBookingsPage() {
                 {!slotsLoading && totalDuration > 0 && slots.length === 0 && form.professionalId && form.date ? (
                   <p className="text-xs text-muted-foreground">Nenhum horario disponivel. Tente outra data.</p>
                 ) : !slotsLoading && slots.length > 0 ? (
-                  <p className="text-xs text-muted-foreground">{slots.length} horarios disponiveis para {totalDuration} min.</p>
+                  <p className="text-xs text-muted-foreground">{slots.length} horarios disponiveis.</p>
                 ) : null}
               </div>
 
