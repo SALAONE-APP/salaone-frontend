@@ -1,4 +1,5 @@
 import api from "./api";
+import type { BusinessHour } from "@/utils/businessHours";
 
 export interface HomeInfo {
   id?: string;
@@ -17,6 +18,7 @@ export interface HomeInfo {
   schedule_line1?: string | null;
   schedule_line2?: string | null;
   schedule_line3?: string | null;
+  business_hours?: BusinessHour[] | null;
   whatsapp_number?: string | null;
   location_title?: string | null;
   location_address?: string | null;
