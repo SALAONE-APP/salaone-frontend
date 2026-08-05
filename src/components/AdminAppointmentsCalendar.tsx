@@ -59,8 +59,9 @@ interface Props {
   minutesPerSlot: number;
   startMinutes: number;
   nowMinutes?: number | null;
-  onFreeFitBooking: (professionalId: string, date: Date, startMinutes: number, durationMinutes: number) => void;
+  onFreeFitBooking: (professionalId: string, date: Date, startMinutes: number, durationMinutes: number, pauseAppointmentId?: string) => void;
   onStartAttendance: (appointmentId: string) => Promise<void>;
+  onSetServicePause: (appointmentId: string, startTime: string | null, endTime: string | null) => Promise<void>;
   getAppointmentStartDate: (appointment: Appointment) => Date | null;
 }
 
@@ -80,10 +81,14 @@ export default function AdminAppointmentsCalendar({
   nowMinutes,
   onFreeFitBooking,
   onStartAttendance,
+  onSetServicePause,
   getAppointmentStartDate,
 }: Props) {
   const [aptModal, setAptModal] = useState<AptModalState | null>(null);
   const [startingAttendance, setStartingAttendance] = useState(false);
+  const [savingPause, setSavingPause] = useState(false);
+  const [pauseStartTime, setPauseStartTime] = useState('');
+  const [pauseEndTime, setPauseEndTime] = useState('');
   const statusLegend = [
     APPOINTMENT_CLIENT_STATUS_CONFIG.no_show,
     APPOINTMENT_CLIENT_STATUS_CONFIG.no_plan,
@@ -113,6 +118,11 @@ export default function AdminAppointmentsCalendar({
     if (!Number.isFinite(freeStart) || !Number.isFinite(freeEnd) || freeDuration <= 0 || freeEnd <= freeStart) {
       return false;
     }
+
+    // A pause is intentionally inside its parent appointment, so it must not go
+    // through the regular-gap overlap check below. The free-slot builder only
+    // adds this id after confirming that the whole slot is inside the pause.
+    if (freeSlot.pauseAppointmentId) return true;
 
     const ranges = appointments.map(getAppointmentRangeMinutes).filter(Boolean).sort((a, b) => a!.startMinutes - b!.startMinutes) as { startMinutes: number; endMinutes: number }[];
 
@@ -314,15 +324,15 @@ export default function AdminAppointmentsCalendar({
                           return (
                             <div
                               key={`free-${freeIdx}`}
-                              className={`calendar-free-fit${isFreeFitPast ? ' past-free-fit' : ''}`}
+                              className={`calendar-free-fit${freeSlot.pauseAppointmentId ? ' pause-free-fit' : ''}${isFreeFitPast ? ' past-free-fit' : ''}`}
                               style={{ top: `${freeTop}px`, height: `${freeHeight}px` }}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (isFreeFitPast || !calDate) return;
-                                onFreeFitBooking(professional.id, calDate, freeSlot.startMinutes, freeSlot.durationMinutes);
+                                onFreeFitBooking(professional.id, calDate, freeSlot.startMinutes, freeSlot.durationMinutes, freeSlot.pauseAppointmentId);
                               }}
                             >
-                              Agenda livre &bull; {freeSlot.durationMinutes} min
+                              {freeSlot.pauseAppointmentId ? 'Pausa livre' : 'Agenda livre'} &bull; {freeSlot.durationMinutes} min
                             </div>
                           );
                         })}
@@ -571,6 +581,54 @@ export default function AdminAppointmentsCalendar({
               </div>
 
               <div className="apt-detail-footer">
+                {['scheduled', 'confirmed', 'in_service'].includes(appointment.status) && (
+                  <section className="apt-detail-pause-card">
+                    <div className="apt-detail-pause-heading">
+                      <div><strong>Pausa para encaixe</strong><span>Libere um intervalo deste agendamento para outro cliente.</span></div>
+                      {appointment.pauseStartAt && <span className="apt-detail-pause-badge">Pausa ativa</span>}
+                    </div>
+                    <div className="apt-detail-pause-form">
+                      <label>Início
+                        <input
+                          type="time"
+                          value={pauseStartTime}
+                          onChange={(event) => setPauseStartTime(event.target.value)}
+                        />
+                      </label>
+                      <label>Fim
+                        <input
+                          type="time"
+                          value={pauseEndTime}
+                          onChange={(event) => setPauseEndTime(event.target.value)}
+                        />
+                      </label>
+                      <button
+                        className="apt-detail-button apt-detail-button-primary"
+                        disabled={savingPause || !pauseStartTime || !pauseEndTime}
+                        onClick={async () => {
+                          setSavingPause(true);
+                          try {
+                            await onSetServicePause(appointment.id, pauseStartTime, pauseEndTime);
+                            setAptModal(null);
+                          } finally { setSavingPause(false); }
+                        }}
+                      >{savingPause ? 'Salvando...' : appointment.pauseStartAt ? 'Atualizar pausa' : 'Inserir pausa'}</button>
+                      {appointment.pauseStartAt && (
+                        <button
+                          className="apt-detail-button apt-detail-button-danger"
+                          disabled={savingPause}
+                          onClick={async () => {
+                            setSavingPause(true);
+                            try {
+                              await onSetServicePause(appointment.id, null, null);
+                              setAptModal(null);
+                            } finally { setSavingPause(false); }
+                          }}
+                        >Remover pausa</button>
+                      )}
+                    </div>
+                  </section>
+                )}
                 <details className="apt-detail-legend">
                   <summary>Legenda de cores</summary>
                   <div className="apt-detail-legend-list">
@@ -591,7 +649,7 @@ export default function AdminAppointmentsCalendar({
                 </details>
                 {(appointment.status === 'scheduled' || appointment.status === 'confirmed') && (
                   <button
-                    className="apt-detail-btn-close"
+                    className="apt-detail-button apt-detail-button-secondary"
                     disabled={startingAttendance}
                     onClick={async () => {
                       setStartingAttendance(true);
@@ -606,7 +664,7 @@ export default function AdminAppointmentsCalendar({
                     {startingAttendance ? 'Iniciando...' : 'Iniciar atendimento'}
                   </button>
                 )}
-                <button className="apt-detail-btn-close" onClick={() => setAptModal(null)}>Fechar</button>
+                <button className="apt-detail-button apt-detail-button-primary" onClick={() => setAptModal(null)}>Fechar</button>
               </div>
             </div>
           </div>
