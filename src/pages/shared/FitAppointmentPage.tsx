@@ -179,6 +179,7 @@ interface FitSlotInfo {
   date: Date;
   startMinutes: number;
   durationMinutes: number;
+  maxEndMinutes?: number;
   pauseAppointmentId?: string;
 }
 
@@ -227,12 +228,12 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
   const selectedStartMinutes = /^\d{2}:\d{2}$/.test(time)
     ? time.split(':').map(Number).reduce((hours, minutes) => hours * 60 + minutes)
     : null;
-  const slotEndMinutes = slotInfo.startMinutes + slotInfo.durationMinutes;
   const startsOutsideSlot = selectedStartMinutes !== null && (
-    selectedStartMinutes < slotInfo.startMinutes || selectedStartMinutes >= slotEndMinutes
+    selectedStartMinutes < slotInfo.startMinutes ||
+    (slotInfo.maxEndMinutes !== undefined && selectedStartMinutes >= slotInfo.maxEndMinutes)
   );
   const durationExceeds = totalDuration > 0 && selectedStartMinutes !== null && (
-    selectedStartMinutes + totalDuration > slotEndMinutes
+    slotInfo.maxEndMinutes !== undefined && selectedStartMinutes + totalDuration > slotInfo.maxEndMinutes
   );
   const invalidSlotSelection = startsOutsideSlot || durationExceeds;
   const dateKey = getLocalDateKey(slotInfo.date);
@@ -247,11 +248,11 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
     if (serviceIds.length === 0) { toast.error("Selecione pelo menos um servico."); return; }
     if (!time || !/^\d{2}:\d{2}$/.test(time)) { toast.error("Informe o horario no formato HH:MM."); return; }
     if (startsOutsideSlot) {
-      toast.error("O horario deve estar dentro do intervalo liberado para a pausa.");
+      toast.error("O horario deve estar dentro do intervalo livre selecionado.");
       return;
     }
     if (durationExceeds) {
-      toast.error("A duracao dos servicos ultrapassa o fim da pausa.");
+      toast.error("A duracao dos servicos ultrapassa o intervalo livre selecionado.");
       return;
     }
 
@@ -299,9 +300,6 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
                 month: "2-digit",
                 year: "numeric",
               })}
-              {" · "}
-              {minutesToTime(slotInfo.startMinutes)} — {minutesToTime(slotInfo.startMinutes + slotInfo.durationMinutes)}
-              {" "}({slotInfo.durationMinutes} min disponíveis)
             </DialogDescription>
           </DialogHeader>
 
@@ -309,15 +307,12 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
             <div className="space-y-2">
               <Label htmlFor="fit-time">
                 Horario de inicio
-                <span className="ml-1 text-xs text-muted-foreground">
-                  (ate {minutesToTime(slotInfo.startMinutes + slotInfo.durationMinutes)})
-                </span>
               </Label>
               <Input
                 id="fit-time"
                 type="time"
                 min={minutesToTime(slotInfo.startMinutes)}
-                max={minutesToTime(slotEndMinutes - 1)}
+                max={slotInfo.maxEndMinutes !== undefined ? minutesToTime(slotInfo.maxEndMinutes - 1) : undefined}
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
                 className="h-9"
@@ -584,12 +579,22 @@ export function FitAppointmentPage() {
 
   function handleFreeFitBooking(professionalId: string, date: Date, startMins: number, durationMins: number, pauseAppointmentId?: string) {
     const professional = professionals.find((b) => b.id === professionalId);
+    const maxEndMinutes = pauseAppointmentId
+      ? startMins + durationMins
+      : (appointmentsByProfessional.get(professionalId) ?? [])
+          .map((appointment) => {
+            const [hours, minutes] = appointment.startTime.split(':').map(Number);
+            return (hours ?? 0) * 60 + (minutes ?? 0);
+          })
+          .filter((appointmentStart) => appointmentStart > startMins)
+          .sort((a, b) => a - b)[0];
     setFitSlot({
       professionalId,
       professionalName: professional?.displayName ?? "Profissional",
       date,
       startMinutes: startMins,
       durationMinutes: durationMins,
+      maxEndMinutes,
       pauseAppointmentId,
     });
   }
