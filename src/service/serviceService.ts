@@ -6,6 +6,7 @@ export interface Service {
   description?: string | null;
   basePrice: number;
   durationMinutes: number;
+  bufferMinutes?: number;
   servicePoints?: number;
   service_points?: number;
   commissionPercent?: number | null;
@@ -59,6 +60,8 @@ interface BackendService {
   basePrice?: number;
   duration_minutes?: number;
   durationMinutes?: number;
+  buffer_minutes?: number;
+  bufferMinutes?: number;
   commission_value?: number | string | null;
   commissionPercent?: number | null;
   active?: boolean;
@@ -82,6 +85,7 @@ function normalizeService(service: BackendService): Service {
     description: service.description ?? null,
     basePrice: Number(service.basePrice ?? service.price ?? 0),
     durationMinutes: Number(service.durationMinutes ?? service.duration_minutes ?? 0),
+    bufferMinutes: Number(service.bufferMinutes ?? service.buffer_minutes ?? 0),
     commissionPercent:
       service.commissionPercent != null
         ? Number(service.commissionPercent)
