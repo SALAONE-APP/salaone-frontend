@@ -179,6 +179,7 @@ interface FitSlotInfo {
   date: Date;
   startMinutes: number;
   durationMinutes: number;
+  pauseAppointmentId?: string;
 }
 
 interface FitBookingDialogProps {
@@ -217,10 +218,23 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
     [services, serviceIds],
   );
   const totalDuration = useMemo(
-    () => selectedServices.reduce((sum, s) => sum + Number(s.durationMinutes ?? 30), 0),
+    () => selectedServices.reduce(
+      (sum, s) => sum + Number(s.durationMinutes ?? 30) + Number(s.bufferMinutes ?? 0),
+      0,
+    ),
     [selectedServices],
   );
-  const durationExceeds = totalDuration > 0 && totalDuration > slotInfo.durationMinutes;
+  const selectedStartMinutes = /^\d{2}:\d{2}$/.test(time)
+    ? time.split(':').map(Number).reduce((hours, minutes) => hours * 60 + minutes)
+    : null;
+  const slotEndMinutes = slotInfo.startMinutes + slotInfo.durationMinutes;
+  const startsOutsideSlot = selectedStartMinutes !== null && (
+    selectedStartMinutes < slotInfo.startMinutes || selectedStartMinutes >= slotEndMinutes
+  );
+  const durationExceeds = totalDuration > 0 && selectedStartMinutes !== null && (
+    selectedStartMinutes + totalDuration > slotEndMinutes
+  );
+  const invalidSlotSelection = startsOutsideSlot || durationExceeds;
   const dateKey = getLocalDateKey(slotInfo.date);
 
   function toggleService(id: string, checked: boolean) {
@@ -232,6 +246,14 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
     if (!clientId) { toast.error("Selecione o cliente."); return; }
     if (serviceIds.length === 0) { toast.error("Selecione pelo menos um servico."); return; }
     if (!time || !/^\d{2}:\d{2}$/.test(time)) { toast.error("Informe o horario no formato HH:MM."); return; }
+    if (startsOutsideSlot) {
+      toast.error("O horario deve estar dentro do intervalo liberado para a pausa.");
+      return;
+    }
+    if (durationExceeds) {
+      toast.error("A duracao dos servicos ultrapassa o fim da pausa.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -242,6 +264,7 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
         time,
         notes: buildFitNotes(notes),
         allowOutsideBusinessHours: false,
+        pauseAppointmentId: slotInfo.pauseAppointmentId,
         services: selectedServices.map((s) => ({
           id: s.id,
           name: s.name,
@@ -293,6 +316,8 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
               <Input
                 id="fit-time"
                 type="time"
+                min={minutesToTime(slotInfo.startMinutes)}
+                max={minutesToTime(slotEndMinutes - 1)}
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
                 className="h-9"
@@ -367,7 +392,7 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={saving} className="gap-2">
+            <Button type="submit" disabled={saving || invalidSlotSelection} className="gap-2">
               {saving ? (
                 <><Loader2 className="h-4 w-4 animate-spin" />Salvando</>
               ) : (
@@ -557,7 +582,7 @@ export function FitAppointmentPage() {
     [appointments],
   );
 
-  function handleFreeFitBooking(professionalId: string, date: Date, startMins: number, durationMins: number) {
+  function handleFreeFitBooking(professionalId: string, date: Date, startMins: number, durationMins: number, pauseAppointmentId?: string) {
     const professional = professionals.find((b) => b.id === professionalId);
     setFitSlot({
       professionalId,
@@ -565,6 +590,7 @@ export function FitAppointmentPage() {
       date,
       startMinutes: startMins,
       durationMinutes: durationMins,
+      pauseAppointmentId,
     });
   }
 
@@ -781,6 +807,16 @@ export function FitAppointmentPage() {
                 const apiMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
                 toast.error(apiMessage || "Não foi possível iniciar o atendimento.");
                 throw error;
+              }
+            }}
+            onSetServicePause={async (appointmentId, startTime, endTime) => {
+              try {
+                await updateAppointment(appointmentId, { pauseStartTime: startTime, pauseEndTime: endTime });
+                toast.success(startTime ? 'Pausa liberada para encaixe.' : 'Pausa removida.');
+                await loadAppointments();
+              } catch (err) {
+                toast.error(getApiMessage(err));
+                throw err;
               }
             }}
             getAppointmentStartDate={getAppointmentStartDate}

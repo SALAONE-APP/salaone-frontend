@@ -15,6 +15,9 @@ export interface Appointment {
   dependentId?: string | null;
   startAt: string;
   endAt: string;
+  pauseStartAt?: string | null;
+  pauseEndAt?: string | null;
+  pauseParentAppointmentId?: string | null;
   status: AppointmentStatus;
   notes?: string | null;
   professional?: {
@@ -98,6 +101,7 @@ export interface CreateAppointmentPayload {
   time: string;
   notes?: string | null;
   allowOutsideBusinessHours?: boolean;
+  pauseAppointmentId?: string;
   services: Array<{
     id: string;
     name: string;
@@ -135,7 +139,7 @@ export async function createAppointment(data: CreateAppointmentPayload) {
 
 export async function updateAppointment(
   appointmentId: string,
-  data: { status?: AppointmentStatus; notes?: string | null; professionalId?: string; date?: string; time?: string },
+  data: { status?: AppointmentStatus; notes?: string | null; professionalId?: string; date?: string; time?: string; pauseStartTime?: string | null; pauseEndTime?: string | null },
 ) {
   const response = await api.patch<Appointment>(`/appointments/${appointmentId}`, data);
 

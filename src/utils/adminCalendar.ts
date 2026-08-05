@@ -38,6 +38,7 @@ export interface CalendarAppointment extends Appointment {
 export interface FreeSlot {
   startMinutes: number;
   durationMinutes: number;
+  pauseAppointmentId?: string;
 }
 
 export const PROFESSIONAL_CALENDAR_COLORS: CalendarColor[] = [
@@ -60,6 +61,15 @@ export const FIT_APPOINTMENT_COLOR: CalendarColor = {
   cardText: '#e0f2fe',
   tint: 'rgba(14,165,233,0.055)',
   tintStrong: 'rgba(14,165,233,0.13)',
+};
+
+export const PAUSE_FIT_APPOINTMENT_COLOR: CalendarColor = {
+  accent: '#f472b6',
+  border: 'rgba(244,114,182,0.62)',
+  cardBg: 'rgba(80,7,36,0.96)',
+  cardText: '#fce7f3',
+  tint: 'rgba(244,114,182,0.06)',
+  tintStrong: 'rgba(244,114,182,0.15)',
 };
 
 export const APPOINTMENT_CLIENT_STATUS_CONFIG: Record<AppointmentClientStatusKey, AppointmentClientStatus> = {
@@ -284,7 +294,9 @@ export const buildCalendarAppointmentsByProfessional = ({
     const duration = getAppointmentDurationMinutes(appointment, getAppointmentStartDate);
     const isFit = isFitAppointment(appointment);
     const clientStatus = getAppointmentClientStatus(appointment, getAppointmentStartDate);
-    const color = clientStatus.color;
+    const color = appointment.pauseParentAppointmentId
+      ? PAUSE_FIT_APPOINTMENT_COLOR
+      : clientStatus.color;
 
     map.get(professionalId)!.push({
       ...appointment,
@@ -308,14 +320,22 @@ interface CreateFreeSlotParams {
   minutesPerSlot: number;
   fitSlotMaxMinutes: number;
   endMinutes: number;
+  pauseAppointmentId?: string;
 }
+
+const isoToMinutes = (value: string): number => {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date(value)).split(':').map(Number);
+  return (parts[0] ?? 0) * 60 + (parts[1] ?? 0);
+};
 
 const normalizeMinutesToStep = (minutes: number, step: number): number => {
   const safeStep = Number(step) > 0 ? Number(step) : CALENDAR_MINUTES_PER_SLOT;
   return Math.ceil(Number(minutes) / safeStep) * safeStep;
 };
 
-const createFreeFitSlot = ({ freeSlots, gapStart, gapEnd, minutesPerSlot, fitSlotMaxMinutes, endMinutes }: CreateFreeSlotParams): void => {
+const createFreeFitSlot = ({ freeSlots, gapStart, gapEnd, minutesPerSlot, fitSlotMaxMinutes, endMinutes, pauseAppointmentId }: CreateFreeSlotParams): void => {
   const normalizedStart = normalizeMinutesToStep(gapStart, minutesPerSlot);
   const normalizedEnd = Math.min(gapEnd, endMinutes);
   const gap = normalizedEnd - normalizedStart;
@@ -325,7 +345,7 @@ const createFreeFitSlot = ({ freeSlots, gapStart, gapEnd, minutesPerSlot, fitSlo
   const durationMinutes = Math.min(fitSlotMaxMinutes, Math.floor(gap / minutesPerSlot) * minutesPerSlot);
   if (durationMinutes < minutesPerSlot) return;
 
-  freeSlots.push({ startMinutes: normalizedStart, durationMinutes });
+  freeSlots.push({ startMinutes: normalizedStart, durationMinutes, pauseAppointmentId });
 };
 
 export const buildCalendarFreeSlotsByProfessional = ({
@@ -349,7 +369,7 @@ export const buildCalendarFreeSlotsByProfessional = ({
 
   professionals.forEach((professional) => {
     const apts = (appointmentsByProfessional.get(professional.id) || [])
-      .map((apt) => {
+      .flatMap((apt) => {
         const [h, m] = String(apt.startTime || '00:00').split(':').map(Number);
         const startM = (h ?? 0) * 60 + (m ?? 0);
         let duration = Number(apt.duration || 0);
@@ -373,7 +393,16 @@ export const buildCalendarFreeSlotsByProfessional = ({
 
         if (!(duration > 0)) duration = minutesPerSlot;
 
-        return { startM, endM: startM + duration, duration, isFitAppointment: apt.isFitAppointment };
+        const endM = startM + duration;
+        const pauseStart = apt.pauseStartAt ? isoToMinutes(apt.pauseStartAt) : null;
+        const pauseEnd = apt.pauseEndAt ? isoToMinutes(apt.pauseEndAt) : null;
+        if (['scheduled', 'confirmed', 'in_service'].includes(apt.status) && pauseStart !== null && pauseEnd !== null && pauseStart < pauseEnd) {
+          return [
+            { startM, endM: pauseStart, duration: pauseStart - startM, isFitAppointment: apt.isFitAppointment },
+            { startM: pauseEnd, endM, duration: endM - pauseEnd, isFitAppointment: apt.isFitAppointment },
+          ].filter((part) => part.duration > 0);
+        }
+        return [{ startM, endM, duration, isFitAppointment: apt.isFitAppointment }];
       })
       .filter((a) => Number.isFinite(a.startM) && Number.isFinite(a.endM) && a.duration > 0 && a.endM > startMinutes && a.startM < endMinutes)
       .map((a) => ({ ...a, startM: Math.max(a.startM, startMinutes), endM: Math.min(a.endM, endMinutes) }))
@@ -400,6 +429,25 @@ export const buildCalendarFreeSlotsByProfessional = ({
     if (cursor < endMinutes) {
       createFreeFitSlot({ freeSlots, gapStart: cursor, gapEnd: endMinutes, minutesPerSlot, fitSlotMaxMinutes, endMinutes });
     }
+
+    const pauseAppointments = (appointmentsByProfessional.get(professional.id) || []).filter(
+      (apt) => ['scheduled', 'confirmed', 'in_service'].includes(apt.status) && apt.pauseStartAt && apt.pauseEndAt,
+    );
+    freeSlots.forEach((slot) => {
+      const slotEnd = slot.startMinutes + slot.durationMinutes;
+      const parent = pauseAppointments
+        .filter((apt) => {
+          const pauseStart = isoToMinutes(apt.pauseStartAt!);
+          const pauseEnd = isoToMinutes(apt.pauseEndAt!);
+          return slot.startMinutes >= pauseStart && slotEnd <= pauseEnd;
+        })
+        .sort((a, b) => {
+          const durationA = isoToMinutes(a.pauseEndAt!) - isoToMinutes(a.pauseStartAt!);
+          const durationB = isoToMinutes(b.pauseEndAt!) - isoToMinutes(b.pauseStartAt!);
+          return durationA - durationB;
+        })[0];
+      if (parent) slot.pauseAppointmentId = parent.id;
+    });
 
     map.set(professional.id, freeSlots);
   });
