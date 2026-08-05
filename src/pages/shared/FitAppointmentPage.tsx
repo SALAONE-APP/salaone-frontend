@@ -35,17 +35,16 @@ import {
 } from "@/service/appointmentService";
 import { listProfessionals, type Professional } from "@/service/professionalService";
 import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
+import { getHomeInfo } from "@/service/homeInfoService";
 import { listServices, type Service } from "@/service/serviceService";
 import {
   buildCalendarAppointmentsByProfessional,
   buildCalendarFreeSlotsByProfessional,
   buildCalendarTimeSlots,
   APPOINTMENT_CLIENT_STATUS_CONFIG,
-  CALENDAR_END_MINUTES,
   CALENDAR_FIT_SLOT_MAX_MINUTES,
   CALENDAR_MINUTES_PER_SLOT,
   CALENDAR_SLOT_HEIGHT,
-  CALENDAR_START_MINUTES,
   getLocalDateKey,
   getStableCalendarColor,
   minutesToTime,
@@ -54,6 +53,12 @@ import {
 } from "@/utils/adminCalendar";
 import { buildFitNotes } from "@/utils/fitAppointment";
 import { openWhatsAppShare } from "@/utils/whatsapp";
+import {
+  DEFAULT_BUSINESS_HOURS,
+  normalizeBusinessHours,
+  timeToMinutes,
+  type BusinessHour,
+} from "@/utils/businessHours";
 
 /* ── helpers ── */
 
@@ -397,6 +402,7 @@ export function FitAppointmentPage() {
   const [fitSlot, setFitSlot] = useState<FitSlotInfo | null>(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [salonProfile, setSalonProfile] = useState<SalonProfile | null>(null);
+  const [businessHours, setBusinessHours] = useState<BusinessHour[]>(DEFAULT_BUSINESS_HOURS);
 
   const activeDateKey = getLocalDateKey(selectedDate);
   const isToday = activeDateKey === getLocalDateKey(getTodaySaoPaulo());
@@ -428,6 +434,9 @@ export function FitAppointmentPage() {
 
   useEffect(() => {
     getSalonProfile().then(setSalonProfile).catch(() => null);
+    getHomeInfo()
+      .then((info) => setBusinessHours(normalizeBusinessHours(info.business_hours)))
+      .catch(() => null);
   }, []);
 
   /* Load appointments when date changes */
@@ -471,30 +480,42 @@ export function FitAppointmentPage() {
     [appointments, professionals, activeDateKey, getAppointmentStartDate],
   );
 
+  const selectedDayHours = businessHours.find((item) => item.weekday === selectedDate.getDay());
+  const calendarStartMinutes = selectedDayHours?.isOpen
+    ? timeToMinutes(selectedDayHours.startTime)
+    : 9 * 60;
+  const calendarEndMinutes = selectedDayHours?.isOpen
+    ? timeToMinutes(selectedDayHours.endTime)
+    : 18 * 60;
+  const availableProfessionals = selectedDayHours?.isOpen ? professionals : [];
+
   const freeSlotsByProfessional = useMemo(
     () => buildCalendarFreeSlotsByProfessional({
-      professionals, appointmentsByProfessional,
-      startMinutes: CALENDAR_START_MINUTES, endMinutes: CALENDAR_END_MINUTES,
+      professionals: availableProfessionals, appointmentsByProfessional,
+      startMinutes: calendarStartMinutes, endMinutes: calendarEndMinutes,
       minutesPerSlot: CALENDAR_MINUTES_PER_SLOT, fitSlotMaxMinutes: CALENDAR_FIT_SLOT_MAX_MINUTES,
       nowMinutes,
     }),
-    [professionals, appointmentsByProfessional, nowMinutes],
+    [availableProfessionals, appointmentsByProfessional, calendarStartMinutes, calendarEndMinutes, nowMinutes],
   );
 
   const shareFreeSlotsByProfessional = useMemo(
     () => buildCalendarFreeSlotsByProfessional({
-      professionals, appointmentsByProfessional,
-      startMinutes: CALENDAR_START_MINUTES, endMinutes: CALENDAR_END_MINUTES,
+      professionals: availableProfessionals, appointmentsByProfessional,
+      startMinutes: calendarStartMinutes, endMinutes: calendarEndMinutes,
       minutesPerSlot: CALENDAR_MINUTES_PER_SLOT,
-      fitSlotMaxMinutes: CALENDAR_END_MINUTES - CALENDAR_START_MINUTES,
+      fitSlotMaxMinutes: calendarEndMinutes - calendarStartMinutes,
       nowMinutes,
     }),
-    [professionals, appointmentsByProfessional, nowMinutes],
+    [availableProfessionals, appointmentsByProfessional, calendarStartMinutes, calendarEndMinutes, nowMinutes],
   );
 
-  const timeSlots = useMemo(() => buildCalendarTimeSlots(), []);
+  const timeSlots = useMemo(
+    () => buildCalendarTimeSlots(calendarStartMinutes, calendarEndMinutes),
+    [calendarStartMinutes, calendarEndMinutes],
+  );
   const bodyHeight =
-    ((CALENDAR_END_MINUTES - CALENDAR_START_MINUTES) / CALENDAR_MINUTES_PER_SLOT) *
+    ((calendarEndMinutes - calendarStartMinutes) / CALENDAR_MINUTES_PER_SLOT) *
     CALENDAR_SLOT_HEIGHT;
 
   const totalFreeSlots = useMemo(() => {
@@ -748,7 +769,7 @@ export function FitAppointmentPage() {
             bodyHeight={bodyHeight}
             slotHeight={CALENDAR_SLOT_HEIGHT}
             minutesPerSlot={CALENDAR_MINUTES_PER_SLOT}
-            startMinutes={CALENDAR_START_MINUTES}
+            startMinutes={calendarStartMinutes}
             nowMinutes={nowMinutes}
             onFreeFitBooking={handleFreeFitBooking}
             onStartAttendance={async (appointmentId) => {

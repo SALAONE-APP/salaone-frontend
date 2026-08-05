@@ -63,6 +63,12 @@ import {
   updateSettings,
 } from '../../service/settingsService';
 import { changePassword, updateProfilePhoto } from '../../service/userService';
+import {
+  BUSINESS_WEEKDAYS,
+  DEFAULT_BUSINESS_HOURS,
+  normalizeBusinessHours,
+  type BusinessHour,
+} from '@/utils/businessHours';
 
 type StoredSalon = {
   id?: string;
@@ -201,6 +207,9 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     schedule_line2: '',
     schedule_line3: '',
   });
+  const [businessHoursForm, setBusinessHoursForm] = useState<BusinessHour[]>(
+    () => normalizeBusinessHours(DEFAULT_BUSINESS_HOURS),
+  );
   const [aboutForm, setAboutForm] = useState({
     about_title: '',
     about_text1: '',
@@ -437,6 +446,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
           schedule_line2: data.schedule_line2 ?? '',
           schedule_line3: data.schedule_line3 ?? '',
         });
+        setBusinessHoursForm(normalizeBusinessHours(data.business_hours));
         setAboutForm({
           about_title: data.about_title ?? '',
           about_text1: data.about_text1 ?? '',
@@ -654,6 +664,12 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       ...current,
       [field]: value,
     }));
+  }
+
+  function updateBusinessHour(weekday: number, patch: Partial<BusinessHour>) {
+    setBusinessHoursForm((current) => current.map((item) =>
+      item.weekday === weekday ? { ...item, ...patch } : item,
+    ));
   }
 
   function updateHeroField(
@@ -1089,6 +1105,13 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   }
 
   async function saveGeneralSettings() {
+    const invalidBusinessDay = businessHoursForm.find(
+      (item) => item.isOpen && item.startTime >= item.endTime,
+    );
+    if (invalidBusinessDay) {
+      toast.error(`O horário final de ${BUSINESS_WEEKDAYS[invalidBusinessDay.weekday]} deve ser depois do inicial.`);
+      return;
+    }
     const trimmedHeroImages = heroForm.hero_images
       .map((image) => image.trim())
       .filter(Boolean)
@@ -1159,6 +1182,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
           ...trimmedAboutForm,
           ...trimmedLocationForm,
           ...trimmedWorkingHoursForm,
+          business_hours: businessHoursForm,
         }),
       ]);
 
@@ -1188,6 +1212,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         schedule_line2: updatedHomeInfo.schedule_line2 ?? '',
         schedule_line3: updatedHomeInfo.schedule_line3 ?? '',
       });
+      setBusinessHoursForm(normalizeBusinessHours(updatedHomeInfo.business_hours));
       setAboutForm({
         about_title: updatedHomeInfo.about_title ?? '',
         about_text1: updatedHomeInfo.about_text1 ?? '',
@@ -1715,6 +1740,41 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
           <div className="bg-card rounded-xl border border-border p-6">
             <h3 className="text-lg font-medium text-foreground mb-4">Horario de Funcionamento</h3>
             <div className="grid grid-cols-1 gap-4">
+              <p className="text-sm text-muted-foreground">
+                Estes horários controlam os agendamentos disponíveis para cada dia.
+              </p>
+              {businessHoursForm.map((item) => (
+                <div key={item.weekday} className="grid grid-cols-1 gap-3 rounded-lg border border-border p-3 sm:grid-cols-[160px_90px_1fr_1fr] sm:items-center">
+                  <span className="text-sm font-medium text-foreground">{BUSINESS_WEEKDAYS[item.weekday]}</span>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={item.isOpen}
+                      onCheckedChange={(checked) => updateBusinessHour(item.weekday, { isOpen: checked })}
+                      disabled={isLoadingHomeInfo || isSavingGeneralSettings}
+                    />
+                    <span className="text-xs text-muted-foreground">{item.isOpen ? 'Aberto' : 'Fechado'}</span>
+                  </div>
+                  <input
+                    type="time"
+                    value={item.startTime}
+                    onChange={(event) => updateBusinessHour(item.weekday, { startTime: event.target.value })}
+                    disabled={!item.isOpen || isLoadingHomeInfo || isSavingGeneralSettings}
+                    aria-label={`Abertura de ${BUSINESS_WEEKDAYS[item.weekday]}`}
+                    className="w-full bg-secondary text-sm text-foreground rounded-md px-3 py-2 border border-border disabled:opacity-50"
+                  />
+                  <input
+                    type="time"
+                    value={item.endTime}
+                    onChange={(event) => updateBusinessHour(item.weekday, { endTime: event.target.value })}
+                    disabled={!item.isOpen || isLoadingHomeInfo || isSavingGeneralSettings}
+                    aria-label={`Fechamento de ${BUSINESS_WEEKDAYS[item.weekday]}`}
+                    className="w-full bg-secondary text-sm text-foreground rounded-md px-3 py-2 border border-border disabled:opacity-50"
+                  />
+                </div>
+              ))}
+              <div className="border-t border-border pt-4 text-sm text-muted-foreground">
+                Os campos abaixo continuam sendo o texto exibido ao público.
+              </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Titulo</label>
                 <input
