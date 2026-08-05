@@ -940,6 +940,7 @@ export function BookingsPage() {
                 ) : (
                   filteredAppointments.map((appointment) => {
                     const start = formatDateTime(appointment.startAt);
+                    const end = formatDateTime(appointment.endAt);
                     const serviceText =
                       appointment.services
                         .map((service) => service.serviceName)
@@ -1031,7 +1032,7 @@ export function BookingsPage() {
                             </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Clock size={14} />
-                              {start.time}
+                              {start.time} – {end.time}
                             </div>
                           </div>
                         </td>

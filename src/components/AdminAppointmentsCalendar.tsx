@@ -126,13 +126,13 @@ export default function AdminAppointmentsCalendar({
 
     const ranges = appointments.map(getAppointmentRangeMinutes).filter(Boolean).sort((a, b) => a!.startMinutes - b!.startMinutes) as { startMinutes: number; endMinutes: number }[];
 
-    if (ranges.length < 2) return false;
-
     const hasAppointmentBefore = ranges.some((r) => r.endMinutes <= freeStart);
-    const hasAppointmentAfter = ranges.some((r) => r.startMinutes >= freeEnd);
     const overlapsAppointment = ranges.some((r) => freeStart < r.endMinutes && freeEnd > r.startMinutes);
 
-    return hasAppointmentBefore && hasAppointmentAfter && !overlapsAppointment;
+    // Exibe tambem o intervalo liberado depois do ultimo atendimento. Isso e
+    // essencial quando um servico termina antes da duracao originalmente
+    // prevista e nao existe outro agendamento depois dele.
+    return hasAppointmentBefore && !overlapsAppointment;
   };
 
   return (
