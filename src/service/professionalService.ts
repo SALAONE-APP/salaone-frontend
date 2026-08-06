@@ -54,6 +54,15 @@ export async function listProfessionals(
   return { page: 1, limit: items.length, total: items.length, items };
 }
 
+export async function listBookableProfessionals(): Promise<ListProfessionalsResponse> {
+  const response = await api.get<{ employees: BackendEmployee[] }>("/employees/bookable");
+  const items = response.data.employees
+    .filter((employee) => employee.is_active !== false && employee.is_professional !== false)
+    .map(normalizeProfessional);
+
+  return { page: 1, limit: items.length, total: items.length, items };
+}
+
 export async function getMyProfessional(): Promise<Professional> {
   const response = await api.get<{ employee: BackendEmployee }>("/employees/me");
   return normalizeProfessional(response.data.employee);

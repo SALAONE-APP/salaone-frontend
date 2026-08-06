@@ -58,7 +58,7 @@ import {
   type AppointmentStatus,
 } from "@/service/appointmentService";
 import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
-import { listProfessionals, type Professional } from "@/service/professionalService";
+import { listBookableProfessionals, type Professional } from "@/service/professionalService";
 import { listServices, type Service } from "@/service/serviceService";
 import { isFitAppointment } from "@/utils/fitAppointment";
 import { ClientPickerModal } from "@/components/ClientPickerModal";
@@ -236,7 +236,7 @@ export function ProfessionalBookingsPage() {
       try {
         const [servicesResult, professionalsResult] = await Promise.all([
           listServices({ includeInactive: false, page: 1, limit: 100 }),
-          listProfessionals({ page: 1, limit: 100 }),
+          listBookableProfessionals(),
         ]);
         setServices(servicesResult.items.filter((s) => s.active));
         setProfessionals(professionalsResult.items);
