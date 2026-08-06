@@ -58,6 +58,7 @@ import {
   type AppointmentStatus,
 } from "@/service/appointmentService";
 import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
+import { listProfessionals, type Professional } from "@/service/professionalService";
 import { listServices, type Service } from "@/service/serviceService";
 import { isFitAppointment } from "@/utils/fitAppointment";
 import { ClientPickerModal } from "@/components/ClientPickerModal";
@@ -68,6 +69,7 @@ type StatusFilter = "all" | "active" | AppointmentStatus;
 
 interface BookingFormState {
   clientId: string;
+  professionalId: string;
   date: string;
   time: string;
   serviceIds: string[];
@@ -152,6 +154,7 @@ const statusStyles: Record<AppointmentStatus, string> = {
 
 const emptyForm: BookingFormState = {
   clientId: "",
+  professionalId: "",
   date: dateToDateString(new Date()),
   time: "",
   serviceIds: [],
@@ -180,6 +183,7 @@ export function ProfessionalBookingsPage() {
   const [todayCount, setTodayCount] = useState<number | null>(null);
   const [form, setForm] = useState<BookingFormState>(emptyForm);
   const [services, setServices] = useState<Service[]>([]);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
 
@@ -230,8 +234,12 @@ export function ProfessionalBookingsPage() {
     if (!dialogOpen) return;
     async function loadFormOptions() {
       try {
-        const servicesResult = await listServices({ includeInactive: false, page: 1, limit: 100 });
+        const [servicesResult, professionalsResult] = await Promise.all([
+          listServices({ includeInactive: false, page: 1, limit: 100 }),
+          listProfessionals({ page: 1, limit: 100 }),
+        ]);
         setServices(servicesResult.items.filter((s) => s.active));
+        setProfessionals(professionalsResult.items);
       } catch (err) {
         toast.error(getApiMessage(err));
       }
@@ -250,18 +258,18 @@ export function ProfessionalBookingsPage() {
   );
 
   useEffect(() => {
-    if (!dialogOpen || !professional?.id || !form.date || totalDuration <= 0 || form.allowOutsideBusinessHours) {
+    if (!dialogOpen || !form.professionalId || !form.date || totalDuration <= 0 || form.allowOutsideBusinessHours) {
       setSlots([]);
       return;
     }
     let active = true;
     setSlotsLoading(true);
-    getAvailableSlots({ professionalId: professional.id, date: form.date, duration: totalDuration })
+    getAvailableSlots({ professionalId: form.professionalId, date: form.date, duration: totalDuration })
       .then((s) => { if (active) setSlots(s); })
       .catch((err) => { if (active) toast.error(getApiMessage(err)); })
       .finally(() => { if (active) setSlotsLoading(false); });
     return () => { active = false; };
-  }, [dialogOpen, professional, form.allowOutsideBusinessHours, form.date, totalDuration]);
+  }, [dialogOpen, form.allowOutsideBusinessHours, form.date, form.professionalId, totalDuration]);
 
   const filteredAppointments = useMemo(() => {
     const term = normalizeText(search.trim());
@@ -303,7 +311,7 @@ export function ProfessionalBookingsPage() {
   }
 
   function openCreateDialog(allowOutside = false) {
-    setForm({ ...emptyForm, date: dateToDateString(new Date()), allowOutsideBusinessHours: allowOutside });
+    setForm({ ...emptyForm, professionalId: professional?.id ?? "", date: dateToDateString(new Date()), allowOutsideBusinessHours: allowOutside });
     setSelectedClientName("");
     setDialogOpen(true);
   }
@@ -312,6 +320,7 @@ export function ProfessionalBookingsPage() {
     e.preventDefault();
     if (!professional?.id) return;
     if (!form.clientId) { toast.error("Selecione o cliente."); return; }
+    if (!form.professionalId) { toast.error("Selecione o profissional."); return; }
     if (!form.date) { toast.error("Selecione a data."); return; }
     if (!form.time) { toast.error("Selecione ou informe o horario."); return; }
     if (form.serviceIds.length === 0) { toast.error("Selecione pelo menos um servico."); return; }
@@ -325,7 +334,7 @@ export function ProfessionalBookingsPage() {
     try {
       await createAppointment({
         clientId: form.clientId,
-        professionalId: professional.id,
+        professionalId: form.professionalId,
         date: form.date,
         time: form.time,
         notes: form.notes.trim() || null,
@@ -713,9 +722,16 @@ export function ProfessionalBookingsPage() {
 
               <div className="space-y-2">
                 <Label>Profissional</Label>
-                <div className="flex h-9 items-center rounded-md border border-border bg-secondary/50 px-3 text-sm text-foreground">
-                  {professional.displayName}
-                </div>
+                {canManage ? (
+                  <Select value={form.professionalId} onValueChange={(value) => { setField("professionalId", value); setField("time", ""); }}>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Selecionar profissional" /></SelectTrigger>
+                    <SelectContent>
+                      {professionals.map((item) => <SelectItem key={item.id} value={item.id}>{item.displayName}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="flex h-9 items-center rounded-md border border-border bg-secondary/50 px-3 text-sm text-foreground">{professional.displayName}</div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -745,7 +761,7 @@ export function ProfessionalBookingsPage() {
                   <Select
                     value={form.time}
                     onValueChange={(v) => setField("time", v)}
-                    disabled={!form.date || totalDuration <= 0 || slotsLoading}
+                    disabled={!form.professionalId || !form.date || totalDuration <= 0 || slotsLoading}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder={slotsLoading ? "Carregando horarios" : "Selecionar horario"} />
