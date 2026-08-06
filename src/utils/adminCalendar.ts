@@ -410,9 +410,37 @@ export const buildCalendarFreeSlotsByProfessional = ({
 
     const freeSlots: FreeSlot[] = [];
 
+    const pauseAppointments = (appointmentsByProfessional.get(professional.id) || []).filter(
+      (apt) => ['scheduled', 'confirmed', 'in_service'].includes(apt.status) && apt.pauseStartAt && apt.pauseEndAt,
+    );
+
+    const addFreeGap = (gapStart: number, gapEnd: number) => {
+      const parent = pauseAppointments
+        .filter((apt) => {
+          const pauseStart = isoToMinutes(apt.pauseStartAt!);
+          const pauseEnd = isoToMinutes(apt.pauseEndAt!);
+          return gapStart >= pauseStart && gapEnd <= pauseEnd;
+        })
+        .sort((a, b) => {
+          const durationA = isoToMinutes(a.pauseEndAt!) - isoToMinutes(a.pauseStartAt!);
+          const durationB = isoToMinutes(b.pauseEndAt!) - isoToMinutes(b.pauseStartAt!);
+          return durationA - durationB;
+        })[0];
+
+      createFreeFitSlot({
+        freeSlots,
+        gapStart,
+        gapEnd,
+        minutesPerSlot,
+        fitSlotMaxMinutes: parent ? gapEnd - gapStart : fitSlotMaxMinutes,
+        endMinutes,
+        pauseAppointmentId: parent?.id,
+      });
+    };
+
     if (apts.length === 0) {
       const gapStart = nowMinutes !== null ? Math.max(startMinutes, nowMinutes) : startMinutes;
-      createFreeFitSlot({ freeSlots, gapStart, gapEnd: endMinutes, minutesPerSlot, fitSlotMaxMinutes, endMinutes });
+      addFreeGap(gapStart, endMinutes);
       map.set(professional.id, freeSlots);
       return;
     }
@@ -421,33 +449,14 @@ export const buildCalendarFreeSlotsByProfessional = ({
 
     apts.forEach((apt) => {
       if (apt.startM > cursor) {
-        createFreeFitSlot({ freeSlots, gapStart: cursor, gapEnd: apt.startM, minutesPerSlot, fitSlotMaxMinutes, endMinutes });
+        addFreeGap(cursor, apt.startM);
       }
       cursor = Math.max(cursor, apt.endM);
     });
 
     if (cursor < endMinutes) {
-      createFreeFitSlot({ freeSlots, gapStart: cursor, gapEnd: endMinutes, minutesPerSlot, fitSlotMaxMinutes, endMinutes });
+      addFreeGap(cursor, endMinutes);
     }
-
-    const pauseAppointments = (appointmentsByProfessional.get(professional.id) || []).filter(
-      (apt) => ['scheduled', 'confirmed', 'in_service'].includes(apt.status) && apt.pauseStartAt && apt.pauseEndAt,
-    );
-    freeSlots.forEach((slot) => {
-      const slotEnd = slot.startMinutes + slot.durationMinutes;
-      const parent = pauseAppointments
-        .filter((apt) => {
-          const pauseStart = isoToMinutes(apt.pauseStartAt!);
-          const pauseEnd = isoToMinutes(apt.pauseEndAt!);
-          return slot.startMinutes >= pauseStart && slotEnd <= pauseEnd;
-        })
-        .sort((a, b) => {
-          const durationA = isoToMinutes(a.pauseEndAt!) - isoToMinutes(a.pauseStartAt!);
-          const durationB = isoToMinutes(b.pauseEndAt!) - isoToMinutes(b.pauseStartAt!);
-          return durationA - durationB;
-        })[0];
-      if (parent) slot.pauseAppointmentId = parent.id;
-    });
 
     map.set(professional.id, freeSlots);
   });
