@@ -51,14 +51,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!localStorage.getItem("token")) return;
 
-    void fetchMe()
+    let active = true;
+    const refreshUser = () => {
+      if (!localStorage.getItem("token")) return;
+      void fetchMe()
       .then((freshUser) => {
+        if (!active) return;
         localStorage.setItem("user", JSON.stringify(freshUser));
         setUser(freshUser);
       })
       .catch(() => {
         // Mantém a sessão local em falhas transitórias de rede.
       });
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") refreshUser();
+    };
+
+    refreshUser();
+    window.addEventListener("focus", refreshUser);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      active = false;
+      window.removeEventListener("focus", refreshUser);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, []);
 
   async function login(email: string, password: string) {
