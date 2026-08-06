@@ -659,6 +659,34 @@
   color: #ffffff;
 }
 
+.calendar-pause-range {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  z-index: 35;
+  min-height: 14px;
+  box-sizing: border-box;
+  border: 2px solid rgba(52, 211, 153, 0.82);
+  border-radius: 5px;
+  background: rgba(6, 78, 59, 0.32);
+  color: #d1fae5;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.calendar-pause-range > span {
+  position: sticky;
+  top: 2px;
+  display: inline-block;
+  margin: 2px 4px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(6, 78, 59, 0.9);
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .apt-detail-pause-card {
   flex: 0 0 100%;
   padding: 14px;
