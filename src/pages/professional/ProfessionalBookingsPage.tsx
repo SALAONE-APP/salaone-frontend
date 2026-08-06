@@ -722,16 +722,12 @@ export function ProfessionalBookingsPage() {
 
               <div className="space-y-2">
                 <Label>Profissional</Label>
-                {canManage ? (
-                  <Select value={form.professionalId} onValueChange={(value) => { setField("professionalId", value); setField("time", ""); }}>
-                    <SelectTrigger className="w-full"><SelectValue placeholder="Selecionar profissional" /></SelectTrigger>
-                    <SelectContent>
-                      {professionals.map((item) => <SelectItem key={item.id} value={item.id}>{item.displayName}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div className="flex h-9 items-center rounded-md border border-border bg-secondary/50 px-3 text-sm text-foreground">{professional.displayName}</div>
-                )}
+                <Select value={form.professionalId} onValueChange={(value) => { setField("professionalId", value); setField("time", ""); }}>
+                  <SelectTrigger className="w-full"><SelectValue placeholder="Selecionar profissional" /></SelectTrigger>
+                  <SelectContent>
+                    {professionals.map((item) => <SelectItem key={item.id} value={item.id}>{item.displayName}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
