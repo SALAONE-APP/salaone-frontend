@@ -234,18 +234,20 @@ export function ProfessionalBookingsPage() {
     if (!dialogOpen) return;
     async function loadFormOptions() {
       try {
-        const [servicesResult, professionalsResult] = await Promise.all([
-          listServices({ includeInactive: false, page: 1, limit: 100 }),
-          listBookableProfessionals(),
-        ]);
+        const servicesResult = await listServices({ includeInactive: false, page: 1, limit: 100 });
         setServices(servicesResult.items.filter((s) => s.active));
-        setProfessionals(professionalsResult.items);
+        if (canManage) {
+          const professionalsResult = await listBookableProfessionals();
+          setProfessionals(professionalsResult.items);
+        } else {
+          setProfessionals(professional ? [professional] : []);
+        }
       } catch (err) {
         toast.error(getApiMessage(err));
       }
     }
     void loadFormOptions();
-  }, [dialogOpen]);
+  }, [canManage, dialogOpen, professional]);
 
   const selectedServices = useMemo(
     () => services.filter((s) => form.serviceIds.includes(s.id)),
@@ -722,12 +724,16 @@ export function ProfessionalBookingsPage() {
 
               <div className="space-y-2">
                 <Label>Profissional</Label>
-                <Select value={form.professionalId} onValueChange={(value) => { setField("professionalId", value); setField("time", ""); }}>
-                  <SelectTrigger className="w-full"><SelectValue placeholder="Selecionar profissional" /></SelectTrigger>
-                  <SelectContent>
-                    {professionals.map((item) => <SelectItem key={item.id} value={item.id}>{item.displayName}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                {canManage ? (
+                  <Select value={form.professionalId} onValueChange={(value) => { setField("professionalId", value); setField("time", ""); }}>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Selecionar profissional" /></SelectTrigger>
+                    <SelectContent>
+                      {professionals.map((item) => <SelectItem key={item.id} value={item.id}>{item.displayName}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="flex h-9 items-center rounded-md border border-border bg-secondary/50 px-3 text-sm text-foreground">{professional.displayName}</div>
+                )}
               </div>
 
               <div className="space-y-2">
