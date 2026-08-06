@@ -66,6 +66,14 @@ function normalizeRole(role?: string) {
   return role === "professional" ? "professional" : role;
 }
 
+function normalizePermissions(permissions?: Record<string, boolean> | null) {
+  if (!permissions) return permissions ?? null;
+  return {
+    ...permissions,
+    manageAgendamentos: permissions.manageAgendamentos ?? permissions.manageAppointments ?? false,
+  };
+}
+
 function normalizeSalon(salon: BackendSalon): StoredSalon {
   return {
     id: salon.id,
@@ -86,7 +94,7 @@ export async function login(data: LoginPayload): Promise<AuthResponse> {
   const user = {
     ...response.data.user,
     role: normalizeRole(membership?.role ?? response.data.user.role),
-    permissions: membership?.permissions ?? null,
+    permissions: normalizePermissions(membership?.permissions),
   };
 
   localStorage.setItem("token", response.data.token);
@@ -139,7 +147,7 @@ export async function fetchMe() {
   return {
     ...response.data.user,
     role: normalizeRole(membership?.role ?? response.data.user.role),
-    permissions: membership?.permissions ?? null,
+    permissions: normalizePermissions(membership?.permissions),
   };
 }
 

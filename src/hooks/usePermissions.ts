@@ -39,7 +39,12 @@ export function usePermissions() {
   function can(permission: PermissionKey): boolean {
     if (isAdmin) return true;
 
-    const explicit = user?.permissions?.[permission];
+    const legacyAliases: Partial<Record<PermissionKey, string[]>> = {
+      manageAgendamentos: ["manageAppointments"],
+    };
+    const explicit = user?.permissions?.[permission] ?? legacyAliases[permission]
+      ?.map((key) => user?.permissions?.[key])
+      .find((value) => value !== undefined && value !== null);
 
     // Valor explícito no banco tem prioridade (true ou false)
     if (explicit !== undefined && explicit !== null) return explicit === true;
