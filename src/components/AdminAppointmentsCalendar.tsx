@@ -264,6 +264,22 @@ export default function AdminAppointmentsCalendar({
                     const calDate = activeDateKey ? new Date(`${activeDateKey}T00:00:00`) : null;
                     const regularApts = professionalApts.filter((a) => !a.isFitAppointment);
                     const fitApts = professionalApts.filter((a) => a.isFitAppointment);
+                    const pauseRanges = professionalApts.flatMap((appointment) => {
+                      if (!appointment.pauseStartAt || !appointment.pauseEndAt) return [];
+                      const toMinutes = (value: string) => {
+                        const [hours, minutes] = new Intl.DateTimeFormat('en-GB', {
+                          timeZone: 'America/Sao_Paulo',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: false,
+                        }).format(new Date(value)).split(':').map(Number);
+                        return (hours ?? 0) * 60 + (minutes ?? 0);
+                      };
+                      const pauseStart = toMinutes(appointment.pauseStartAt);
+                      const pauseEnd = toMinutes(appointment.pauseEndAt);
+                      if (pauseEnd <= pauseStart) return [];
+                      return [{ id: appointment.id, startMinutes: pauseStart, durationMinutes: pauseEnd - pauseStart }];
+                    });
 
                     const aptOverlapsRegular = (apt: CalendarAppointment): boolean => {
                       const [fh, fm] = String(apt.startTime || '00:00').split(':').map(Number);
@@ -310,6 +326,21 @@ export default function AdminAppointmentsCalendar({
 
                     return (
                       <div key={professional.id} className="calendar-appointments-column" style={{ cursor: 'pointer' }} onClick={handleColumnClick}>
+                        {/* Full pause range, independent from the available fit slots inside it. */}
+                        {pauseRanges.map((pause) => {
+                          const pauseTop = ((pause.startMinutes - startMinutes) / minutesPerSlot) * slotHeight;
+                          const pauseHeight = (pause.durationMinutes / minutesPerSlot) * slotHeight;
+                          return (
+                            <div
+                              key={`pause-range-${pause.id}`}
+                              className="calendar-pause-range"
+                              style={{ top: `${pauseTop}px`, height: `${pauseHeight}px` }}
+                              aria-label={`Pausa de ${pause.durationMinutes} minutos`}
+                            >
+                              <span>Pausa · {pause.durationMinutes} min</span>
+                            </div>
+                          );
+                        })}
                         {/* Free fit slots */}
                         {professionalFreeSlots.map((freeSlot, freeIdx) => {
                           const freeTop = ((freeSlot.startMinutes - startMinutes) / minutesPerSlot) * slotHeight;
