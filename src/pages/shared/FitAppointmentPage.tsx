@@ -42,7 +42,6 @@ import {
   buildCalendarFreeSlotsByProfessional,
   buildCalendarTimeSlots,
   APPOINTMENT_CLIENT_STATUS_CONFIG,
-  CALENDAR_FIT_SLOT_MAX_MINUTES,
   CALENDAR_MINUTES_PER_SLOT,
   CALENDAR_SLOT_HEIGHT,
   getLocalDateKey,
@@ -513,7 +512,8 @@ export function FitAppointmentPage() {
     () => buildCalendarFreeSlotsByProfessional({
       professionals: availableProfessionals, appointmentsByProfessional,
       startMinutes: calendarStartMinutes, endMinutes: calendarEndMinutes,
-      minutesPerSlot: CALENDAR_MINUTES_PER_SLOT, fitSlotMaxMinutes: CALENDAR_FIT_SLOT_MAX_MINUTES,
+      minutesPerSlot: CALENDAR_MINUTES_PER_SLOT,
+      fitSlotMaxMinutes: calendarEndMinutes - calendarStartMinutes,
       nowMinutes,
     }),
     [availableProfessionals, appointmentsByProfessional, calendarStartMinutes, calendarEndMinutes, nowMinutes],
