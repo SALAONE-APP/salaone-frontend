@@ -9,8 +9,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { uploadProfilePhoto } from '@/service/uploadService';
 import {
   changePassword,
-  updateProfilePhoto,
-  updateUser,
+  updateMyProfile,
+  updateMyProfilePhoto,
 } from '@/service/userService';
 import {
   createDependent,
@@ -34,6 +34,10 @@ function formatCPF(value: string) {
     .replace(/^(\d{3})(\d)/, '$1.$2')
     .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
     .replace(/\.(\d{3})(\d)/, '.$1-$2');
+}
+
+function formatBirthDate(value?: string | null) {
+  return value ? value.slice(0, 10) : '';
 }
 
 function getApiErrorMessage(error: unknown) {
@@ -66,7 +70,7 @@ export function ClientSettingsPage() {
     email: user?.email ?? '',
     phone: user?.phone ? formatPhone(user.phone) : '',
     cpf: user?.cpf ? formatCPF(user.cpf) : '',
-    birthDate: user?.birthDate ?? user?.birth_date ?? '',
+    birthDate: formatBirthDate(user?.birthDate ?? user?.birth_date),
   });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
@@ -91,6 +95,17 @@ export function ClientSettingsPage() {
       void loadDependents(user.id);
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    setProfilePhotoUrl(user?.photoUrl ?? '');
+    setProfileForm({
+      name: user?.name ?? '',
+      email: user?.email ?? '',
+      phone: user?.phone ? formatPhone(user.phone) : '',
+      cpf: user?.cpf ? formatCPF(user.cpf) : '',
+      birthDate: formatBirthDate(user?.birthDate ?? user?.birth_date),
+    });
+  }, [user]);
 
   async function loadDependents(userId: string) {
     setIsLoadingDependents(true);
@@ -206,7 +221,7 @@ export function ClientSettingsPage() {
     setIsUploadingPhoto(true);
     try {
       const image = await uploadProfilePhoto(file);
-      const updated = await updateProfilePhoto(user.id, image.secure_url, image.public_id);
+      const updated = await updateMyProfilePhoto(image.secure_url, image.public_id);
       updateAuthUser({ ...user, ...updated, photoUrl: updated.photoUrl ?? '' });
       setProfilePhotoUrl(updated.photoUrl ?? '');
       toast.success('Foto de perfil atualizada.');
@@ -227,7 +242,7 @@ export function ClientSettingsPage() {
     if (!user?.id || isUploadingPhoto) return;
     setIsUploadingPhoto(true);
     try {
-      const updated = await updateProfilePhoto(user.id, null, null);
+      const updated = await updateMyProfilePhoto(null, null);
       updateAuthUser({ ...user, ...updated, photoUrl: '' });
       setProfilePhotoUrl('');
       toast.success('Foto removida.');
@@ -240,16 +255,33 @@ export function ClientSettingsPage() {
 
   async function handleSaveProfile() {
     if (!user?.id) return;
+
+    const name = profileForm.name.trim();
+    const email = profileForm.email.trim();
+    const phone = profileForm.phone.replace(/\D/g, '');
+    if (name.length < 2) {
+      toast.error('Informe seu nome completo.');
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      toast.error('Informe um email válido.');
+      return;
+    }
+    if (phone.length < 10) {
+      toast.error('Informe um telefone válido.');
+      return;
+    }
+
     setIsSavingProfile(true);
     try {
-      const updated = await updateUser(user.id, {
-        name: profileForm.name.trim() || undefined,
-        email: profileForm.email.trim() || undefined,
-        phone: profileForm.phone.replace(/\D/g, '') || null,
+      const updated = await updateMyProfile({
+        name,
+        email,
+        phone: phone || null,
         birthDate: profileForm.birthDate || null,
       });
       updateAuthUser({ ...user, ...updated });
-      toast.success('Informações salvas com sucesso.');
+      toast.success('Perfil atualizado com sucesso.');
     } catch (error) {
       toast.error(getApiErrorMessage(error) || 'Erro ao salvar informações.');
     } finally {
@@ -359,6 +391,7 @@ export function ClientSettingsPage() {
             <label className="text-sm font-medium text-foreground">Nome completo</label>
             <input
               type="text"
+              required
               value={profileForm.name}
               onChange={(e) => setProfileForm((f) => ({ ...f, name: e.target.value }))}
               className="w-full bg-secondary text-sm text-foreground rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-1 focus:ring-primary"
@@ -368,6 +401,7 @@ export function ClientSettingsPage() {
             <label className="text-sm font-medium text-foreground">Email</label>
             <input
               type="email"
+              required
               value={profileForm.email}
               onChange={(e) => setProfileForm((f) => ({ ...f, email: e.target.value }))}
               className="w-full bg-secondary text-sm text-foreground rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-1 focus:ring-primary"
@@ -377,6 +411,7 @@ export function ClientSettingsPage() {
             <label className="text-sm font-medium text-foreground">Telefone</label>
             <input
               type="tel"
+              required
               value={profileForm.phone}
               onChange={(e) =>
                 setProfileForm((f) => ({ ...f, phone: formatPhone(e.target.value) }))
