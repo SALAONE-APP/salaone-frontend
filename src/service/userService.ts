@@ -106,6 +106,14 @@ export async function updateUser(userId: string, data: UpdateUserPayload) {
   return response.data;
 }
 
+export async function updateMyProfile(
+  data: Pick<UpdateUserPayload, "name" | "email" | "phone" | "birthDate" | "photoUrl" | "photoPublicId">
+) {
+  const response = await api.patch<UserProfile>("/users/me", data);
+
+  return response.data;
+}
+
 export async function updateUserPermissions(
   userId: string,
   permissions: Record<string, boolean>
@@ -130,4 +138,8 @@ export async function updateProfilePhoto(userId: string, photoUrl: string | null
   });
 
   return response.data;
+}
+
+export async function updateMyProfilePhoto(photoUrl: string | null, photoPublicId: string | null) {
+  return updateMyProfile({ photoUrl, photoPublicId });
 }
