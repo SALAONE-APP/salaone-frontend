@@ -56,6 +56,8 @@ import {
 } from "@/service/blockedDateService";
 import { listProfessionals, type Professional } from "@/service/professionalService";
 import { listAppointments, type Appointment } from "@/service/appointmentService";
+import { getClientBookingBlockPeriod, updateClientBookingBlockPeriod } from "@/service/settingsService";
+import { usePermissions } from "@/hooks/usePermissions";
 
 /* ─── date helpers ─── */
 
@@ -242,6 +244,7 @@ function getTodayDayIndex(): number {
 /* ─── component ─── */
 
 export function SchedulesPage() {
+  const { isAdmin } = usePermissions();
   const [currentWeekMonday, setCurrentWeekMonday] = useState(() => getMonday(new Date()));
   const [selectedDayIndex, setSelectedDayIndex] = useState(getTodayDayIndex);
 
@@ -259,6 +262,9 @@ export function SchedulesPage() {
   const [blockedDateDialogOpen, setBlockedDateDialogOpen] = useState(false);
   const [editingBlockedDate, setEditingBlockedDate] = useState<BlockedDate | null>(null);
   const [form, setForm] = useState<BlockedDateFormState>(emptyBlockedDateForm);
+  const [clientBlockStart, setClientBlockStart] = useState("");
+  const [clientBlockEnd, setClientBlockEnd] = useState("");
+  const [savingClientBlock, setSavingClientBlock] = useState(false);
 
   const weekDates = useMemo(
     () => WEEK_DAYS.map((_, i) => addDays(currentWeekMonday, i)),
@@ -286,6 +292,50 @@ export function SchedulesPage() {
       setLoadingBlockedDates(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    getClientBookingBlockPeriod()
+      .then((period) => {
+        setClientBlockStart(period.startDate ?? "");
+        setClientBlockEnd(period.endDate ?? "");
+      })
+      .catch((err) => toast.error(getApiMessage(err)));
+  }, [isAdmin]);
+
+  async function saveClientBookingBlock() {
+    if (!clientBlockStart || !clientBlockEnd) {
+      toast.error("Informe as datas inicial e final do bloqueio.");
+      return;
+    }
+    if (clientBlockStart > clientBlockEnd) {
+      toast.error("A data final deve ser igual ou posterior a data inicial.");
+      return;
+    }
+    setSavingClientBlock(true);
+    try {
+      await updateClientBookingBlockPeriod({ startDate: clientBlockStart, endDate: clientBlockEnd });
+      toast.success("Periodo de autoagendamento bloqueado para os clientes.");
+    } catch (err) {
+      toast.error(getApiMessage(err));
+    } finally {
+      setSavingClientBlock(false);
+    }
+  }
+
+  async function clearClientBookingBlock() {
+    setSavingClientBlock(true);
+    try {
+      await updateClientBookingBlockPeriod({ startDate: null, endDate: null });
+      setClientBlockStart("");
+      setClientBlockEnd("");
+      toast.success("Autoagendamento liberado para todos os periodos.");
+    } catch (err) {
+      toast.error(getApiMessage(err));
+    } finally {
+      setSavingClientBlock(false);
+    }
+  }
 
   const loadScheduleData = useCallback(async (dateStr: string) => {
     try {
@@ -729,6 +779,41 @@ export function SchedulesPage() {
           </table>
         </div>
       </div>
+
+      {isAdmin && (
+        <div className="rounded-xl border border-amber-500/30 bg-card p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <CalendarX size={18} className="text-amber-600" />
+                <h3 className="text-base font-medium text-foreground">Bloquear autoagendamento dos clientes</h3>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Clientes nao poderao escolher datas dentro deste periodo. Agendamentos criados pela equipe continuam liberados.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="space-y-1.5">
+                <Label htmlFor="client-booking-block-start">Data inicial</Label>
+                <Input id="client-booking-block-start" type="date" value={clientBlockStart} onChange={(event) => setClientBlockStart(event.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="client-booking-block-end">Data final</Label>
+                <Input id="client-booking-block-end" type="date" value={clientBlockEnd} onChange={(event) => setClientBlockEnd(event.target.value)} />
+              </div>
+              <Button disabled={savingClientBlock} onClick={() => void saveClientBookingBlock()}>
+                {savingClientBlock && <Loader2 size={14} className="mr-2 animate-spin" />}
+                Bloquear periodo
+              </Button>
+              {(clientBlockStart || clientBlockEnd) && (
+                <Button variant="outline" disabled={savingClientBlock} onClick={() => void clearClientBookingBlock()}>
+                  Liberar periodo
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Blocked dates */}
       <div className="bg-card rounded-xl border border-border overflow-hidden">
