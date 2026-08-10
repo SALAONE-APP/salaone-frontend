@@ -253,6 +253,8 @@ export function BookingsPage() {
   const [sendingWhatsAppId, setSendingWhatsAppId] = useState<string | null>(
     null,
   );
+  const [bulkConfirmDialogOpen, setBulkConfirmDialogOpen] = useState(false);
+  const [bulkConfirming, setBulkConfirming] = useState(false);
 
   const limit = 20;
 
@@ -528,8 +530,18 @@ export function BookingsPage() {
     };
   }, [appointments]);
 
-  const { selectedRows, toggleRow, toggleAll } = useTableSelection(
+  const { selectedRows, toggleRow, toggleAll, clearSelection } = useTableSelection(
     filteredAppointments.map((appointment) => appointment.id),
+  );
+
+  const selectedAppointments = useMemo(
+    () => appointments.filter((appointment) => selectedRows.includes(appointment.id)),
+    [appointments, selectedRows],
+  );
+
+  const appointmentsToConfirm = useMemo(
+    () => selectedAppointments.filter((appointment) => appointment.status === "scheduled"),
+    [selectedAppointments],
   );
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -684,6 +696,42 @@ export function BookingsPage() {
     }
   }
 
+  async function handleBulkConfirm() {
+    if (appointmentsToConfirm.length === 0) return;
+
+    setBulkConfirming(true);
+    const results = await Promise.allSettled(
+      appointmentsToConfirm.map((appointment) =>
+        updateAppointment(appointment.id, { status: "confirmed" }),
+      ),
+    );
+    const confirmedCount = results.filter((result) => result.status === "fulfilled").length;
+    const failedCount = results.length - confirmedCount;
+
+    try {
+      await loadAppointments();
+      if (confirmedCount > 0) clearSelection();
+      setBulkConfirmDialogOpen(false);
+
+      if (failedCount === 0) {
+        toast.success(
+          `${confirmedCount} ${confirmedCount === 1 ? "agendamento confirmado" : "agendamentos confirmados"}.`,
+        );
+      } else if (confirmedCount > 0) {
+        toast.warning(
+          `${confirmedCount} confirmado(s), mas ${failedCount} nao puderam ser confirmados.`,
+        );
+      } else {
+        const firstFailure = results.find(
+          (result): result is PromiseRejectedResult => result.status === "rejected",
+        );
+        toast.error(getApiMessage(firstFailure?.reason));
+      }
+    } finally {
+      setBulkConfirming(false);
+    }
+  }
+
   async function handleCancel(appointment: Appointment) {
     try {
       await cancelAppointment(appointment.id);
@@ -806,6 +854,17 @@ export function BookingsPage() {
                   }`}
           </h3>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {selectedRows.length > 0 && (
+              <Button
+                size="sm"
+                className="gap-2"
+                disabled={appointmentsToConfirm.length === 0}
+                onClick={() => setBulkConfirmDialogOpen(true)}
+              >
+                <CheckCircle2 size={14} />
+                Confirmar selecionados ({appointmentsToConfirm.length})
+              </Button>
+            )}
             <div className="relative">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -1693,6 +1752,38 @@ export function BookingsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={bulkConfirmDialogOpen}
+        onOpenChange={(open) => !bulkConfirming && setBulkConfirmDialogOpen(open)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar agendamentos selecionados?</DialogTitle>
+            <DialogDescription>
+              {appointmentsToConfirm.length === 1
+                ? "1 agendamento sera confirmado."
+                : `${appointmentsToConfirm.length} agendamentos serao confirmados.`}
+              {selectedAppointments.length > appointmentsToConfirm.length
+                ? ` ${selectedAppointments.length - appointmentsToConfirm.length} item(ns) que nao estao com status Agendado serao ignorados.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={bulkConfirming}
+              onClick={() => setBulkConfirmDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button disabled={bulkConfirming} onClick={() => void handleBulkConfirm()}>
+              {bulkConfirming && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {bulkConfirming ? "Confirmando..." : "Confirmar agendamentos"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
