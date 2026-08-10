@@ -6,12 +6,14 @@ import {
   Edit,
   Filter,
   KeyRound,
+  LockOpen,
   Loader2,
   Mail,
   MoreHorizontal,
   Phone,
   Plus,
   Search,
+  ShieldBan,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -63,7 +65,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 
 import type { UserProfile } from "@/service/userService";
-import { createAdminClient, deleteAdminClient, importAdminClients, listAdminClients, resetAdminClientPassword, updateAdminClient, type ClientImportRow } from "@/service/adminClientService";
+import { createAdminClient, deleteAdminClient, importAdminClients, listAdminClients, resetAdminClientPassword, updateAdminClient, updateAdminClientAppointmentBlock, type ClientImportRow } from "@/service/adminClientService";
 import {
   createSubscription,
   type Subscription,
@@ -164,6 +166,17 @@ function formatDate(value?: string | null) {
     month: "2-digit",
     year: "numeric",
   }).format(date);
+}
+
+function dateToDateTimeLocal(date: Date) {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 16);
+}
+
+function isAppointmentBlocked(customer: UserProfile) {
+  if (!customer.appointmentBlockedAt) return false;
+  if (!customer.appointmentBlockedUntil) return true;
+  return new Date(customer.appointmentBlockedUntil).getTime() > Date.now();
 }
 
 function getDaysSinceLastVisit(customer: UserProfile) {
@@ -403,6 +416,10 @@ export function CustomersPage() {
   const [customerToResetPassword, setCustomerToResetPassword] = useState<UserProfile | null>(null);
   const [newClientPassword, setNewClientPassword] = useState("");
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [customerToBlock, setCustomerToBlock] = useState<UserProfile | null>(null);
+  const [blockUntil, setBlockUntil] = useState("");
+  const [blockReason, setBlockReason] = useState("");
+  const [updatingBlock, setUpdatingBlock] = useState(false);
   const [subscriptionMap, setSubscriptionMap] = useState<Map<string, Subscription>>(new Map());
   const [subDialogCustomer, setSubDialogCustomer] = useState<UserProfile | null>(null);
   const [availablePlans] = useState<Plan[]>([]);
@@ -787,6 +804,55 @@ export function CustomersPage() {
     }
   }
 
+  function openAppointmentBlockDialog(customer: UserProfile) {
+    const defaultUntil = new Date();
+    defaultUntil.setDate(defaultUntil.getDate() + 7);
+    defaultUntil.setSeconds(0, 0);
+    setCustomerToBlock(customer);
+    setBlockUntil(dateToDateTimeLocal(defaultUntil));
+    setBlockReason(customer.appointmentBlockReason ?? "");
+  }
+
+  async function handleAppointmentBlock(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!customerToBlock) return;
+
+    const until = blockUntil ? new Date(blockUntil) : null;
+    if (until && until.getTime() <= Date.now()) {
+      toast.error("Informe uma data futura para o fim do bloqueio.");
+      return;
+    }
+
+    setUpdatingBlock(true);
+    try {
+      await updateAdminClientAppointmentBlock(customerToBlock.id, {
+        blocked: true,
+        until: until?.toISOString() ?? null,
+        reason: blockReason.trim() || null,
+      });
+      toast.success("Agendamentos do cliente bloqueados.");
+      setCustomerToBlock(null);
+      await reloadCurrentPage();
+    } catch (err) {
+      toast.error(getApiMessage(err));
+    } finally {
+      setUpdatingBlock(false);
+    }
+  }
+
+  async function handleAppointmentUnblock(customer: UserProfile) {
+    setUpdatingBlock(true);
+    try {
+      await updateAdminClientAppointmentBlock(customer.id, { blocked: false });
+      toast.success("Agendamentos do cliente liberados.");
+      await reloadCurrentPage();
+    } catch (err) {
+      toast.error(getApiMessage(err));
+    } finally {
+      setUpdatingBlock(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
@@ -997,6 +1063,15 @@ export function CustomersPage() {
                           >
                             {statusLabel(status)}
                           </Badge>
+                          {isAppointmentBlocked(customer) && (
+                            <Badge
+                              variant="outline"
+                              className="ml-1 rounded-full border-red-500/20 bg-red-500/10 px-2 py-0.5 text-xs text-red-600"
+                              title={customer.appointmentBlockReason ?? undefined}
+                            >
+                              Agenda bloqueada
+                            </Badge>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           {(() => {
@@ -1098,15 +1173,31 @@ export function CustomersPage() {
                                 Editar cliente
                               </DropdownMenuItem>
                               {isAdmin && (
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setCustomerToResetPassword(customer);
-                                    setNewClientPassword("");
-                                  }}
-                                >
-                                  <KeyRound size={14} />
-                                  Redefinir senha
-                                </DropdownMenuItem>
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setCustomerToResetPassword(customer);
+                                      setNewClientPassword("");
+                                    }}
+                                  >
+                                    <KeyRound size={14} />
+                                    Redefinir senha
+                                  </DropdownMenuItem>
+                                  {isAppointmentBlocked(customer) ? (
+                                    <DropdownMenuItem
+                                      disabled={updatingBlock}
+                                      onClick={() => void handleAppointmentUnblock(customer)}
+                                    >
+                                      <LockOpen size={14} />
+                                      Liberar agendamentos
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem onClick={() => openAppointmentBlockDialog(customer)}>
+                                      <ShieldBan size={14} />
+                                      Bloquear agendamentos
+                                    </DropdownMenuItem>
+                                  )}
+                                </>
                               )}
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
@@ -1351,6 +1442,62 @@ export function CustomersPage() {
                 }
               >
                 {savingSub ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Salvando</> : "Criar plano"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(customerToBlock)}
+        onOpenChange={(open) => {
+          if (!open && !updatingBlock) setCustomerToBlock(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <form onSubmit={handleAppointmentBlock}>
+            <DialogHeader>
+              <DialogTitle>Bloquear agendamentos</DialogTitle>
+              <DialogDescription>
+                {customerToBlock?.name} nao podera criar novos agendamentos enquanto o bloqueio estiver ativo. O administrador ainda podera agendar em nome do cliente.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-5">
+              <div className="space-y-2">
+                <Label htmlFor="appointment-block-until">Bloqueado ate</Label>
+                <Input
+                  id="appointment-block-until"
+                  type="datetime-local"
+                  value={blockUntil}
+                  onChange={(event) => setBlockUntil(event.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Deixe vazio para manter bloqueado ate a liberacao manual.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="appointment-block-reason">Motivo</Label>
+                <Input
+                  id="appointment-block-reason"
+                  value={blockReason}
+                  maxLength={500}
+                  onChange={(event) => setBlockReason(event.target.value)}
+                  placeholder="Opcional"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={updatingBlock}
+                onClick={() => setCustomerToBlock(null)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" variant="destructive" disabled={updatingBlock}>
+                {updatingBlock && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Bloquear agendamentos
               </Button>
             </DialogFooter>
           </form>

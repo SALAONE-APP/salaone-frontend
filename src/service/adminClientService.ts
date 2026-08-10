@@ -9,6 +9,9 @@ interface BackendClient {
   cpf?: string | null;
   birth_date?: string | null;
   is_active: boolean;
+  appointment_blocked_at?: string | null;
+  appointment_blocked_until?: string | null;
+  appointment_block_reason?: string | null;
   created_at: string;
   updated_at: string;
   appointments?: Array<{ start_at: string; status: string }>;
@@ -24,6 +27,9 @@ function mapClient(client: BackendClient): UserProfile {
     role: "client", isAdmin: false, createdAt: client.created_at, updatedAt: client.updated_at,
     visits: visits.length, lastVisit,
     lastAppointmentStatus: client.is_active ? null : "inactive",
+    appointmentBlockedAt: client.appointment_blocked_at ?? null,
+    appointmentBlockedUntil: client.appointment_blocked_until ?? null,
+    appointmentBlockReason: client.appointment_block_reason ?? null,
   };
 }
 
@@ -57,6 +63,17 @@ export async function resetAdminClientPassword(id: string, newPassword: string) 
     newPassword,
   });
   return response.data;
+}
+
+export async function updateAdminClientAppointmentBlock(
+  id: string,
+  data: { blocked: boolean; until?: string | null; reason?: string | null },
+) {
+  const response = await api.patch<{ client: BackendClient }>(
+    `/clients/${id}/appointment-block`,
+    data,
+  );
+  return mapClient(response.data.client);
 }
 
 export interface ClientImportRow {
