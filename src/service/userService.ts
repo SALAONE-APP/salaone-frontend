@@ -37,9 +37,6 @@ export interface UserProfile {
   visits?: number;
   lastVisit?: string | null;
   lastAppointmentStatus?: string | null;
-  appointmentBlockedAt?: string | null;
-  appointmentBlockedUntil?: string | null;
-  appointmentBlockReason?: string | null;
 }
 
 export interface ListUsersParams {

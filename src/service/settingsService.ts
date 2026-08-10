@@ -38,6 +38,21 @@ export interface PaymentFrequencySettings {
   employeePaymentFrequency: PaymentFrequency;
 }
 
+export interface ClientBookingBlockPeriod {
+  startDate: string | null;
+  endDate: string | null;
+}
+
+export async function getClientBookingBlockPeriod() {
+  const response = await api.get<ClientBookingBlockPeriod>("/settings/client-booking-block");
+  return response.data;
+}
+
+export async function updateClientBookingBlockPeriod(data: ClientBookingBlockPeriod) {
+  const response = await api.put<ClientBookingBlockPeriod>("/settings/client-booking-block", data);
+  return response.data;
+}
+
 export async function getSettings() {
   const response = await api.get<Settings>("/settings");
   return response.data;
