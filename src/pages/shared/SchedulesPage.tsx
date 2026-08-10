@@ -56,7 +56,6 @@ import {
 } from "@/service/blockedDateService";
 import { listProfessionals, type Professional } from "@/service/professionalService";
 import { listAppointments, type Appointment } from "@/service/appointmentService";
-import { usePermissions } from "@/hooks/usePermissions";
 
 /* ─── date helpers ─── */
 
@@ -243,7 +242,6 @@ function getTodayDayIndex(): number {
 /* ─── component ─── */
 
 export function SchedulesPage() {
-  const { isAdmin } = usePermissions();
   const [currentWeekMonday, setCurrentWeekMonday] = useState(() => getMonday(new Date()));
   const [selectedDayIndex, setSelectedDayIndex] = useState(getTodayDayIndex);
 
