@@ -160,10 +160,20 @@ export async function listAllPayments(params: ListPaymentsParams = {}): Promise<
 
 export async function updatePayment(
   payment: Pick<PaymentRecord, "id" | "appointmentId">,
-  data: { status?: PaymentStatus; method?: PaymentMethod; paidAt?: string; noShow?: boolean },
+  data: { status?: PaymentStatus; method?: PaymentMethod; amount?: number; discountAmount?: number | null; paidAt?: string; noShow?: boolean },
 ) {
   const response = await api.patch<PaymentRecord>(`/payments/${payment.id}`, data);
 
+  return response.data;
+}
+
+export interface SplitPaymentPart {
+  method: Exclude<PaymentMethod, "local" | "subscription">;
+  amount: number;
+}
+
+export async function splitPayment(paymentId: string, parts: SplitPaymentPart[], totalAmount: number, discountAmount: number) {
+  const response = await api.post<PaymentRecord[]>(`/payments/${paymentId}/split`, { parts, totalAmount, discountAmount });
   return response.data;
 }
 
