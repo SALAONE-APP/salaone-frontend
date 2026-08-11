@@ -153,8 +153,12 @@ export function ProfileSidebar({ title, homeHref, sections }: ProfileSidebarProp
         mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       )}
     >
-      <div className="flex items-center justify-between border-b border-sidebar-border p-4">
-        <Link to={homeHref} className="flex items-center gap-3" onClick={closeMobile}>
+      <div className="flex min-w-0 items-center gap-2 border-b border-sidebar-border p-4">
+        <Link
+          to={homeHref}
+          className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden"
+          onClick={closeMobile}
+        >
           <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary">
             {logoUrl ? (
               <img src={logoUrl} alt={sidebarTitle} className="h-full w-full object-cover" />
@@ -165,7 +169,7 @@ export function ProfileSidebar({ title, homeHref, sections }: ProfileSidebarProp
             )}
           </div>
           {!collapsed && (
-            <span className="truncate font-semibold text-sidebar-foreground">
+            <span className="min-w-0 truncate font-semibold text-sidebar-foreground">
               {sidebarTitle}
             </span>
           )}
@@ -175,7 +179,7 @@ export function ProfileSidebar({ title, homeHref, sections }: ProfileSidebarProp
         <button
           type="button"
           onClick={closeMobile}
-          className="rounded-md p-1 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground md:hidden"
+          className="relative z-10 flex-shrink-0 rounded-md p-1 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground md:hidden"
           aria-label="Fechar menu"
         >
           <X size={16} />
@@ -185,7 +189,7 @@ export function ProfileSidebar({ title, homeHref, sections }: ProfileSidebarProp
         <button
           type="button"
           onClick={() => setCollapsed(!collapsed)}
-          className="hidden rounded-md p-1 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground md:flex"
+          className="hidden flex-shrink-0 rounded-md p-1 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground md:flex"
           aria-label={collapsed ? "Expandir sidebar" : "Colapsar sidebar"}
         >
           {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}

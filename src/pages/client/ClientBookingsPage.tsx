@@ -73,7 +73,7 @@ import {
   type Subscription,
 } from "@/service/subscriptionService";
 import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
-import { getSettings, type BookingPaymentMethod, type SubscriptionProfessionalRule } from "@/service/settingsService";
+import { getClientBookingBlockPeriod, getSettings, type BookingPaymentMethod, type ClientBookingBlockPeriod, type SubscriptionProfessionalRule } from "@/service/settingsService";
 import {
   createAppointmentPayment,
   listAppointmentPayments,
@@ -330,6 +330,7 @@ export function ClientBookingsPage() {
   // Regra de profissional por assinatura
   const [subscriptionProfessionalRule, setSubscriptionProfessionalRule] = useState<SubscriptionProfessionalRule>("fixed");
   const [hiddenPaymentMethods, setHiddenPaymentMethods] = useState<BookingPaymentMethod[]>([]);
+  const [clientBookingBlock, setClientBookingBlock] = useState<ClientBookingBlockPeriod>({ startDate: null, endDate: null });
 
   // Perfil da salão (para WhatsApp)
   const [salonProfile, setSalonProfile] = useState<SalonProfile | null>(null);
@@ -409,9 +410,10 @@ export function ClientBookingsPage() {
       } catch (err) { toast.error(getApiMessage(err)); }
 
       try {
-        const settings = await getSettings();
+        const [settings, bookingBlock] = await Promise.all([getSettings(), getClientBookingBlockPeriod()]);
         setSubscriptionProfessionalRule(settings.subscriptionProfessionalRule ?? "fixed");
         setHiddenPaymentMethods(settings.hiddenBookingPaymentMethods ?? []);
+        setClientBookingBlock(bookingBlock);
       } catch {
         // fallback para "fixed" se o endpoint não estiver acessível para o usuário
       }
@@ -437,6 +439,30 @@ export function ClientBookingsPage() {
   const serviceTotal = useMemo(() => selectedServices.reduce((sum, s) => sum + getServicePrice(s), 0), [selectedServices]);
   const productTotal = useMemo(() => selectedProducts.reduce((sum, product) => sum + product.price * product.quantity, 0), [selectedProducts]);
   const totalPrice = serviceTotal + productTotal;
+
+  function isClientBookingDateBlocked(date: string) {
+    return Boolean(
+      date &&
+      clientBookingBlock.startDate &&
+      clientBookingBlock.endDate &&
+      date >= clientBookingBlock.startDate &&
+      date <= clientBookingBlock.endDate,
+    );
+  }
+
+  function selectClientBookingDate(date: string, reschedule = false) {
+    if (isClientBookingDateBlocked(date)) {
+      toast.error(`Agendamentos online indisponiveis de ${formatDateBR(clientBookingBlock.startDate!)} ate ${formatDateBR(clientBookingBlock.endDate!)}.`);
+      return;
+    }
+    if (reschedule) {
+      setRescheduleDate(date);
+      setRescheduleTime("");
+    } else {
+      setField("date", date);
+      setField("time", "");
+    }
+  }
 
   const isFixedRule = subscriptionProfessionalRule === "fixed";
   const hasActiveSubscription =
@@ -1075,7 +1101,7 @@ export function ClientBookingsPage() {
               <Label>Nova data</Label>
               <AppCalendar
                 value={dateStringToDate(rescheduleDate)}
-                onChange={(date) => setRescheduleDate(dateToDateString(date))}
+                onChange={(date) => selectClientBookingDate(dateToDateString(date), true)}
                 fromYear={new Date().getFullYear()}
                 toYear={new Date().getFullYear() + 1}
                 className="h-9 rounded-md"
@@ -1192,7 +1218,7 @@ export function ClientBookingsPage() {
               <>
               <div className="space-y-2">
                 <Label>Data</Label>
-                <AppCalendar value={dateStringToDate(form.date)} onChange={(d) => { setField("date", dateToDateString(d)); setField("time", ""); }} fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 1} className="h-9 rounded-md" />
+                <AppCalendar value={dateStringToDate(form.date)} onChange={(date) => selectClientBookingDate(dateToDateString(date))} fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 1} className="h-9 rounded-md" />
               </div>
 
               <div className="space-y-3 md:col-span-2">
