@@ -9,6 +9,7 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 import AdminAppointmentsCalendar from "@/components/AdminAppointmentsCalendar";
 import { AppCalendar } from "@/components/AppCalendar";
@@ -37,6 +38,7 @@ import { listProfessionals, type Professional } from "@/service/professionalServ
 import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
 import { getHomeInfo } from "@/service/homeInfoService";
 import { listServices, type Service } from "@/service/serviceService";
+import { openServiceTab } from "@/service/serviceTabService";
 import {
   buildCalendarAppointmentsByProfessional,
   buildCalendarFreeSlotsByProfessional,
@@ -413,6 +415,7 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
 /* ── FitAppointmentPage ── */
 
 export function FitAppointmentPage() {
+  const navigate = useNavigate();
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(getTodaySaoPaulo);
@@ -806,11 +809,13 @@ export function FitAppointmentPage() {
             onStartAttendance={async (appointmentId) => {
               try {
                 await updateAppointment(appointmentId, { status: "in_service" });
-                toast.success("Atendimento iniciado.");
+                await openServiceTab(appointmentId);
+                toast.success("Atendimento iniciado e comanda aberta.");
                 await loadAppointments();
+                navigate("/service-tabs");
               } catch (error) {
                 const apiMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-                toast.error(apiMessage || "Não foi possível iniciar o atendimento.");
+                toast.error(apiMessage || "Não foi possível iniciar o atendimento e abrir a comanda.");
                 throw error;
               }
             }}

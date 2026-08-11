@@ -260,8 +260,33 @@ export function ProfessionalEarningsPage({
             })
           : getMyPayrollSummary({ periodStart: periodStartStr, periodEnd: periodEndStr }),
       ]);
-      setAppointments(appointmentsRes.items);
-      setRow(summaryRes.items[0] ?? null);
+      const summaryRow = summaryRes.items[0] ?? null;
+      const tabAttendances: Appointment[] = (summaryRow?.serviceTabAttendances ?? []).map((item) => ({
+        id: `service-tab-${item.id}`,
+        professionalId: professional.id,
+        clientId: item.clientId,
+        startAt: item.paidAt,
+        endAt: item.paidAt,
+        status: "completed",
+        notes: `Comanda #${item.tabId.slice(0, 8).toUpperCase()}`,
+        professional: { id: professional.id, displayName: professional.displayName },
+        client: { id: item.clientId, name: item.clientName },
+        services: [{
+          id: item.id,
+          serviceId: item.serviceId ?? item.id,
+          serviceName: `${item.serviceName} (comanda)`,
+          unitPrice: item.unitPrice,
+          durationMinutes: 0,
+          quantity: item.quantity,
+          totalPrice: item.totalAmount,
+          commissionAmount: item.commissionAmount,
+        }],
+        products: [],
+        totalAmount: item.totalAmount,
+        commissionAmount: item.commissionAmount,
+      }));
+      setAppointments([...appointmentsRes.items, ...tabAttendances]);
+      setRow(summaryRow);
     } catch (err) {
       toast.error(getApiMessage(err));
     } finally {

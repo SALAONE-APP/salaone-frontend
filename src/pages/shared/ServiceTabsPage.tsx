@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { listAppointments, type Appointment } from "@/service/appointmentService";
 import { listProducts, type Product } from "@/service/productService";
-import { listProfessionals, type Professional } from "@/service/professionalService";
+import { listBookableProfessionals, type Professional } from "@/service/professionalService";
 import { listServices, type Service } from "@/service/serviceService";
 import {
   addServiceTabItem,
@@ -28,6 +28,11 @@ import {
 
 function money(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function parseMoneyInput(value: string) {
+  const digits = value.replace(/\D/g, "");
+  return digits ? Number(digits) / 100 : 0;
 }
 
 function message(error: unknown) {
@@ -68,7 +73,7 @@ export function ServiceTabsPage() {
         listAppointments({ status: "in_service", allAppointments: true, limit: 100 }),
         listServices({ limit: 100 }),
         listProducts({ active: true }),
-        listProfessionals(),
+        listBookableProfessionals(),
       ]);
       setTabs(tabData);
       setAppointments(appointmentData.items);
@@ -111,11 +116,11 @@ export function ServiceTabsPage() {
       toast.error("Selecione o item.");
       return;
     }
-    if (itemForm.type === "service" && !itemForm.professionalId) {
-      toast.error("Selecione o atendente responsável pelo serviço.");
+    if ((itemForm.type === "service" || itemForm.type === "consumption") && !itemForm.professionalId) {
+      toast.error("Selecione o funcionário responsável.");
       return;
     }
-    if (itemForm.type === "consumption" && (!itemForm.name.trim() || Number(itemForm.unitPrice) < 0)) {
+    if (itemForm.type === "consumption" && (!itemForm.name.trim() || parseMoneyInput(itemForm.unitPrice) < 0)) {
       toast.error("Informe o consumo e o valor.");
       return;
     }
@@ -126,8 +131,8 @@ export function ServiceTabsPage() {
         referenceId: itemForm.referenceId || null,
         name: itemForm.name || null,
         quantity: itemForm.quantity,
-        unitPrice: itemForm.type === "consumption" ? Number(itemForm.unitPrice) : null,
-        professionalId: itemForm.type === "service" ? itemForm.professionalId : null,
+        unitPrice: itemForm.type === "consumption" ? parseMoneyInput(itemForm.unitPrice) : null,
+        professionalId: itemForm.type === "service" || itemForm.type === "consumption" ? itemForm.professionalId : null,
       };
       if (editingItemId) {
         await updateServiceTabItem(itemTab.id, editingItemId, payload);
@@ -155,7 +160,7 @@ export function ServiceTabsPage() {
       referenceId: item.referenceId ?? "",
       name: item.name,
       quantity: item.quantity,
-      unitPrice: String(item.unitPrice),
+      unitPrice: item.type === "consumption" ? money(item.unitPrice) : String(item.unitPrice),
       professionalId: item.professional?.id ?? tab.appointment.professional.id,
     });
   }
@@ -230,8 +235,8 @@ export function ServiceTabsPage() {
                 <div>
                   <p className="font-medium text-foreground">{item.name}</p>
                   <p className="text-xs text-muted-foreground">{item.quantity} × {money(item.unitPrice)}</p>
-                  {item.type === "service" && item.professional && (
-                    <p className="text-xs text-muted-foreground">Atendente: {item.professional.displayName}</p>
+                  {(item.type === "service" || item.type === "consumption") && item.professional && (
+                    <p className="text-xs text-muted-foreground">Responsável: {item.professional.displayName}</p>
                   )}
                 </div>
               </div>
@@ -352,11 +357,12 @@ export function ServiceTabsPage() {
         <DialogContent>
           <DialogHeader><DialogTitle>{editingItemId ? "Editar item da comanda" : "Adicionar item a comanda"}</DialogTitle></DialogHeader>
           <form onSubmit={handleAddItem} className="space-y-4">
-            <div className="space-y-2"><Label>Tipo</Label><Select disabled={Boolean(editingItemId)} value={itemForm.type} onValueChange={(type: ServiceTabItemType) => setItemForm({ ...emptyItem, type, professionalId: type === "service" ? itemTab?.appointment.professional.id ?? "" : "" })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="service">Servico extra</SelectItem><SelectItem value="product">Produto</SelectItem><SelectItem value="consumption">Outro consumo</SelectItem></SelectContent></Select></div>
+            <div className="space-y-2"><Label>Tipo</Label><Select disabled={Boolean(editingItemId)} value={itemForm.type} onValueChange={(type: ServiceTabItemType) => setItemForm({ ...emptyItem, type, professionalId: type === "service" || type === "consumption" ? itemTab?.appointment.professional.id ?? "" : "" })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="service">Outros serviços</SelectItem><SelectItem value="product">Produto</SelectItem><SelectItem value="consumption">Outro consumo</SelectItem></SelectContent></Select></div>
             {itemForm.type === "service" && <div className="space-y-2"><Label>Serviço extra</Label><Select value={itemForm.referenceId} onValueChange={(referenceId) => setItemForm((form) => ({ ...form, referenceId }))}><SelectTrigger><SelectValue placeholder="Escolha outro serviço para o atendimento" /></SelectTrigger><SelectContent>{services.map((service) => { const price = Number(service.promotionalPrice ?? 0) > 0 ? Number(service.promotionalPrice) : service.basePrice; return <SelectItem key={service.id} value={service.id} disabled={price <= 0}>{service.name} · {money(price)}</SelectItem>; })}</SelectContent></Select><p className="text-xs text-muted-foreground">Selecione qualquer serviço adicional oferecido durante o atendimento.</p></div>}
-            {itemForm.type === "service" && <div className="space-y-2"><Label>Atendente</Label><Select value={itemForm.professionalId} onValueChange={(professionalId) => setItemForm((form) => ({ ...form, professionalId }))}><SelectTrigger><SelectValue placeholder="Selecione o atendente" /></SelectTrigger><SelectContent>{professionals.map((professional) => <SelectItem key={professional.id} value={professional.id}>{professional.displayName}</SelectItem>)}</SelectContent></Select><p className="text-xs text-muted-foreground">Pode ser o atendente principal ou outro profissional.</p></div>}
+            {itemForm.type === "service" && <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-3"><Label>Funcionário responsável</Label><Select value={itemForm.professionalId} onValueChange={(professionalId) => setItemForm((form) => ({ ...form, professionalId }))}><SelectTrigger><SelectValue placeholder="Escolha quem realizou o serviço" /></SelectTrigger><SelectContent>{professionals.map((professional) => <SelectItem key={professional.id} value={professional.id}>{professional.displayName}{professional.id === itemTab?.appointment.professional.id ? " (atendimento principal)" : ""}</SelectItem>)}</SelectContent></Select>{professionals.length === 0 ? <p className="text-xs text-destructive">Nenhum profissional ativo disponível.</p> : <p className="text-xs text-muted-foreground">Selecione o funcionário que realizou este serviço, mesmo que seja diferente do atendimento principal.</p>}</div>}
             {itemForm.type === "product" && <div className="space-y-2"><Label>Produto</Label><Select value={itemForm.referenceId} onValueChange={(referenceId) => setItemForm((form) => ({ ...form, referenceId }))}><SelectTrigger><SelectValue placeholder="Selecionar produto" /></SelectTrigger><SelectContent>{products.map((product) => <SelectItem key={product.id} value={product.id} disabled={product.stock <= 0}>{product.name} · {money(product.price)} · estoque {product.stock}</SelectItem>)}</SelectContent></Select></div>}
-            {itemForm.type === "consumption" && <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>Consumo</Label><Input value={itemForm.name} onChange={(event) => setItemForm((form) => ({ ...form, name: event.target.value }))} placeholder="Cafe, agua..." /></div><div className="space-y-2"><Label>Valor unitario</Label><Input type="number" min={0} step="0.01" value={itemForm.unitPrice} onChange={(event) => setItemForm((form) => ({ ...form, unitPrice: event.target.value }))} /></div></div>}
+            {itemForm.type === "consumption" && <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>Consumo</Label><Input value={itemForm.name} onChange={(event) => setItemForm((form) => ({ ...form, name: event.target.value }))} placeholder="Cafe, agua..." /></div><div className="space-y-2"><Label>Valor unitário</Label><Input inputMode="numeric" placeholder="R$ 0,00" value={itemForm.unitPrice} onChange={(event) => setItemForm((form) => ({ ...form, unitPrice: money(parseMoneyInput(event.target.value)) }))} /></div></div>}
+            {itemForm.type === "consumption" && <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-3"><Label>Funcionário responsável</Label><Select value={itemForm.professionalId} onValueChange={(professionalId) => setItemForm((form) => ({ ...form, professionalId }))}><SelectTrigger><SelectValue placeholder="Escolha o responsável pelo consumo" /></SelectTrigger><SelectContent>{professionals.map((professional) => <SelectItem key={professional.id} value={professional.id}>{professional.displayName}{professional.id === itemTab?.appointment.professional.id ? " (atendimento principal)" : ""}</SelectItem>)}</SelectContent></Select>{professionals.length === 0 ? <p className="text-xs text-destructive">Nenhum profissional ativo disponível.</p> : <p className="text-xs text-muted-foreground">Selecione o funcionário responsável por este consumo.</p>}</div>}
             <div className="space-y-2"><Label>Quantidade</Label><div className="flex items-center gap-2"><Button type="button" size="icon" variant="outline" onClick={() => setItemForm((form) => ({ ...form, quantity: Math.max(1, form.quantity - 1) }))}><Minus size={16} /></Button><span className="w-10 text-center">{itemForm.quantity}</span><Button type="button" size="icon" variant="outline" onClick={() => setItemForm((form) => ({ ...form, quantity: form.quantity + 1 }))}><Plus size={16} /></Button></div></div>
             <DialogFooter><Button type="button" variant="outline" onClick={() => { setItemTab(null); setEditingItemId(null); }}>Cancelar</Button><Button type="submit" disabled={busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editingItemId ? "Salvar alterações" : "Adicionar"}</Button></DialogFooter>
           </form>
