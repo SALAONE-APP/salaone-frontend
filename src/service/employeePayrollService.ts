@@ -97,6 +97,21 @@ export interface EmployeePayrollRow {
   vales: EmployeeVale[];
   payments: EmployeePayment[];
   paymentHistory: EmployeePayment[];
+  serviceTabAttendances?: Array<{
+    id: string;
+    tabId: string;
+    appointmentId: string;
+    clientId: string;
+    clientName: string;
+    serviceId?: string | null;
+    serviceName: string;
+    unitPrice: number;
+    quantity: number;
+    totalAmount: number;
+    commissionAmount: number;
+    startAt: string;
+    paidAt: string;
+  }>;
 }
 
 export interface PayrollSummaryResponse {
