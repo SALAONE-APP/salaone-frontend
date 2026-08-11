@@ -17,6 +17,7 @@ import {
   MoreHorizontal,
   Package,
   Plus,
+  ReceiptText,
   Search,
   Scissors,
   User,
@@ -24,6 +25,7 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 import { AppCalendar } from "@/components/AppCalendar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -58,6 +60,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useTableSelection } from "@/hooks/useTableSelection";
 import {
   cancelAppointment,
@@ -87,6 +90,7 @@ import { isFitAppointment } from "@/utils/fitAppointment";
 import { ClientPickerModal } from "@/components/ClientPickerModal";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { hasWhatsAppPhone, sendAppointmentWhatsApp } from "@/utils/whatsapp";
+import { openServiceTab } from "@/service/serviceTabService";
 
 type StatusFilter = "all" | "active" | AppointmentStatus;
 
@@ -215,6 +219,8 @@ function getServiceDuration(service: Service) {
 
 export function BookingsPage() {
   const { user } = useAuth();
+  const { can } = usePermissions();
+  const navigate = useNavigate();
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [total, setTotal] = useState(0);
@@ -255,6 +261,7 @@ export function BookingsPage() {
   );
   const [bulkConfirmDialogOpen, setBulkConfirmDialogOpen] = useState(false);
   const [bulkConfirming, setBulkConfirming] = useState(false);
+  const [startingAttendanceId, setStartingAttendanceId] = useState<string | null>(null);
 
   const limit = 20;
 
@@ -693,6 +700,24 @@ export function BookingsPage() {
       }
     } catch (err) {
       toast.error(getApiMessage(err));
+    }
+  }
+
+  async function startAttendanceWithTab(appointment: Appointment) {
+    setStartingAttendanceId(appointment.id);
+    try {
+      if (appointment.status !== "in_service") {
+        await updateAppointment(appointment.id, { status: "in_service" });
+      }
+      await openServiceTab(appointment.id);
+      toast.success("Atendimento iniciado e comanda aberta.");
+      await loadAppointments();
+      navigate("/service-tabs");
+    } catch (err) {
+      toast.error(getApiMessage(err));
+      await loadAppointments();
+    } finally {
+      setStartingAttendanceId(null);
     }
   }
 
@@ -1140,6 +1165,19 @@ export function BookingsPage() {
                                 <CheckCircle2 size={14} />
                                 Confirmar
                               </DropdownMenuItem>
+                              {can("managePayments") && ["scheduled", "confirmed", "in_service"].includes(appointment.status) && (
+                                <DropdownMenuItem
+                                  disabled={startingAttendanceId === appointment.id}
+                                  onClick={() => void startAttendanceWithTab(appointment)}
+                                >
+                                  {startingAttendanceId === appointment.id ? (
+                                    <Loader2 size={14} className="animate-spin" />
+                                  ) : (
+                                    <ReceiptText size={14} />
+                                  )}
+                                  {appointment.status === "in_service" ? "Abrir comanda" : "Iniciar atendimento e abrir comanda"}
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
                                 disabled={appointment.status === "completed"}
                                 onClick={() =>
