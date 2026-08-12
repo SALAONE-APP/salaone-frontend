@@ -262,6 +262,9 @@ export function BookingsPage() {
   const [bulkConfirmDialogOpen, setBulkConfirmDialogOpen] = useState(false);
   const [bulkConfirming, setBulkConfirming] = useState(false);
   const [startingAttendanceId, setStartingAttendanceId] = useState<string | null>(null);
+  const [completionAppointment, setCompletionAppointment] = useState<Appointment | null>(null);
+  const [completionTime, setCompletionTime] = useState("");
+  const [completing, setCompleting] = useState(false);
 
   const limit = 20;
 
@@ -700,6 +703,42 @@ export function BookingsPage() {
       }
     } catch (err) {
       toast.error(getApiMessage(err));
+    }
+  }
+
+  function openCompletionDialog(appointment: Appointment) {
+    const now = new Date();
+    setCompletionAppointment(appointment);
+    setCompletionTime(now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false }));
+  }
+
+  async function handleCompleteAppointment() {
+    if (!completionAppointment || !/^\d{2}:\d{2}$/.test(completionTime)) {
+      toast.error("Informe um horario valido.");
+      return;
+    }
+    const appointmentDate = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date(completionAppointment.startAt));
+    const completedAt = new Date(`${appointmentDate}T${completionTime}:00-03:00`);
+    if (completedAt.getTime() <= new Date(completionAppointment.startAt).getTime()) {
+      toast.error("O horario final deve ser posterior ao inicio do atendimento.");
+      return;
+    }
+    if (completedAt.getTime() > Date.now()) {
+      toast.error("O horario final nao pode estar no futuro.");
+      return;
+    }
+    setCompleting(true);
+    try {
+      await updateAppointment(completionAppointment.id, { status: "completed", completedAt: completedAt.toISOString() });
+      toast.success("Atendimento finalizado no horario informado.");
+      setCompletionAppointment(null);
+      await loadAppointments();
+    } catch (err) {
+      toast.error(getApiMessage(err));
+    } finally {
+      setCompleting(false);
     }
   }
 
@@ -1180,8 +1219,9 @@ export function BookingsPage() {
                               )}
                               <DropdownMenuItem
                                 disabled={appointment.status === "completed"}
-                                onClick={() =>
-                                  changeStatus(appointment, "completed")
+                                onClick={() => user?.role === "admin"
+                                  ? openCompletionDialog(appointment)
+                                  : void changeStatus(appointment, "completed")
                                 }
                               >
                                 <CheckCircle2 size={14} />
@@ -1448,6 +1488,37 @@ export function BookingsPage() {
               ) : (
                 "Confirmar transferencia"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(completionAppointment)} onOpenChange={(open) => { if (!open && !completing) setCompletionAppointment(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Finalizar atendimento</DialogTitle>
+            <DialogDescription>
+              Informe o horario real em que o atendimento terminou. A comanda e o pagamento continuam separados.
+            </DialogDescription>
+          </DialogHeader>
+          {completionAppointment && (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-secondary/30 p-3 text-sm">
+                <p><span className="font-medium">Cliente:</span> {completionAppointment.client?.name ?? "Cliente"}</p>
+                <p><span className="font-medium">Inicio:</span> {formatDateTime(completionAppointment.startAt).time}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="completion-time">Horario de termino</Label>
+                <Input id="completion-time" type="time" value={completionTime} onChange={(event) => setCompletionTime(event.target.value)} />
+                <p className="text-xs text-muted-foreground">O horario deve ser posterior ao inicio e nao pode estar no futuro.</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={completing} onClick={() => setCompletionAppointment(null)}>Cancelar</Button>
+            <Button type="button" disabled={completing || !completionTime} onClick={() => void handleCompleteAppointment()}>
+              {completing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirmar finalizacao
             </Button>
           </DialogFooter>
         </DialogContent>
