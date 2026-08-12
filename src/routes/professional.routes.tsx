@@ -7,6 +7,9 @@ import { CustomersPage } from "../pages/shared/CustomersPage";
 import { ClientRecordsPage } from "../pages/shared/ClientRecordsPage";
 import { HelpCenterPage } from "../pages/shared/HelpCenterPage";
 import { ServicesPage } from "../pages/shared/ServicesPage";
+import { ServiceTabsPage } from "../pages/shared/ServiceTabsPage";
+import { ProductsPage } from "../pages/admin/ProductsPage";
+import { SchedulesPage } from "../pages/shared/SchedulesPage";
 import type { AppRoute } from "./types";
 
 export const professionalRoutes: AppRoute[] = [
@@ -55,6 +58,27 @@ export const professionalRoutes: AppRoute[] = [
     breadcrumbs: ["Profissional", "Ganhos"],
     Component: ProfessionalEarningsPage,
     // sempre visível — é direito do profissional ver os próprios ganhos
+  },
+  {
+    path: "/products",
+    title: "Produtos",
+    breadcrumbs: ["Profissional", "Produtos"],
+    Component: ProductsPage,
+    requiredPermission: "manageProducts",
+  },
+  {
+    path: "/service-tabs",
+    title: "Comandas",
+    breadcrumbs: ["Profissional", "Comandas"],
+    Component: ServiceTabsPage,
+    requiredPermission: "managePayments",
+  },
+  {
+    path: "/blocked-schedules",
+    title: "Bloqueios de agenda",
+    breadcrumbs: ["Profissional", "Bloqueios de agenda"],
+    Component: SchedulesPage,
+    requiredPermission: "manageBlockedDates",
   },
   {
     path: "/settings",
