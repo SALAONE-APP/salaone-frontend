@@ -10,6 +10,9 @@ import { ServicesPage } from "../pages/shared/ServicesPage";
 import { ServiceTabsPage } from "../pages/shared/ServiceTabsPage";
 import { ProductsPage } from "../pages/admin/ProductsPage";
 import { SchedulesPage } from "../pages/shared/SchedulesPage";
+import { PaymentsPage } from "../pages/shared/PaymentsPage";
+import { CashClosingPage } from "../pages/shared/CashClosingPage";
+import { AdminSettingsPage } from "../pages/admin/AdminSettingsPage";
 import type { AppRoute } from "./types";
 
 export const professionalRoutes: AppRoute[] = [
@@ -74,6 +77,20 @@ export const professionalRoutes: AppRoute[] = [
     requiredPermission: "managePayments",
   },
   {
+    path: "/financial-payments",
+    title: "Pagamentos do salao",
+    breadcrumbs: ["Profissional", "Financeiro", "Pagamentos"],
+    Component: PaymentsPage,
+    requiredPermission: "managePayments",
+  },
+  {
+    path: "/cash-closing",
+    title: "Fechamento de caixa",
+    breadcrumbs: ["Profissional", "Financeiro", "Fechamento de caixa"],
+    Component: CashClosingPage,
+    requiredPermission: "managePayments",
+  },
+  {
     path: "/blocked-schedules",
     title: "Bloqueios de agenda",
     breadcrumbs: ["Profissional", "Bloqueios de agenda"],
@@ -85,6 +102,13 @@ export const professionalRoutes: AppRoute[] = [
     title: "Configuracoes",
     breadcrumbs: ["Profissional", "Configuracoes"],
     Component: ProfessionalSettingsPage,
+  },
+  {
+    path: "/salon-settings",
+    title: "Configuracoes do salao",
+    breadcrumbs: ["Profissional", "Configuracoes do salao"],
+    Component: AdminSettingsPage,
+    requiredPermission: "manageSettings",
   },
   {
     path: "/help",
