@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { listDependents, type Dependent } from "@/service/dependentService";
 import { toast } from "sonner";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { AppCalendar } from "@/components/AppCalendar";
 import { PaymentChoiceModal, type PaymentChoice } from "@/components/PaymentChoiceModal";
@@ -283,6 +284,8 @@ function getStoredSalonId(): string {
 
 export function ClientBookingsPage() {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Assinatura do cliente
   const [mySubscription, setMySubscription] = useState<Subscription | null | undefined>(undefined);
@@ -350,6 +353,14 @@ export function ClientBookingsPage() {
   const [rescheduleSlots, setRescheduleSlots] = useState<string[]>([]);
   const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
+
+  useEffect(() => {
+    const serviceId = (location.state as { serviceId?: string } | null)?.serviceId;
+    if (!serviceId) return;
+    setForm({ ...emptyForm, date: dateToDateString(new Date()), serviceIds: [serviceId] });
+    setBookingOpen(true);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, navigate]);
 
   const limit = 20;
 

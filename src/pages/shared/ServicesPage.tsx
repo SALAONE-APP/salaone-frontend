@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Archive,
   Clock,
+  CalendarPlus,
   Edit,
   Filter,
   Image as ImageIcon,
@@ -25,6 +26,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 import {
   AlertDialog,
@@ -158,6 +160,7 @@ function serviceToForm(service: Service): ServiceFormState {
 }
 
 export function ServicesPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { can } = usePermissions();
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -173,6 +176,7 @@ export function ServicesPage() {
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
+  const [catalogService, setCatalogService] = useState<Service | null>(null);
   const [serviceToDeactivate, setServiceToDeactivate] = useState<Service | null>(null);
   const [serviceToReactivate, setServiceToReactivate] = useState<Service | null>(null);
   const [form, setForm] = useState<ServiceFormState>(emptyForm);
@@ -506,7 +510,11 @@ export function ServicesPage() {
                     return (
                       <tr
                         key={service.id}
-                        className="border-b border-border transition-colors last:border-b-0 hover:bg-secondary/30"
+                        className={`border-b border-border transition-colors last:border-b-0 hover:bg-secondary/30 ${isClient ? "cursor-pointer" : ""}`}
+                        onClick={isClient ? () => setCatalogService(service) : undefined}
+                        onKeyDown={isClient ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setCatalogService(service); } } : undefined}
+                        role={isClient ? "button" : undefined}
+                        tabIndex={isClient ? 0 : undefined}
                       >
 
                         <td className="px-4 py-3">
@@ -616,6 +624,50 @@ export function ServicesPage() {
           </div>
         )}
       </div>
+
+      <Dialog open={Boolean(catalogService)} onOpenChange={(open) => { if (!open) setCatalogService(null); }}>
+        <DialogContent className="overflow-hidden p-0 sm:max-w-md">
+          {catalogService && (
+            <>
+              <div className="aspect-[16/9] w-full overflow-hidden bg-secondary">
+                {catalogService.imageUrl ? (
+                  <img src={catalogService.imageUrl} alt={catalogService.name} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full items-center justify-center"><Scissors className="h-12 w-12 text-muted-foreground" /></div>
+                )}
+              </div>
+              <div className="space-y-4 p-6 pt-4">
+                <DialogHeader>
+                  <DialogTitle>{catalogService.name}</DialogTitle>
+                  <DialogDescription className="whitespace-pre-wrap text-left">
+                    {catalogService.description?.trim() || "Consulte os detalhes deste servico com o salao."}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border bg-secondary/30 p-3">
+                    <p className="text-xs text-muted-foreground">Duracao</p>
+                    <p className="mt-1 flex items-center gap-1.5 font-medium"><Clock size={15} />{catalogService.durationMinutes} min</p>
+                  </div>
+                  <div className="rounded-lg border bg-secondary/30 p-3">
+                    <p className="text-xs text-muted-foreground">Valor</p>
+                    {Number(catalogService.promotionalPrice ?? 0) > 0 ? (
+                      <><p className="text-xs text-muted-foreground line-through">{formatCurrency(catalogService.basePrice)}</p><p className="font-semibold text-primary">{formatCurrency(catalogService.promotionalPrice)}</p></>
+                    ) : (
+                      <p className="mt-1 font-semibold">{catalogService.basePrice === 0 ? "Consultar" : formatCurrency(catalogService.basePrice)}</p>
+                    )}
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setCatalogService(null)}>Fechar</Button>
+                  <Button onClick={() => navigate("/bookings", { state: { serviceId: catalogService.id } })}>
+                    <CalendarPlus className="mr-2 h-4 w-4" />Agendar este servico
+                  </Button>
+                </DialogFooter>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
