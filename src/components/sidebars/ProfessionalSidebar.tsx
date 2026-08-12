@@ -1,4 +1,4 @@
-import { Calendar, ClipboardPlus, Home, Package, ReceiptText, Scissors, Settings, UserCheck, Wallet } from "lucide-react";
+import { Calendar, CircleDollarSign, ClipboardPlus, CreditCard, Home, Package, ReceiptText, Scissors, Settings, UserCheck, Wallet } from "lucide-react";
 
 import { usePermissions } from "../../hooks/usePermissions";
 import { ProfileSidebar } from "../shared/ProfileSidebar";
@@ -24,13 +24,16 @@ export function ProfessionalSidebar() {
 
   const financialItems: SidebarItem[] = [
     { icon: Wallet, label: "Ganhos", href: "/payments" },
+    { icon: CreditCard, label: "Pagamentos do salao", href: "/financial-payments", requiredPermission: "managePayments" },
+    { icon: CircleDollarSign, label: "Fechamento de caixa", href: "/cash-closing", requiredPermission: "managePayments" },
   ];
 
   const bottomItems: SidebarItem[] = [];
 
   if (can("manageSettings")) {
-    bottomItems.push({ icon: Settings, label: "Configuracoes", href: "/settings" });
+    bottomItems.push({ icon: Settings, label: "Configuracoes do salao", href: "/salon-settings" });
   }
+  bottomItems.push({ icon: Settings, label: "Meu perfil", href: "/settings" });
 
   const sections: SidebarSection[] = [
     { items: [{ icon: Home, label: "Home", href: "/home" }] },
