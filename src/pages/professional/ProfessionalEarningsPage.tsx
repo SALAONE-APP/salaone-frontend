@@ -268,7 +268,11 @@ export function ProfessionalEarningsPage({
           : getMyPayrollSummary({ periodStart: periodStartStr, periodEnd: periodEndStr }),
       ]);
       const summaryRow = summaryRes.items[0] ?? null;
-      const tabAttendances: Appointment[] = (summaryRow?.serviceTabAttendances ?? []).map((item) => ({
+      const serviceTabAttendances = summaryRow?.serviceTabAttendances ?? [];
+      const tabAppointmentIds = new Set(
+        serviceTabAttendances.map((item) => item.appointmentId),
+      );
+      const tabAttendances: Appointment[] = serviceTabAttendances.map((item) => ({
         id: `service-tab-${item.id}`,
         professionalId: professional.id,
         clientId: item.clientId,
@@ -292,7 +296,12 @@ export function ProfessionalEarningsPage({
         totalAmount: item.totalAmount,
         commissionAmount: item.commissionAmount,
       }));
-      setAppointments([...appointmentsRes.items, ...tabAttendances]);
+      setAppointments([
+        ...appointmentsRes.items.filter(
+          (appointment) => !tabAppointmentIds.has(appointment.id),
+        ),
+        ...tabAttendances,
+      ]);
       setRow(summaryRow);
     } catch (err) {
       toast.error(getApiMessage(err));
