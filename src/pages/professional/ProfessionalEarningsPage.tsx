@@ -13,6 +13,13 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useMyProfessional } from "@/hooks/useMyProfessional";
 import { listAppointments, type Appointment } from "@/service/appointmentService";
 import {
@@ -306,6 +313,11 @@ export function ProfessionalEarningsPage({
     setPeriodStart((prev) => goNextPeriod(prev, frequency));
   }
 
+  function changeFrequency(value: PaymentFrequency) {
+    setFrequency(value);
+    setPeriodStart(getInitialPeriodStart(value));
+  }
+
   const stats = useMemo((): EarningsStats => {
     let earnedRevenue = 0;
     let earnedCommission = 0;
@@ -436,7 +448,7 @@ export function ProfessionalEarningsPage({
       )}
 
       {/* Navegação de período */}
-      <div className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4">
+      <div className="flex flex-col gap-4 rounded-xl border border-border bg-card px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm text-muted-foreground">Período</p>
           <p className="text-lg font-semibold text-foreground">
@@ -447,7 +459,20 @@ export function ProfessionalEarningsPage({
             {periodEndStr.split("-").reverse().join("/")}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <Select
+            value={frequency}
+            onValueChange={(value) => changeFrequency(value as PaymentFrequency)}
+          >
+            <SelectTrigger className="w-[130px]" aria-label="Filtrar histórico por período">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="weekly">Semana</SelectItem>
+              <SelectItem value="biweekly">Quinzena</SelectItem>
+              <SelectItem value="monthly">Mês</SelectItem>
+            </SelectContent>
+          </Select>
           <Button variant="outline" size="sm" onClick={prevPeriod}>
             <ChevronLeft size={16} />
           </Button>
