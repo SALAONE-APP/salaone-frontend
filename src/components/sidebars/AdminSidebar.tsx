@@ -8,6 +8,7 @@ import {
   HandCoins,
   History,
   Image,
+  KanbanSquare,
   Package,
   PlusCircle,
   ReceiptText,
@@ -80,6 +81,7 @@ function buildSections(): SidebarSection[] {
           icon: Star,
           label: "Relacionamento",
           children: [
+            { icon: KanbanSquare, label: "Kanban", href: "/relationship-kanban" },
             { icon: Star, label: "Avaliacoes", href: "/reviews" },
           ],
         },
