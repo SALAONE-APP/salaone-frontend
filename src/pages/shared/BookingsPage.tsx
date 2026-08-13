@@ -226,6 +226,8 @@ export function BookingsPage() {
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
+  const [dateFrom, setDateFrom] = useState(() => dateToDateString(new Date()));
+  const [dateTo, setDateTo] = useState(() => dateToDateString(new Date()));
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -276,6 +278,8 @@ export function BookingsPage() {
       const result = await listAppointments({
         allAppointments: true,
         status: statusFilter === "all" ? undefined : statusFilter,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
         page,
         limit,
       });
@@ -292,7 +296,7 @@ export function BookingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [dateFrom, dateTo, page, statusFilter]);
 
   useEffect(() => {
     void loadAppointments();
@@ -941,6 +945,31 @@ export function BookingsPage() {
                 className="h-9 w-full bg-secondary pl-9 text-sm sm:w-56"
               />
             </div>
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={dateFrom}
+                max={dateTo || undefined}
+                onChange={(event) => {
+                  setDateFrom(event.target.value);
+                  setPage(1);
+                }}
+                aria-label="Data inicial"
+                className="h-9 w-[145px]"
+              />
+              <span className="text-xs text-muted-foreground">até</span>
+              <Input
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(event) => {
+                  setDateTo(event.target.value);
+                  setPage(1);
+                }}
+                aria-label="Data final"
+                className="h-9 w-[145px]"
+              />
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-2">
@@ -952,7 +981,16 @@ export function BookingsPage() {
                 <DropdownMenuRadioGroup
                   value={statusFilter}
                   onValueChange={(value) => {
-                    setStatusFilter(value as StatusFilter);
+                    const nextStatus = value as StatusFilter;
+                    setStatusFilter(nextStatus);
+                    if (nextStatus === "all") {
+                      setDateFrom("");
+                      setDateTo("");
+                    } else if (!dateFrom && !dateTo) {
+                      const today = dateToDateString(new Date());
+                      setDateFrom(today);
+                      setDateTo(today);
+                    }
                     setPage(1);
                   }}
                 >

@@ -13,6 +13,13 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useMyProfessional } from "@/hooks/useMyProfessional";
 import { listAppointments, type Appointment } from "@/service/appointmentService";
 import {
@@ -261,7 +268,11 @@ export function ProfessionalEarningsPage({
           : getMyPayrollSummary({ periodStart: periodStartStr, periodEnd: periodEndStr }),
       ]);
       const summaryRow = summaryRes.items[0] ?? null;
-      const tabAttendances: Appointment[] = (summaryRow?.serviceTabAttendances ?? []).map((item) => ({
+      const serviceTabAttendances = summaryRow?.serviceTabAttendances ?? [];
+      const tabAppointmentIds = new Set(
+        serviceTabAttendances.map((item) => item.appointmentId),
+      );
+      const tabAttendances: Appointment[] = serviceTabAttendances.map((item) => ({
         id: `service-tab-${item.id}`,
         professionalId: professional.id,
         clientId: item.clientId,
@@ -285,7 +296,12 @@ export function ProfessionalEarningsPage({
         totalAmount: item.totalAmount,
         commissionAmount: item.commissionAmount,
       }));
-      setAppointments([...appointmentsRes.items, ...tabAttendances]);
+      setAppointments([
+        ...appointmentsRes.items.filter(
+          (appointment) => !tabAppointmentIds.has(appointment.id),
+        ),
+        ...tabAttendances,
+      ]);
       setRow(summaryRow);
     } catch (err) {
       toast.error(getApiMessage(err));
@@ -304,6 +320,11 @@ export function ProfessionalEarningsPage({
 
   function nextPeriod() {
     setPeriodStart((prev) => goNextPeriod(prev, frequency));
+  }
+
+  function changeFrequency(value: PaymentFrequency) {
+    setFrequency(value);
+    setPeriodStart(getInitialPeriodStart(value));
   }
 
   const stats = useMemo((): EarningsStats => {
@@ -436,7 +457,7 @@ export function ProfessionalEarningsPage({
       )}
 
       {/* Navegação de período */}
-      <div className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4">
+      <div className="flex flex-col gap-4 rounded-xl border border-border bg-card px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm text-muted-foreground">Período</p>
           <p className="text-lg font-semibold text-foreground">
@@ -447,7 +468,20 @@ export function ProfessionalEarningsPage({
             {periodEndStr.split("-").reverse().join("/")}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <Select
+            value={frequency}
+            onValueChange={(value) => changeFrequency(value as PaymentFrequency)}
+          >
+            <SelectTrigger className="w-[130px]" aria-label="Filtrar histórico por período">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="weekly">Semana</SelectItem>
+              <SelectItem value="biweekly">Quinzena</SelectItem>
+              <SelectItem value="monthly">Mês</SelectItem>
+            </SelectContent>
+          </Select>
           <Button variant="outline" size="sm" onClick={prevPeriod}>
             <ChevronLeft size={16} />
           </Button>
