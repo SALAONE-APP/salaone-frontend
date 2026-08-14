@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowUpDown,
@@ -174,21 +174,6 @@ export function RelationshipKanbanPage() {
     return { total, active, recovered, closed, recoveryRate };
   }, [cards]);
 
-  function handleDragStart(event: DragEvent<HTMLDivElement>, cardId: string) {
-    event.dataTransfer.setData("text/plain", cardId);
-    event.dataTransfer.effectAllowed = "move";
-  }
-
-  function handleDragOverColumn(event: DragEvent<HTMLDivElement>, stageKey: string) {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    setDragOverStage(stageKey);
-  }
-
-  function handleDragLeaveColumn() {
-    setDragOverStage(null);
-  }
-
   // Renumera a coluna inteira em passos de 10, a partir de uma ordem já com o
   // card arrastado inserido na posição certa. Evita valores negativos/colisões
   // que a interpolação simples produziria quando os cards nascem com sortOrder=0.
@@ -218,35 +203,111 @@ export function RelationshipKanbanPage() {
     }
   }
 
-  async function handleDropColumn(event: DragEvent<HTMLDivElement>, stageKey: RelationshipStage) {
-    event.preventDefault();
-    const cardId = event.dataTransfer.getData("text/plain");
-    setDragOverStage(null);
-    if (!cardId) return;
+  // Drag-and-drop via Pointer Events (funciona com mouse E touch, ao contrário
+  // da API nativa de HTML5 Drag and Drop, que não dispara em telas de toque).
+  // A referência guarda o estado do gesto sem re-renderizar a cada pixel de
+  // movimento; só viram estado React (dragOverStage/dragOverCardId) os alvos
+  // de destino, para o highlight visual.
+  const dragStateRef = useRef<{
+    cardId: string;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    moved: boolean;
+    ghost: HTMLDivElement | null;
+  } | null>(null);
+  const justDraggedRef = useRef(false);
 
-    // Drop na área vazia da coluna (abaixo dos cards): sempre manda pro fim da coluna.
-    const siblingIds = cards.filter((item) => item.stage === stageKey && item.id !== cardId).map((item) => item.id);
-    await reorderColumn(stageKey, [...siblingIds, cardId]);
+  function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>, card: RelationshipCard) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragStateRef.current = {
+      cardId: card.id,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+      ghost: null,
+    };
   }
 
-  async function handleDropOnCard(
-    event: DragEvent<HTMLDivElement>,
-    stageKey: RelationshipStage,
-    columnCards: RelationshipCard[],
-    targetCard: RelationshipCard,
-  ) {
+  function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const state = dragStateRef.current;
+    if (!state || event.pointerId !== state.pointerId) return;
+
+    const dx = event.clientX - state.startX;
+    const dy = event.clientY - state.startY;
+
+    if (!state.moved) {
+      if (Math.hypot(dx, dy) < 6) return;
+      state.moved = true;
+      const draggedCard = cards.find((item) => item.id === state.cardId);
+      const ghost = document.createElement("div");
+      ghost.textContent = draggedCard?.clientName ?? "";
+      ghost.style.cssText =
+        "position:fixed;top:0;left:0;z-index:9999;pointer-events:none;padding:6px 12px;border-radius:9999px;background:hsl(var(--primary));color:hsl(var(--primary-foreground));font-size:12px;font-weight:500;box-shadow:0 8px 20px rgba(0,0,0,0.25);";
+      document.body.appendChild(ghost);
+      state.ghost = ghost;
+    }
+
     event.preventDefault();
-    event.stopPropagation();
-    const cardId = event.dataTransfer.getData("text/plain");
+    if (state.ghost) {
+      state.ghost.style.transform = `translate3d(${event.clientX + 14}px, ${event.clientY + 14}px, 0)`;
+    }
+
+    const hovered = document.elementFromPoint(event.clientX, event.clientY);
+    const columnKey = hovered?.closest<HTMLElement>("[data-column-key]")?.dataset.columnKey ?? null;
+    const hoveredCardId = hovered?.closest<HTMLElement>("[data-card-id]")?.dataset.cardId ?? null;
+
+    setDragOverStage(columnKey);
+    setDragOverCardId(hoveredCardId && hoveredCardId !== state.cardId ? hoveredCardId : null);
+  }
+
+  async function handlePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    const state = dragStateRef.current;
+    if (!state || event.pointerId !== state.pointerId) return;
+    dragStateRef.current = null;
+    state.ghost?.remove();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    const stageKey = dragOverStage as RelationshipStage | null;
+    const targetCardId = dragOverCardId;
     setDragOverStage(null);
     setDragOverCardId(null);
-    if (!cardId || cardId === targetCard.id) return;
 
-    // Insere o card arrastado imediatamente antes do card sobre o qual foi solto.
-    const siblingIds = columnCards.filter((item) => item.id !== cardId).map((item) => item.id);
-    const targetIndex = siblingIds.indexOf(targetCard.id);
-    siblingIds.splice(targetIndex, 0, cardId);
+    if (!state.moved || !stageKey) return;
+    justDraggedRef.current = true;
+
+    const columnCards = cards.filter((item) => item.stage === stageKey).sort((a, b) => a.sortOrder - b.sortOrder);
+    const targetCard = targetCardId ? columnCards.find((item) => item.id === targetCardId) : undefined;
+    const siblingIds = columnCards.filter((item) => item.id !== state.cardId).map((item) => item.id);
+
+    if (targetCard) {
+      siblingIds.splice(siblingIds.indexOf(targetCard.id), 0, state.cardId);
+    } else {
+      siblingIds.push(state.cardId);
+    }
+
     await reorderColumn(stageKey, siblingIds);
+  }
+
+  function handlePointerCancel(event: ReactPointerEvent<HTMLDivElement>) {
+    const state = dragStateRef.current;
+    if (!state || event.pointerId !== state.pointerId) return;
+    dragStateRef.current = null;
+    state.ghost?.remove();
+    setDragOverStage(null);
+    setDragOverCardId(null);
+  }
+
+  function handleCardClick(cardId: string) {
+    if (justDraggedRef.current) {
+      justDraggedRef.current = false;
+      return;
+    }
+    setSelectedCardId(cardId);
   }
 
   return (
@@ -363,9 +424,7 @@ export function RelationshipKanbanPage() {
           {columns.map((column) => (
             <div
               key={column.key}
-              onDragOver={(event) => handleDragOverColumn(event, column.key)}
-              onDragLeave={handleDragLeaveColumn}
-              onDrop={(event) => handleDropColumn(event, column.key)}
+              data-column-key={column.key}
               className={cn(
                 "flex w-72 shrink-0 flex-col gap-3 rounded-xl border bg-muted/60 p-3 transition-colors",
                 dragOverStage === column.key ? "border-primary bg-primary/5" : "border-border",
@@ -391,19 +450,14 @@ export function RelationshipKanbanPage() {
                     return (
                       <div
                         key={card.id}
-                        draggable
-                        onDragStart={(event) => handleDragStart(event, card.id)}
-                        onDragOver={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          event.dataTransfer.dropEffect = "move";
-                          setDragOverCardId(card.id);
-                        }}
-                        onDragLeave={() => setDragOverCardId((current) => (current === card.id ? null : current))}
-                        onDrop={(event) => handleDropOnCard(event, column.key, column.cards, card)}
-                        onClick={() => setSelectedCardId(card.id)}
+                        data-card-id={card.id}
+                        onPointerDown={(event) => handlePointerDown(event, card)}
+                        onPointerMove={handlePointerMove}
+                        onPointerUp={handlePointerUp}
+                        onPointerCancel={handlePointerCancel}
+                        onClick={() => handleCardClick(card.id)}
                         className={cn(
-                          "cursor-grab rounded-xl border border-border bg-card p-3 shadow-card transition-shadow hover:shadow-card-hover active:cursor-grabbing",
+                          "touch-none cursor-grab select-none rounded-xl border border-border bg-card p-3 shadow-card transition-shadow hover:shadow-card-hover active:cursor-grabbing",
                           dragOverCardId === card.id && "border-t-2 border-t-primary",
                         )}
                       >
@@ -414,6 +468,7 @@ export function RelationshipKanbanPage() {
                           <Link
                             to={`/client-records?client=${card.clientId}`}
                             onClick={(event) => event.stopPropagation()}
+                            onPointerDown={(event) => event.stopPropagation()}
                             className="truncate text-sm font-medium text-foreground hover:underline"
                           >
                             {card.clientName}
