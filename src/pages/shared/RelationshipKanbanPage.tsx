@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
+import { Link } from "react-router-dom";
 import {
   ArrowUpDown,
   Clock,
   Filter,
   Loader2,
   MessageCircle,
+  Plus,
   Repeat,
   Scissors,
   Search,
@@ -14,6 +16,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { RelationshipCardDetailDialog } from "@/components/RelationshipCardDetailDialog";
+import { RelationshipCreateCardDialog } from "@/components/RelationshipCreateCardDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
   listRelationshipCards,
+  reasonLabel,
   updateRelationshipCard,
   type RelationshipCard,
   type RelationshipStage,
@@ -42,21 +47,9 @@ const STAGE_META: { key: RelationshipStage; label: string }[] = [
   { key: "encerrado", label: "Encerrado" },
 ];
 
-const REASON_LABELS: Record<string, string> = {
-  retorno_atrasado: "Retorno atrasado",
-  primeiro_atendimento_sem_retorno: "1º atendimento sem retorno",
-  aniversario: "Aniversário",
-  pos_atendimento: "Pós-atendimento",
-  avaliacao_baixa: "Avaliação baixa",
-  tratamento_em_continuidade: "Tratamento em continuidade",
-  oportunidade_manual: "Oportunidade identificada",
-};
+const RESOLVED_STAGES = new Set(["recuperado", "encerrado"]);
 
 type SortMode = "default" | "days" | "ticket";
-
-function reasonLabel(reason: string) {
-  return REASON_LABELS[reason] ?? reason;
-}
 
 function formatCurrency(value: number | null) {
   if (value === null) return "-";
@@ -91,6 +84,8 @@ export function RelationshipKanbanPage() {
   const [responsibleFilter, setResponsibleFilter] = useState("all");
   const [sortBy, setSortBy] = useState<SortMode>("default");
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -144,6 +139,16 @@ export function RelationshipKanbanPage() {
     [visibleCards, sortBy],
   );
 
+  const summary = useMemo(() => {
+    const total = cards.length;
+    const recovered = cards.filter((card) => card.stage === "recuperado").length;
+    const closed = cards.filter((card) => card.stage === "encerrado").length;
+    const resolved = recovered + closed;
+    const active = cards.filter((card) => !RESOLVED_STAGES.has(card.stage)).length;
+    const recoveryRate = resolved > 0 ? Math.round((recovered / resolved) * 100) : null;
+    return { total, active, recovered, closed, recoveryRate };
+  }, [cards]);
+
   function handleDragStart(event: DragEvent<HTMLDivElement>, cardId: string) {
     event.dataTransfer.setData("text/plain", cardId);
     event.dataTransfer.effectAllowed = "move";
@@ -184,11 +189,36 @@ export function RelationshipKanbanPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold text-foreground">Kanban de Relacionamento</h1>
-        <p className="text-sm text-muted-foreground">
-          Acompanhe clientes em risco, retornos e oportunidades identificadas na operação do salão.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl font-semibold text-foreground">Kanban de Relacionamento</h1>
+          <p className="text-sm text-muted-foreground">
+            Acompanhe clientes em risco, retornos e oportunidades identificadas na operação do salão.
+          </p>
+        </div>
+        <Button size="sm" className="gap-2 self-start" onClick={() => setCreateOpen(true)}>
+          <Plus size={14} />
+          Novo card
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-xl border border-border bg-card p-3">
+          <p className="text-xs text-muted-foreground">Cards ativos</p>
+          <p className="text-lg font-semibold text-foreground">{summary.active}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-3">
+          <p className="text-xs text-muted-foreground">Recuperados</p>
+          <p className="text-lg font-semibold text-foreground">{summary.recovered}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-3">
+          <p className="text-xs text-muted-foreground">Encerrados</p>
+          <p className="text-lg font-semibold text-foreground">{summary.closed}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-3">
+          <p className="text-xs text-muted-foreground">Taxa de recuperação</p>
+          <p className="text-lg font-semibold text-foreground">{summary.recoveryRate === null ? "-" : `${summary.recoveryRate}%`}</p>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 lg:flex-row lg:items-center lg:justify-between">
@@ -283,13 +313,20 @@ export function RelationshipKanbanPage() {
                         key={card.id}
                         draggable
                         onDragStart={(event) => handleDragStart(event, card.id)}
+                        onClick={() => setSelectedCardId(card.id)}
                         className="cursor-grab rounded-xl border border-border bg-card p-3 shadow-card transition-shadow hover:shadow-card-hover active:cursor-grabbing"
                       >
                         <div className="flex items-center gap-2">
                           <Avatar className="h-7 w-7">
                             <AvatarFallback className="text-[11px]">{getInitials(card.clientName)}</AvatarFallback>
                           </Avatar>
-                          <span className="truncate text-sm font-medium text-foreground">{card.clientName}</span>
+                          <Link
+                            to={`/client-records?client=${card.clientId}`}
+                            onClick={(event) => event.stopPropagation()}
+                            className="truncate text-sm font-medium text-foreground hover:underline"
+                          >
+                            {card.clientName}
+                          </Link>
                         </div>
 
                         <div className="mt-2 flex flex-wrap gap-1">
@@ -359,6 +396,17 @@ export function RelationshipKanbanPage() {
           ))}
         </div>
       )}
+
+      <RelationshipCardDetailDialog
+        cardId={selectedCardId}
+        onClose={() => setSelectedCardId(null)}
+        onChanged={() => void load()}
+      />
+      <RelationshipCreateCardDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={() => void load()}
+      />
     </div>
   );
 }
