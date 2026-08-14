@@ -294,7 +294,18 @@ export function RelationshipCardDetailDialog({ cardId, onClose, onChanged }: Pro
 
               <div className="flex flex-col gap-3">
                 <div>
-                  <Label>Responsável</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Responsável</Label>
+                    {user?.salonUserId && responsibleId !== user.salonUserId && (
+                      <button
+                        type="button"
+                        onClick={() => setResponsibleId(user.salonUserId!)}
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        Atribuir a mim
+                      </button>
+                    )}
+                  </div>
                   <Select value={responsibleId} onValueChange={setResponsibleId}>
                     <SelectTrigger className="mt-1.5">
                       <SelectValue placeholder="Selecione" />

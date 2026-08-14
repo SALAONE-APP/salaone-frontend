@@ -12,6 +12,7 @@ export interface RegisterPayload {
 }
 
 export interface SalonMembership {
+  id?: string | null;
   salon_id: string;
   role: string;
   permissions?: Record<string, boolean> | null;
@@ -43,6 +44,7 @@ export interface AuthResponse {
     isAdmin?: boolean;
     photoUrl?: string | null;
     permissions?: Record<string, boolean> | null;
+    salonUserId?: string | null;
   };
   memberships?: SalonMembership[];
   salon?: StoredSalon | null;
@@ -95,6 +97,7 @@ export async function login(data: LoginPayload): Promise<AuthResponse> {
     ...response.data.user,
     role: normalizeRole(membership?.role ?? response.data.user.role),
     permissions: normalizePermissions(membership?.permissions),
+    salonUserId: membership?.id ?? null,
   };
 
   localStorage.setItem("token", response.data.token);
@@ -148,6 +151,7 @@ export async function fetchMe() {
     ...response.data.user,
     role: normalizeRole(membership?.role ?? response.data.user.role),
     permissions: normalizePermissions(membership?.permissions),
+    salonUserId: membership?.id ?? null,
   };
 }
 

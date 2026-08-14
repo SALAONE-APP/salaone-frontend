@@ -37,6 +37,7 @@ import {
   type RelationshipCard,
   type RelationshipStage,
 } from "@/service/relationshipService";
+import { listUsers, type UserProfile } from "@/service/userService";
 
 const STAGE_META: { key: RelationshipStage; label: string }[] = [
   { key: "contato_pendente", label: "Contato pendente" },
@@ -88,6 +89,7 @@ export function RelationshipKanbanPage() {
   const [dragOverCardId, setDragOverCardId] = useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [staffOptions, setStaffOptions] = useState<UserProfile[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,9 +106,13 @@ export function RelationshipKanbanPage() {
 
   useEffect(() => {
     void load();
+    listUsers({ excludeRole: "client", limit: 100 }).then((r) => setStaffOptions(r.items)).catch(() => null);
   }, [load]);
 
   const responsibleOptions = useMemo(() => {
+    if (staffOptions.length > 0) {
+      return staffOptions.map((option) => [option.id, option.name] as [string, string]);
+    }
     const map = new Map<string, string>();
     cards.forEach((card) => {
       if (card.responsibleSalonUserId && card.responsibleName) {
@@ -114,7 +120,7 @@ export function RelationshipKanbanPage() {
       }
     });
     return Array.from(map.entries());
-  }, [cards]);
+  }, [cards, staffOptions]);
 
   const reasonOptions = useMemo(() => {
     const set = new Set<string>();
