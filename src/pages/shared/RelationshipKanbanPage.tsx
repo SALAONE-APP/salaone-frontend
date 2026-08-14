@@ -82,8 +82,10 @@ export function RelationshipKanbanPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [responsibleFilter, setResponsibleFilter] = useState("all");
+  const [reasonFilter, setReasonFilter] = useState("all");
   const [sortBy, setSortBy] = useState<SortMode>("default");
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
+  const [dragOverCardId, setDragOverCardId] = useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -114,11 +116,28 @@ export function RelationshipKanbanPage() {
     return Array.from(map.entries());
   }, [cards]);
 
+  const reasonOptions = useMemo(() => {
+    const set = new Set<string>();
+    cards.forEach((card) => card.triggers.forEach((trigger) => set.add(trigger.reason)));
+    return Array.from(set);
+  }, [cards]);
+
   const visibleCards = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("pt-BR");
     let list = cards.filter((card) => {
-      if (query && !card.clientName.toLocaleLowerCase("pt-BR").includes(query)) return false;
+      if (query) {
+        const haystack = [
+          card.clientName,
+          card.clientPhone,
+          card.responsibleName ?? "",
+          ...card.triggers.map((trigger) => reasonLabel(trigger.reason)),
+        ]
+          .join(" ")
+          .toLocaleLowerCase("pt-BR");
+        if (!haystack.includes(query)) return false;
+      }
       if (responsibleFilter !== "all" && card.responsibleSalonUserId !== responsibleFilter) return false;
+      if (reasonFilter !== "all" && !card.triggers.some((trigger) => trigger.reason === reasonFilter)) return false;
       return true;
     });
     if (sortBy === "days") {
@@ -127,7 +146,7 @@ export function RelationshipKanbanPage() {
       list = [...list].sort((a, b) => (b.stats.averageTicket ?? 0) - (a.stats.averageTicket ?? 0));
     }
     return list;
-  }, [cards, search, responsibleFilter, sortBy]);
+  }, [cards, search, responsibleFilter, reasonFilter, sortBy]);
 
   const columns = useMemo(
     () =>
@@ -164,27 +183,64 @@ export function RelationshipKanbanPage() {
     setDragOverStage(null);
   }
 
+  // Renumera a coluna inteira em passos de 10, a partir de uma ordem já com o
+  // card arrastado inserido na posição certa. Evita valores negativos/colisões
+  // que a interpolação simples produziria quando os cards nascem com sortOrder=0.
+  async function reorderColumn(stageKey: RelationshipStage, orderedIds: string[]) {
+    const previousCards = cards;
+    const nextSortOrderById = new Map(orderedIds.map((id, index) => [id, (index + 1) * 10]));
+
+    setCards((prev) =>
+      prev.map((item) =>
+        nextSortOrderById.has(item.id)
+          ? { ...item, stage: stageKey, sortOrder: nextSortOrderById.get(item.id)! }
+          : item,
+      ),
+    );
+
+    const changed = previousCards.filter(
+      (item) => nextSortOrderById.has(item.id) && (item.stage !== stageKey || item.sortOrder !== nextSortOrderById.get(item.id)),
+    );
+
+    try {
+      await Promise.all(
+        changed.map((item) => updateRelationshipCard(item.id, { stage: stageKey, sortOrder: nextSortOrderById.get(item.id)! })),
+      );
+    } catch {
+      setCards(previousCards);
+      toast.error("Não foi possível reordenar. Tente novamente.");
+    }
+  }
+
   async function handleDropColumn(event: DragEvent<HTMLDivElement>, stageKey: RelationshipStage) {
     event.preventDefault();
     const cardId = event.dataTransfer.getData("text/plain");
     setDragOverStage(null);
     if (!cardId) return;
 
-    const card = cards.find((item) => item.id === cardId);
-    if (!card || card.stage === stageKey) return;
+    // Drop na área vazia da coluna (abaixo dos cards): sempre manda pro fim da coluna.
+    const siblingIds = cards.filter((item) => item.stage === stageKey && item.id !== cardId).map((item) => item.id);
+    await reorderColumn(stageKey, [...siblingIds, cardId]);
+  }
 
-    const targetColumnCount = cards.filter((item) => item.stage === stageKey).length;
-    const newSortOrder = (targetColumnCount + 1) * 10;
-    const previousCards = cards;
+  async function handleDropOnCard(
+    event: DragEvent<HTMLDivElement>,
+    stageKey: RelationshipStage,
+    columnCards: RelationshipCard[],
+    targetCard: RelationshipCard,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    const cardId = event.dataTransfer.getData("text/plain");
+    setDragOverStage(null);
+    setDragOverCardId(null);
+    if (!cardId || cardId === targetCard.id) return;
 
-    setCards((prev) => prev.map((item) => (item.id === cardId ? { ...item, stage: stageKey, sortOrder: newSortOrder } : item)));
-
-    try {
-      await updateRelationshipCard(cardId, { stage: stageKey, sortOrder: newSortOrder });
-    } catch {
-      setCards(previousCards);
-      toast.error("Não foi possível mover o card. Tente novamente.");
-    }
+    // Insere o card arrastado imediatamente antes do card sobre o qual foi solto.
+    const siblingIds = columnCards.filter((item) => item.id !== cardId).map((item) => item.id);
+    const targetIndex = siblingIds.indexOf(targetCard.id);
+    siblingIds.splice(targetIndex, 0, cardId);
+    await reorderColumn(stageKey, siblingIds);
   }
 
   return (
@@ -227,7 +283,7 @@ export function RelationshipKanbanPage() {
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar cliente..."
+            placeholder="Buscar cliente, telefone, motivo ou responsável..."
             className="h-9 w-full bg-secondary pl-9 text-sm sm:w-64"
           />
         </div>
@@ -245,6 +301,24 @@ export function RelationshipKanbanPage() {
                 {responsibleOptions.map(([id, name]) => (
                   <DropdownMenuRadioItem key={id} value={id}>
                     {name}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Filter size={14} />
+                Motivo
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuRadioGroup value={reasonFilter} onValueChange={setReasonFilter}>
+                <DropdownMenuRadioItem value="all">Todos</DropdownMenuRadioItem>
+                {reasonOptions.map((reason) => (
+                  <DropdownMenuRadioItem key={reason} value={reason}>
+                    {reasonLabel(reason)}
                   </DropdownMenuRadioItem>
                 ))}
               </DropdownMenuRadioGroup>
@@ -313,8 +387,19 @@ export function RelationshipKanbanPage() {
                         key={card.id}
                         draggable
                         onDragStart={(event) => handleDragStart(event, card.id)}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          event.dataTransfer.dropEffect = "move";
+                          setDragOverCardId(card.id);
+                        }}
+                        onDragLeave={() => setDragOverCardId((current) => (current === card.id ? null : current))}
+                        onDrop={(event) => handleDropOnCard(event, column.key, column.cards, card)}
                         onClick={() => setSelectedCardId(card.id)}
-                        className="cursor-grab rounded-xl border border-border bg-card p-3 shadow-card transition-shadow hover:shadow-card-hover active:cursor-grabbing"
+                        className={cn(
+                          "cursor-grab rounded-xl border border-border bg-card p-3 shadow-card transition-shadow hover:shadow-card-hover active:cursor-grabbing",
+                          dragOverCardId === card.id && "border-t-2 border-t-primary",
+                        )}
                       >
                         <div className="flex items-center gap-2">
                           <Avatar className="h-7 w-7">
