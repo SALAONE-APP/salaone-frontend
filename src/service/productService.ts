@@ -161,6 +161,23 @@ export async function checkoutProductCart(
   return response.data;
 }
 
+export interface WalkInProductSalePayload {
+  items: Array<{ productId: string; quantity: number; unitPrice: number }>;
+  method: "pix" | "debito" | "credito" | "dinheiro";
+  paidAt?: string;
+  note?: string | null;
+}
+
+export async function createWalkInProductSale(data: WalkInProductSalePayload) {
+  const response = await api.post<{
+    orderId: string;
+    paymentId: string;
+    total: number;
+    status: string;
+  }>("/products/walk-in-sale", data);
+  return response.data;
+}
+
 export interface ProductOrder {
   orderId: string;
   status: string;

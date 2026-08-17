@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BanknoteArrowDown, BanknoteArrowUp, CheckCircle, Download, Loader2, Search } from "lucide-react";
+import { BanknoteArrowDown, BanknoteArrowUp, CheckCircle, Download, Loader2, Search, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +31,7 @@ import {
   type PaymentMethod,
 } from "@/service/paymentService";
 import { downloadPdfReport, type ReportColumn } from "@/utils/reportExport";
+import { WalkInProductSaleDialog } from "@/components/WalkInProductSaleDialog";
 
 type OpenCashSession = {
   openedAt: string;
@@ -460,6 +461,7 @@ export function CashClosingPage() {
   const [openingCashOpen, setOpeningCashOpen] = useState(false);
   const [openingBalance, setOpeningBalance] = useState("");
   const [cashOutOpen, setCashOutOpen] = useState(false);
+  const [walkInSaleOpen, setWalkInSaleOpen] = useState(false);
   const [cashOutCategory, setCashOutCategory] = useState<CashOutCategory>("products");
   const [cashOutAmount, setCashOutAmount] = useState("");
   const [cashOutMethod, setCashOutMethod] = useState<Exclude<PaymentMethod, "subscription">>("dinheiro");
@@ -743,6 +745,15 @@ export function CashClosingPage() {
               <CreditCard size={14} />
               Registrar assinatura
             </Button> */}
+            <Button
+              variant="outline"
+              onClick={() => setWalkInSaleOpen(true)}
+              disabled={!cashIsOpen || loading}
+              className="gap-2"
+            >
+              <ShoppingBag size={14} />
+              Venda avulsa
+            </Button>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="report-start-date" className="text-xs text-muted-foreground">
@@ -1260,6 +1271,8 @@ export function CashClosingPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog> */}
+
+      <WalkInProductSaleDialog open={walkInSaleOpen} onOpenChange={setWalkInSaleOpen} onSuccess={loadCashClosings} />
 
       <Dialog open={cashOutOpen} onOpenChange={setCashOutOpen}>
         <DialogContent className="sm:max-w-xl">
