@@ -91,22 +91,30 @@ export function RelationshipKanbanPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [staffOptions, setStaffOptions] = useState<UserProfile[]>([]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    if (!silent) setError(null);
     try {
       const result = await listRelationshipCards();
       setCards(result);
     } catch {
-      setError("Não foi possível carregar o Kanban de relacionamento.");
+      // Numa atualização silenciosa em segundo plano, uma falha transitória de
+      // rede não deve apagar o board que o usuário já está vendo/mexendo.
+      if (!silent) setError("Não foi possível carregar o Kanban de relacionamento.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     void load();
     listUsers({ excludeRole: "client", limit: 100 }).then((r) => setStaffOptions(r.items)).catch(() => null);
+
+    const timer = window.setInterval(() => {
+      void load(true);
+    }, 10000);
+
+    return () => window.clearInterval(timer);
   }, [load]);
 
   const responsibleOptions = useMemo(() => {
