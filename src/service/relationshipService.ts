@@ -1,16 +1,9 @@
 import api from "./api";
 
-export const RELATIONSHIP_STAGES = [
-  "contato_pendente",
-  "em_contato",
-  "aguardando_cliente",
-  "retorno_agendado",
-  "recuperado",
-  "encerrado",
-] as const;
-
-export type RelationshipStage = (typeof RELATIONSHIP_STAGES)[number];
-
+// Etapas deixaram de ser fixas (Onda F): cada pipeline define as próprias,
+// guardadas no backend. Este mapa só serve de fallback para rotular um
+// `stage` quando não temos o pipeline à mão (ex.: eventos antigos do
+// histórico) - a fonte de verdade passa a ser `pipeline.stages[].label`.
 export const STAGE_LABELS: Record<string, string> = {
   contato_pendente: "Contato pendente",
   em_contato: "Em contato",
@@ -19,6 +12,39 @@ export const STAGE_LABELS: Record<string, string> = {
   recuperado: "Recuperado",
   encerrado: "Encerrado",
 };
+
+export const RELATIONSHIP_TERMINAL_OUTCOMES = ["recuperado", "encerrado"] as const;
+export type RelationshipTerminalOutcome = (typeof RELATIONSHIP_TERMINAL_OUTCOMES)[number];
+
+export interface RelationshipStageDefinition {
+  key: string;
+  label: string;
+  sortOrder: number;
+  isTerminal: boolean;
+  terminalOutcome: RelationshipTerminalOutcome | null;
+}
+
+export interface RelationshipPipeline {
+  id: string;
+  salonId: string;
+  name: string;
+  isDefault: boolean;
+  sortOrder: number;
+  stages: RelationshipStageDefinition[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Ponto de partida sugerido ao criar um pipeline novo - as mesmas 6 etapas
+// de sempre, prontas para editar em vez de começar em branco.
+export const DEFAULT_STAGE_TEMPLATE: RelationshipStageDefinition[] = [
+  { key: "contato_pendente", label: "Contato pendente", sortOrder: 0, isTerminal: false, terminalOutcome: null },
+  { key: "em_contato", label: "Em contato", sortOrder: 1, isTerminal: false, terminalOutcome: null },
+  { key: "aguardando_cliente", label: "Aguardando cliente", sortOrder: 2, isTerminal: false, terminalOutcome: null },
+  { key: "retorno_agendado", label: "Retorno agendado", sortOrder: 3, isTerminal: false, terminalOutcome: null },
+  { key: "recuperado", label: "Recuperado", sortOrder: 4, isTerminal: true, terminalOutcome: "recuperado" },
+  { key: "encerrado", label: "Encerrado", sortOrder: 5, isTerminal: true, terminalOutcome: "encerrado" },
+];
 
 export const REASON_LABELS: Record<string, string> = {
   retorno_atrasado: "Retorno atrasado",
@@ -51,8 +77,8 @@ export function reasonLabel(reason: string) {
   return REASON_LABELS[reason] ?? reason;
 }
 
-export function stageLabel(stage: string) {
-  return STAGE_LABELS[stage] ?? stage;
+export function stageLabel(stage: string, stages?: RelationshipStageDefinition[]) {
+  return stages?.find((item) => item.key === stage)?.label ?? STAGE_LABELS[stage] ?? stage;
 }
 
 export interface RelationshipTrigger {
@@ -78,13 +104,14 @@ export interface RelationshipCard {
   id: string;
   salonId: string;
   clientId: string;
+  pipelineId: string;
   clientName: string;
   clientPhone: string;
   responsibleSalonUserId: string | null;
   responsibleName: string | null;
   createdBy: string | null;
   createdByName: string | null;
-  stage: RelationshipStage;
+  stage: string;
   primaryReason: string | null;
   triggers: RelationshipTrigger[];
   nextAction: string | null;
@@ -111,7 +138,9 @@ export interface RelationshipEvent {
   createdAt: string;
 }
 
-export async function listRelationshipCards(params: { stage?: string; responsibleSalonUserId?: string; q?: string } = {}) {
+export async function listRelationshipCards(
+  params: { pipelineId?: string; stage?: string; responsibleSalonUserId?: string; q?: string } = {},
+) {
   const response = await api.get<{ cards: RelationshipCard[] }>("/relationship/cards", { params });
   return response.data.cards;
 }
@@ -142,6 +171,7 @@ export async function updateRelationshipCard(
 
 export async function createRelationshipCard(data: {
   clientId: string;
+  pipelineId?: string;
   primaryReason: string;
   stage?: string;
   responsibleSalonUserId?: string | null;
@@ -177,4 +207,26 @@ export async function setRelationshipTriggerPrimary(cardId: string, triggerId: s
     { isPrimary: true },
   );
   return response.data.card;
+}
+
+export async function listRelationshipPipelines() {
+  const response = await api.get<{ pipelines: RelationshipPipeline[] }>("/relationship/pipelines");
+  return response.data.pipelines;
+}
+
+export async function createRelationshipPipeline(data: { name: string; stages: RelationshipStageDefinition[] }) {
+  const response = await api.post<{ pipeline: RelationshipPipeline }>("/relationship/pipelines", data);
+  return response.data.pipeline;
+}
+
+export async function updateRelationshipPipeline(
+  id: string,
+  data: { name?: string; sortOrder?: number; isDefault?: boolean; stages?: RelationshipStageDefinition[] },
+) {
+  const response = await api.patch<{ pipeline: RelationshipPipeline }>(`/relationship/pipelines/${id}`, data);
+  return response.data.pipeline;
+}
+
+export async function deleteRelationshipPipeline(id: string) {
+  await api.delete(`/relationship/pipelines/${id}`);
 }

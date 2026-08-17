@@ -10,6 +10,7 @@ import {
   Repeat,
   Scissors,
   Search,
+  Settings2,
   UserCog,
   UserRound,
   Wallet,
@@ -18,6 +19,7 @@ import { toast } from "sonner";
 
 import { RelationshipCardDetailDialog } from "@/components/RelationshipCardDetailDialog";
 import { RelationshipCreateCardDialog } from "@/components/RelationshipCreateCardDialog";
+import { RelationshipPipelineManagerDialog } from "@/components/RelationshipPipelineManagerDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,26 +31,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
   listRelationshipCards,
+  listRelationshipPipelines,
   reasonLabel,
   updateRelationshipCard,
   type RelationshipCard,
-  type RelationshipStage,
+  type RelationshipPipeline,
 } from "@/service/relationshipService";
 import { listUsers, type UserProfile } from "@/service/userService";
-
-const STAGE_META: { key: RelationshipStage; label: string }[] = [
-  { key: "contato_pendente", label: "Contato pendente" },
-  { key: "em_contato", label: "Em contato" },
-  { key: "aguardando_cliente", label: "Aguardando cliente" },
-  { key: "retorno_agendado", label: "Retorno agendado" },
-  { key: "recuperado", label: "Recuperado" },
-  { key: "encerrado", label: "Encerrado" },
-];
-
-const RESOLVED_STAGES = new Set(["recuperado", "encerrado"]);
 
 type SortMode = "default" | "days" | "ticket";
 
@@ -78,6 +71,11 @@ function getInitials(name: string) {
 }
 
 export function RelationshipKanbanPage() {
+  const [pipelines, setPipelines] = useState<RelationshipPipeline[]>([]);
+  const [pipelinesLoading, setPipelinesLoading] = useState(true);
+  const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
+  const [managerOpen, setManagerOpen] = useState(false);
+
   const [cards, setCards] = useState<RelationshipCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,11 +89,26 @@ export function RelationshipKanbanPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [staffOptions, setStaffOptions] = useState<UserProfile[]>([]);
 
-  const load = useCallback(async (silent = false) => {
+  const loadPipelines = useCallback(async () => {
+    try {
+      const result = await listRelationshipPipelines();
+      setPipelines(result);
+      setActivePipelineId((current) => {
+        if (current && result.some((pipeline) => pipeline.id === current)) return current;
+        return result.find((pipeline) => pipeline.isDefault)?.id ?? result[0]?.id ?? null;
+      });
+    } catch {
+      toast.error("Não foi possível carregar os pipelines.");
+    } finally {
+      setPipelinesLoading(false);
+    }
+  }, []);
+
+  const load = useCallback(async (pipelineId: string, silent = false) => {
     if (!silent) setLoading(true);
     if (!silent) setError(null);
     try {
-      const result = await listRelationshipCards();
+      const result = await listRelationshipCards({ pipelineId });
       setCards(result);
     } catch {
       // Numa atualização silenciosa em segundo plano, uma falha transitória de
@@ -107,15 +120,30 @@ export function RelationshipKanbanPage() {
   }, []);
 
   useEffect(() => {
-    void load();
+    void loadPipelines();
     listUsers({ excludeRole: "client", limit: 100 }).then((r) => setStaffOptions(r.items)).catch(() => null);
+  }, [loadPipelines]);
+
+  useEffect(() => {
+    if (!activePipelineId) return;
+    void load(activePipelineId);
 
     const timer = window.setInterval(() => {
-      void load(true);
+      void load(activePipelineId, true);
     }, 10000);
 
     return () => window.clearInterval(timer);
-  }, [load]);
+  }, [activePipelineId, load]);
+
+  const activePipeline = useMemo(
+    () => pipelines.find((pipeline) => pipeline.id === activePipelineId) ?? null,
+    [pipelines, activePipelineId],
+  );
+
+  const stages = useMemo(
+    () => [...(activePipeline?.stages ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
+    [activePipeline],
+  );
 
   const responsibleOptions = useMemo(() => {
     if (staffOptions.length > 0) {
@@ -164,28 +192,29 @@ export function RelationshipKanbanPage() {
 
   const columns = useMemo(
     () =>
-      STAGE_META.map((meta) => {
-        const stageCards = visibleCards.filter((card) => card.stage === meta.key);
+      stages.map((stage) => {
+        const stageCards = visibleCards.filter((card) => card.stage === stage.key);
         const ordered = sortBy === "default" ? [...stageCards].sort((a, b) => a.sortOrder - b.sortOrder) : stageCards;
-        return { ...meta, cards: ordered };
+        return { key: stage.key, label: stage.label, cards: ordered };
       }),
-    [visibleCards, sortBy],
+    [stages, visibleCards, sortBy],
   );
 
   const summary = useMemo(() => {
+    const terminalByKey = new Map(stages.map((stage) => [stage.key, stage.terminalOutcome]));
     const total = cards.length;
-    const recovered = cards.filter((card) => card.stage === "recuperado").length;
-    const closed = cards.filter((card) => card.stage === "encerrado").length;
+    const recovered = cards.filter((card) => terminalByKey.get(card.stage) === "recuperado").length;
+    const closed = cards.filter((card) => terminalByKey.get(card.stage) === "encerrado").length;
     const resolved = recovered + closed;
-    const active = cards.filter((card) => !RESOLVED_STAGES.has(card.stage)).length;
+    const active = cards.filter((card) => !terminalByKey.get(card.stage)).length;
     const recoveryRate = resolved > 0 ? Math.round((recovered / resolved) * 100) : null;
     return { total, active, recovered, closed, recoveryRate };
-  }, [cards]);
+  }, [cards, stages]);
 
   // Renumera a coluna inteira em passos de 10, a partir de uma ordem já com o
   // card arrastado inserido na posição certa. Evita valores negativos/colisões
   // que a interpolação simples produziria quando os cards nascem com sortOrder=0.
-  async function reorderColumn(stageKey: RelationshipStage, orderedIds: string[]) {
+  async function reorderColumn(stageKey: string, orderedIds: string[]) {
     const previousCards = cards;
     const nextSortOrderById = new Map(orderedIds.map((id, index) => [id, (index + 1) * 10]));
 
@@ -280,7 +309,7 @@ export function RelationshipKanbanPage() {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
 
-    const stageKey = dragOverStage as RelationshipStage | null;
+    const stageKey = dragOverStage;
     const targetCardId = dragOverCardId;
     setDragOverStage(null);
     setDragOverCardId(null);
@@ -327,239 +356,286 @@ export function RelationshipKanbanPage() {
             Acompanhe clientes em risco, retornos e oportunidades identificadas na operação do salão.
           </p>
         </div>
-        <Button size="sm" className="gap-2 self-start" onClick={() => setCreateOpen(true)}>
-          <Plus size={14} />
-          Novo card
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-xl border border-border bg-card p-3">
-          <p className="text-xs text-muted-foreground">Cards ativos</p>
-          <p className="text-lg font-semibold text-foreground">{summary.active}</p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-3">
-          <p className="text-xs text-muted-foreground">Recuperados</p>
-          <p className="text-lg font-semibold text-foreground">{summary.recovered}</p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-3">
-          <p className="text-xs text-muted-foreground">Encerrados</p>
-          <p className="text-lg font-semibold text-foreground">{summary.closed}</p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-3">
-          <p className="text-xs text-muted-foreground">Taxa de recuperação</p>
-          <p className="text-lg font-semibold text-foreground">{summary.recoveryRate === null ? "-" : `${summary.recoveryRate}%`}</p>
+        <div className="flex items-center gap-2 self-start">
+          <Button variant="ghost" size="icon" className="h-9 w-9" title="Gerenciar pipelines" onClick={() => setManagerOpen(true)}>
+            <Settings2 size={16} />
+          </Button>
+          <Button size="sm" className="gap-2" onClick={() => setCreateOpen(true)} disabled={!activePipelineId}>
+            <Plus size={14} />
+            Novo card
+          </Button>
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar cliente, telefone, motivo ou responsável..."
-            className="h-9 w-full bg-secondary pl-9 text-sm sm:w-64"
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Filter size={14} />
-                Responsável
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuRadioGroup value={responsibleFilter} onValueChange={setResponsibleFilter}>
-                <DropdownMenuRadioItem value="all">Todos</DropdownMenuRadioItem>
-                {responsibleOptions.map(([id, name]) => (
-                  <DropdownMenuRadioItem key={id} value={id}>
-                    {name}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Filter size={14} />
-                Motivo
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuRadioGroup value={reasonFilter} onValueChange={setReasonFilter}>
-                <DropdownMenuRadioItem value="all">Todos</DropdownMenuRadioItem>
-                {reasonOptions.map((reason) => (
-                  <DropdownMenuRadioItem key={reason} value={reason}>
-                    {reasonLabel(reason)}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <ArrowUpDown size={14} />
-                Ordenar
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuRadioGroup value={sortBy} onValueChange={(value) => setSortBy(value as SortMode)}>
-                <DropdownMenuRadioItem value="default">Padrão</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="days">Mais dias sem retornar</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="ticket">Maior ticket médio</DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
+      {pipelines.length > 1 && activePipelineId && (
+        <Tabs value={activePipelineId} onValueChange={setActivePipelineId}>
+          <TabsList>
+            {pipelines.map((pipeline) => (
+              <TabsTrigger key={pipeline.id} value={pipeline.id}>
+                {pipeline.name}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      )}
 
-      {loading ? (
+      {pipelinesLoading ? (
         <div className="flex items-center justify-center rounded-xl border border-border bg-card p-16">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
-      ) : error ? (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">{error}</div>
-      ) : visibleCards.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card p-16 text-center text-sm text-muted-foreground">
-          Nenhum card encontrado com os filtros atuais.
+      ) : pipelines.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-16 text-center">
+          <p className="text-sm font-medium text-foreground">Nenhum pipeline configurado ainda</p>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            Um pipeline define as etapas do seu fluxo de relacionamento. Crie o primeiro para começar a usar o Kanban.
+          </p>
+          <Button size="sm" className="gap-2" onClick={() => setManagerOpen(true)}>
+            <Plus size={14} />
+            Criar pipeline
+          </Button>
         </div>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-2">
-          {columns.map((column) => (
-            <div
-              key={column.key}
-              data-column-key={column.key}
-              className={cn(
-                "flex w-72 shrink-0 flex-col gap-3 rounded-xl border bg-muted/60 p-3 transition-colors",
-                dragOverStage === column.key ? "border-primary bg-primary/5" : "border-border",
-              )}
-            >
-              <div className="flex items-center justify-between px-1">
-                <span className="text-sm font-medium text-foreground">{column.label}</span>
-                <Badge variant="secondary" className="rounded-full">
-                  {column.cards.length}
-                </Badge>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                {column.cards.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-                    Nenhum card aqui
-                  </div>
-                ) : (
-                  column.cards.map((card) => {
-                    const primaryTrigger = card.triggers.find((trigger) => trigger.isPrimary) ?? null;
-                    const secondaryTriggers = card.triggers.filter((trigger) => !trigger.isPrimary);
-
-                    return (
-                      <div
-                        key={card.id}
-                        data-card-id={card.id}
-                        onPointerDown={(event) => handlePointerDown(event, card)}
-                        onPointerMove={handlePointerMove}
-                        onPointerUp={handlePointerUp}
-                        onPointerCancel={handlePointerCancel}
-                        onClick={() => handleCardClick(card.id)}
-                        className={cn(
-                          "touch-none cursor-grab select-none rounded-xl border border-border bg-card p-3 shadow-card transition-shadow hover:shadow-card-hover active:cursor-grabbing",
-                          dragOverCardId === card.id && "border-t-2 border-t-primary",
-                        )}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-7 w-7">
-                            <AvatarFallback className="text-[11px]">{getInitials(card.clientName)}</AvatarFallback>
-                          </Avatar>
-                          <Link
-                            to={`/client-records?client=${card.clientId}`}
-                            onClick={(event) => event.stopPropagation()}
-                            onPointerDown={(event) => event.stopPropagation()}
-                            className="truncate text-sm font-medium text-foreground hover:underline"
-                          >
-                            {card.clientName}
-                          </Link>
-                        </div>
-
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {primaryTrigger && (
-                            <Badge className="text-[11px]">{reasonLabel(primaryTrigger.reason)}</Badge>
-                          )}
-                          {secondaryTriggers.map((trigger) => (
-                            <Badge key={trigger.id} variant="outline" className="text-[11px]">
-                              {reasonLabel(trigger.reason)}
-                            </Badge>
-                          ))}
-                        </div>
-
-                        <div className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground">
-                          {card.stats.favoriteService && (
-                            <div className="flex items-center gap-1.5">
-                              <Scissors size={12} />
-                              <span className="truncate">{card.stats.favoriteService}</span>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-1.5">
-                            <Clock size={12} />
-                            <span>Última visita: {formatDaysSince(card.stats.daysSinceLastVisit)}</span>
-                          </div>
-                          {card.stats.averageFrequencyDays !== null && (
-                            <div className="flex items-center gap-1.5">
-                              <Repeat size={12} />
-                              <span>Frequência média: {formatFrequency(card.stats.averageFrequencyDays)}</span>
-                            </div>
-                          )}
-                          {card.stats.favoriteProfessional && (
-                            <div className="flex items-center gap-1.5">
-                              <UserRound size={12} />
-                              <span className="truncate">{card.stats.favoriteProfessional}</span>
-                            </div>
-                          )}
-                          {card.stats.averageTicket !== null && (
-                            <div className="flex items-center gap-1.5">
-                              <Wallet size={12} />
-                              <span>Ticket médio: {formatCurrency(card.stats.averageTicket)}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {(card.nextAction || card.responsibleName) && (
-                          <div className="mt-3 flex flex-col gap-1 border-t border-border pt-2 text-xs">
-                            {card.nextAction && (
-                              <div className="flex items-start gap-1.5 text-foreground">
-                                <MessageCircle size={12} className="mt-0.5 shrink-0" />
-                                <span className="truncate">{card.nextAction}</span>
-                              </div>
-                            )}
-                            {card.responsibleName && (
-                              <div className="flex items-center gap-1.5 text-muted-foreground">
-                                <UserCog size={12} />
-                                <span>{card.responsibleName}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+        <>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl border border-border bg-card p-3">
+              <p className="text-xs text-muted-foreground">Cards ativos</p>
+              <p className="text-lg font-semibold text-foreground">{summary.active}</p>
             </div>
-          ))}
-        </div>
+            <div className="rounded-xl border border-border bg-card p-3">
+              <p className="text-xs text-muted-foreground">Recuperados</p>
+              <p className="text-lg font-semibold text-foreground">{summary.recovered}</p>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-3">
+              <p className="text-xs text-muted-foreground">Encerrados</p>
+              <p className="text-lg font-semibold text-foreground">{summary.closed}</p>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-3">
+              <p className="text-xs text-muted-foreground">Taxa de recuperação</p>
+              <p className="text-lg font-semibold text-foreground">{summary.recoveryRate === null ? "-" : `${summary.recoveryRate}%`}</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar cliente, telefone, motivo ou responsável..."
+                className="h-9 w-full bg-secondary pl-9 text-sm sm:w-64"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Filter size={14} />
+                    Responsável
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuRadioGroup value={responsibleFilter} onValueChange={setResponsibleFilter}>
+                    <DropdownMenuRadioItem value="all">Todos</DropdownMenuRadioItem>
+                    {responsibleOptions.map(([id, name]) => (
+                      <DropdownMenuRadioItem key={id} value={id}>
+                        {name}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Filter size={14} />
+                    Motivo
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuRadioGroup value={reasonFilter} onValueChange={setReasonFilter}>
+                    <DropdownMenuRadioItem value="all">Todos</DropdownMenuRadioItem>
+                    {reasonOptions.map((reason) => (
+                      <DropdownMenuRadioItem key={reason} value={reason}>
+                        {reasonLabel(reason)}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <ArrowUpDown size={14} />
+                    Ordenar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuRadioGroup value={sortBy} onValueChange={(value) => setSortBy(value as SortMode)}>
+                    <DropdownMenuRadioItem value="default">Padrão</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="days">Mais dias sem retornar</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="ticket">Maior ticket médio</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center rounded-xl border border-border bg-card p-16">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : error ? (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">{error}</div>
+          ) : visibleCards.length === 0 ? (
+            <div className="rounded-xl border border-border bg-card p-16 text-center text-sm text-muted-foreground">
+              Nenhum card encontrado com os filtros atuais.
+            </div>
+          ) : (
+            <div className="flex gap-4 overflow-x-auto pb-2">
+              {columns.map((column) => (
+                <div
+                  key={column.key}
+                  data-column-key={column.key}
+                  className={cn(
+                    "flex w-72 shrink-0 flex-col gap-3 rounded-xl border bg-muted/60 p-3 transition-colors",
+                    dragOverStage === column.key ? "border-primary bg-primary/5" : "border-border",
+                  )}
+                >
+                  <div className="flex items-center justify-between px-1">
+                    <span className="text-sm font-medium text-foreground">{column.label}</span>
+                    <Badge variant="secondary" className="rounded-full">
+                      {column.cards.length}
+                    </Badge>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    {column.cards.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+                        Nenhum card aqui
+                      </div>
+                    ) : (
+                      column.cards.map((card) => {
+                        const primaryTrigger = card.triggers.find((trigger) => trigger.isPrimary) ?? null;
+                        const secondaryTriggers = card.triggers.filter((trigger) => !trigger.isPrimary);
+
+                        return (
+                          <div
+                            key={card.id}
+                            data-card-id={card.id}
+                            onPointerDown={(event) => handlePointerDown(event, card)}
+                            onPointerMove={handlePointerMove}
+                            onPointerUp={handlePointerUp}
+                            onPointerCancel={handlePointerCancel}
+                            onClick={() => handleCardClick(card.id)}
+                            className={cn(
+                              "touch-none cursor-grab select-none rounded-xl border border-border bg-card p-3 shadow-card transition-shadow hover:shadow-card-hover active:cursor-grabbing",
+                              dragOverCardId === card.id && "border-t-2 border-t-primary",
+                            )}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-7 w-7">
+                                <AvatarFallback className="text-[11px]">{getInitials(card.clientName)}</AvatarFallback>
+                              </Avatar>
+                              <Link
+                                to={`/client-records?client=${card.clientId}`}
+                                onClick={(event) => event.stopPropagation()}
+                                onPointerDown={(event) => event.stopPropagation()}
+                                className="truncate text-sm font-medium text-foreground hover:underline"
+                              >
+                                {card.clientName}
+                              </Link>
+                            </div>
+
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {primaryTrigger && (
+                                <Badge className="text-[11px]">{reasonLabel(primaryTrigger.reason)}</Badge>
+                              )}
+                              {secondaryTriggers.map((trigger) => (
+                                <Badge key={trigger.id} variant="outline" className="text-[11px]">
+                                  {reasonLabel(trigger.reason)}
+                                </Badge>
+                              ))}
+                            </div>
+
+                            <div className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground">
+                              {card.stats.favoriteService && (
+                                <div className="flex items-center gap-1.5">
+                                  <Scissors size={12} />
+                                  <span className="truncate">{card.stats.favoriteService}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-1.5">
+                                <Clock size={12} />
+                                <span>Última visita: {formatDaysSince(card.stats.daysSinceLastVisit)}</span>
+                              </div>
+                              {card.stats.averageFrequencyDays !== null && (
+                                <div className="flex items-center gap-1.5">
+                                  <Repeat size={12} />
+                                  <span>Frequência média: {formatFrequency(card.stats.averageFrequencyDays)}</span>
+                                </div>
+                              )}
+                              {card.stats.favoriteProfessional && (
+                                <div className="flex items-center gap-1.5">
+                                  <UserRound size={12} />
+                                  <span className="truncate">{card.stats.favoriteProfessional}</span>
+                                </div>
+                              )}
+                              {card.stats.averageTicket !== null && (
+                                <div className="flex items-center gap-1.5">
+                                  <Wallet size={12} />
+                                  <span>Ticket médio: {formatCurrency(card.stats.averageTicket)}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {(card.nextAction || card.responsibleName) && (
+                              <div className="mt-3 flex flex-col gap-1 border-t border-border pt-2 text-xs">
+                                {card.nextAction && (
+                                  <div className="flex items-start gap-1.5 text-foreground">
+                                    <MessageCircle size={12} className="mt-0.5 shrink-0" />
+                                    <span className="truncate">{card.nextAction}</span>
+                                  </div>
+                                )}
+                                {card.responsibleName && (
+                                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                                    <UserCog size={12} />
+                                    <span>{card.responsibleName}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <RelationshipCardDetailDialog
         cardId={selectedCardId}
+        pipelines={pipelines}
         onClose={() => setSelectedCardId(null)}
-        onChanged={() => void load()}
+        onChanged={() => activePipelineId && void load(activePipelineId)}
       />
       <RelationshipCreateCardDialog
         open={createOpen}
+        pipelines={pipelines}
+        defaultPipelineId={activePipelineId}
         onClose={() => setCreateOpen(false)}
-        onCreated={() => void load()}
+        onCreated={() => activePipelineId && void load(activePipelineId)}
+      />
+      <RelationshipPipelineManagerDialog
+        open={managerOpen}
+        onClose={() => setManagerOpen(false)}
+        pipelines={pipelines}
+        activePipelineId={activePipelineId}
+        cardsInActivePipeline={cards}
+        onChanged={() => void loadPipelines()}
       />
     </div>
   );

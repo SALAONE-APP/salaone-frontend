@@ -35,11 +35,13 @@ import {
   updateRelationshipCard,
   type RelationshipCard,
   type RelationshipEvent,
+  type RelationshipPipeline,
 } from "@/service/relationshipService";
 import { listUsers, type UserProfile } from "@/service/userService";
 
 interface Props {
   cardId: string | null;
+  pipelines: RelationshipPipeline[];
   onClose: () => void;
   onChanged: () => void;
 }
@@ -64,7 +66,7 @@ function toDateTimeLocalInput(value: string | null) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export function RelationshipCardDetailDialog({ cardId, onClose, onChanged }: Props) {
+export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onChanged }: Props) {
   const { user } = useAuth();
   const [card, setCard] = useState<RelationshipCard | null>(null);
   const [events, setEvents] = useState<RelationshipEvent[]>([]);
@@ -190,6 +192,8 @@ export function RelationshipCardDetailDialog({ cardId, onClose, onChanged }: Pro
     }
   }
 
+  const cardStages = card ? pipelines.find((pipeline) => pipeline.id === card.pipelineId)?.stages : undefined;
+
   const canDelete = Boolean(
     card && user && (user.role === "admin" || user.role === "super_admin" || card.createdBy === user.id),
   );
@@ -203,7 +207,7 @@ export function RelationshipCardDetailDialog({ cardId, onClose, onChanged }: Pro
               {card ? (
                 <>
                   {card.clientName}
-                  <Badge variant="outline">{stageLabel(card.stage)}</Badge>
+                  <Badge variant="outline">{stageLabel(card.stage, cardStages)}</Badge>
                 </>
               ) : (
                 "Carregando card..."
@@ -387,7 +391,7 @@ export function RelationshipCardDetailDialog({ cardId, onClose, onChanged }: Pro
                         </div>
                         {event.fromStage && event.toStage && (
                           <p className="mt-1 text-muted-foreground">
-                            {stageLabel(event.fromStage)} → {stageLabel(event.toStage)}
+                            {stageLabel(event.fromStage, cardStages)} → {stageLabel(event.toStage, cardStages)}
                           </p>
                         )}
                         {event.contactType && (

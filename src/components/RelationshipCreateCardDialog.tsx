@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { REASON_LABELS, createRelationshipCard } from "@/service/relationshipService";
+import { REASON_LABELS, createRelationshipCard, type RelationshipPipeline } from "@/service/relationshipService";
 import { listUsers, type UserProfile } from "@/service/userService";
 
 interface Props {
   open: boolean;
+  pipelines: RelationshipPipeline[];
+  defaultPipelineId: string | null;
   onClose: () => void;
   onCreated: () => void;
 }
@@ -22,12 +24,13 @@ function extractErrorMessage(error: unknown, fallback: string) {
   return typeof value === "string" ? value : fallback;
 }
 
-export function RelationshipCreateCardDialog({ open, onClose, onCreated }: Props) {
+export function RelationshipCreateCardDialog({ open, pipelines, defaultPipelineId, onClose, onCreated }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [client, setClient] = useState<UserProfile | null>(null);
   const [primaryReason, setPrimaryReason] = useState("");
   const [responsibleId, setResponsibleId] = useState("none");
   const [responsibleOptions, setResponsibleOptions] = useState<UserProfile[]>([]);
+  const [pipelineId, setPipelineId] = useState<string | null>(null);
   const [nextAction, setNextAction] = useState("");
   const [nextActionAt, setNextActionAt] = useState("");
   const [notes, setNotes] = useState("");
@@ -43,8 +46,9 @@ export function RelationshipCreateCardDialog({ open, onClose, onCreated }: Props
       setNotes("");
       return;
     }
+    setPipelineId(defaultPipelineId);
     listUsers({ excludeRole: "client", limit: 100 }).then((r) => setResponsibleOptions(r.items)).catch(() => null);
-  }, [open]);
+  }, [open, defaultPipelineId]);
 
   async function handleSubmit() {
     if (!client) {
@@ -59,6 +63,7 @@ export function RelationshipCreateCardDialog({ open, onClose, onCreated }: Props
     try {
       await createRelationshipCard({
         clientId: client.id,
+        pipelineId: pipelineId ?? undefined,
         primaryReason,
         responsibleSalonUserId: responsibleId === "none" ? null : responsibleId,
         nextAction: nextAction.trim() || null,
@@ -101,6 +106,24 @@ export function RelationshipCreateCardDialog({ open, onClose, onCreated }: Props
               </Button>
             )}
           </div>
+
+          {pipelines.length > 1 && (
+            <div>
+              <Label>Pipeline</Label>
+              <Select value={pipelineId ?? undefined} onValueChange={setPipelineId}>
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue placeholder="Selecione o pipeline" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pipelines.map((pipeline) => (
+                    <SelectItem key={pipeline.id} value={pipeline.id}>
+                      {pipeline.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div>
             <Label>Motivo principal</Label>
