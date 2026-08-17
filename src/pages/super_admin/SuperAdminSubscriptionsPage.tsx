@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 
 import {
   activatePixPlatformSubscription,
@@ -28,6 +29,10 @@ export function SuperAdminSubscriptionsPage() {
   const [salons, setSalons] = useState<SuperAdminSalon[]>([]);
   const [plans, setPlans] = useState<PlatformPlan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
   const [pixModal, setPixModal] = useState({
     open: false,
     salonId: "",
@@ -136,11 +141,73 @@ export function SuperAdminSubscriptionsPage() {
     [salons]
   );
 
+  const calendarDays = useMemo(() => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const first = new Date(year, month, 1);
+    const gridStart = new Date(year, month, 1 - first.getDay());
+    return Array.from({ length: 42 }, (_, index) => {
+      const date = new Date(gridStart);
+      date.setDate(gridStart.getDate() + index);
+      const events = rows.filter((row) => {
+        if (!row.nextBillingAt) return false;
+        const due = new Date(row.nextBillingAt);
+        return due.getFullYear() === date.getFullYear() && due.getMonth() === date.getMonth() && due.getDate() === date.getDate();
+      });
+      return { date, events, currentMonth: date.getMonth() === month };
+    });
+  }, [calendarMonth, rows]);
+
+  const monthLabel = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(calendarMonth);
+  const todayKey = new Date().toDateString();
+
+  function changeMonth(offset: number) {
+    setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
+  }
+
   return (
     <div className="space-y-4">
       <div>
         <h3 className="text-base font-semibold text-foreground">Gestao de Assinaturas</h3>
         <p className="text-sm text-muted-foreground">Visualize o resumo de planos e situacao atual das assinaturas.</p>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-primary" />
+            <div>
+              <h4 className="font-medium capitalize text-foreground">{monthLabel}</h4>
+              <p className="text-xs text-muted-foreground">Vencimentos das assinaturas dos saloes</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => changeMonth(-1)} aria-label="Mes anterior"><ChevronLeft className="h-4 w-4" /></Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setCalendarMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}>Hoje</Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => changeMonth(1)} aria-label="Proximo mes"><ChevronRight className="h-4 w-4" /></Button>
+          </div>
+        </div>
+        <div className="grid grid-cols-7 border-b border-border bg-secondary/30 text-center text-xs font-medium uppercase text-muted-foreground">
+          {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"].map((day) => <div key={day} className="p-2">{day}</div>)}
+        </div>
+        {loading ? <div className="flex h-64 items-center justify-center text-sm text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" />Carregando vencimentos...</div> : (
+          <div className="grid grid-cols-7">
+            {calendarDays.map(({ date, events, currentMonth }) => (
+              <div key={date.toISOString()} className={`min-h-24 border-b border-r border-border p-1.5 sm:min-h-28 ${currentMonth ? "bg-card" : "bg-secondary/20"}`}>
+                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${date.toDateString() === todayKey ? "bg-primary font-semibold text-primary-foreground" : currentMonth ? "text-foreground" : "text-muted-foreground/50"}`}>{date.getDate()}</span>
+                <div className="mt-1 space-y-1">
+                  {events.slice(0, 3).map((event) => (
+                    <div key={event.id} title={`${event.name} - ${event.plan} - ${fmtCurrency(event.price)}`} className={`truncate rounded px-1.5 py-1 text-[10px] font-medium sm:text-xs ${event.status === "active" ? "bg-emerald-500/10 text-emerald-700" : event.status === "past_due" ? "bg-amber-500/15 text-amber-700" : "bg-destructive/10 text-destructive"}`}>
+                      {event.name}
+                    </div>
+                  ))}
+                  {events.length > 3 ? <p className="px-1 text-[10px] text-muted-foreground">+{events.length - 3} vencimento(s)</p> : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {!loading && rows.every((row) => !row.nextBillingAt) ? <p className="border-t border-border p-4 text-center text-sm text-muted-foreground">Nenhum salao possui data de vencimento cadastrada.</p> : null}
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
