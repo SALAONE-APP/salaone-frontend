@@ -165,6 +165,21 @@ interface BackendSalon {
   blocked_reason?: string | null;
   blocked_at?: string | null;
   deactivated_at?: string | null;
+  salon_subscriptions?: {
+    id: string;
+    status: string;
+    start_date?: string | null;
+    next_billing_date?: string | null;
+    canceled_at?: string | null;
+    created_at: string;
+    platform_plans?: {
+      id: string;
+      name: string;
+      price: number;
+      interval: string;
+      interval_count: number;
+    } | null;
+  } | null;
 }
 
 interface BackendSalonUser {
@@ -195,6 +210,17 @@ function mapBackendSalon(salon: BackendSalon): SuperAdminSalon {
     blockedReason: salon.blocked_reason ?? null,
     blockedAt: salon.blocked_at ?? null,
     deactivatedAt: salon.deactivated_at ?? null,
+    platformSubscription: salon.salon_subscriptions ? {
+      id: salon.salon_subscriptions.id,
+      status: salon.salon_subscriptions.status,
+      selected_plan: salon.salon_subscriptions.platform_plans?.name ?? "",
+      amount: salon.salon_subscriptions.platform_plans?.price ?? null,
+      start_date: salon.salon_subscriptions.start_date ?? null,
+      next_billing_date: salon.salon_subscriptions.next_billing_date ?? null,
+      canceled_at: salon.salon_subscriptions.canceled_at ?? null,
+      created_at: salon.salon_subscriptions.created_at,
+      platform_plans: salon.salon_subscriptions.platform_plans ?? null,
+    } : null,
     metrics: {
       appointmentsCount: 0,
       servicesCount: 0,
