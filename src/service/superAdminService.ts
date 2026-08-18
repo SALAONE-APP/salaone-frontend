@@ -23,6 +23,7 @@ export interface SuperAdminPlatformSubscription {
   amount?: number | null;
   start_date?: string | null;
   next_billing_date?: string | null;
+  trial_ends_at?: string | null;
   canceled_at?: string | null;
   created_at: string;
   platform_plans?: {
@@ -31,6 +32,7 @@ export interface SuperAdminPlatformSubscription {
     price: number;
     interval: string;
     interval_count: number;
+    trial_period_days?: number | null;
   } | null;
 }
 
@@ -170,6 +172,7 @@ interface BackendSalon {
     status: string;
     start_date?: string | null;
     next_billing_date?: string | null;
+    trial_ends_at?: string | null;
     canceled_at?: string | null;
     created_at: string;
     platform_plans?: {
@@ -178,6 +181,7 @@ interface BackendSalon {
       price: number;
       interval: string;
       interval_count: number;
+      trial_period_days?: number | null;
     } | null;
   } | null;
 }
@@ -217,6 +221,7 @@ function mapBackendSalon(salon: BackendSalon): SuperAdminSalon {
       amount: salon.salon_subscriptions.platform_plans?.price ?? null,
       start_date: salon.salon_subscriptions.start_date ?? null,
       next_billing_date: salon.salon_subscriptions.next_billing_date ?? null,
+      trial_ends_at: salon.salon_subscriptions.trial_ends_at ?? null,
       canceled_at: salon.salon_subscriptions.canceled_at ?? null,
       created_at: salon.salon_subscriptions.created_at,
       platform_plans: salon.salon_subscriptions.platform_plans ?? null,
