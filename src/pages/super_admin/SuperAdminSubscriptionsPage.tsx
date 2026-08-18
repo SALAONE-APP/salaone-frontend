@@ -25,6 +25,28 @@ function fmtCurrency(value?: number | null) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function getPaymentStatus(status: string, dueAt?: string | null) {
+  const normalizedStatus = String(status || "").toLowerCase();
+  const dueDate = dueAt ? new Date(dueAt) : null;
+  const isOverdue = dueDate && !Number.isNaN(dueDate.getTime()) && dueDate.getTime() < new Date().setHours(0, 0, 0, 0);
+
+  if (normalizedStatus === "active") return { label: "Pago", className: "bg-emerald-500/10 text-emerald-700" };
+  if (normalizedStatus === "past_due" || normalizedStatus === "expired" || isOverdue) {
+    return { label: "Em atraso", className: "bg-destructive/10 text-destructive" };
+  }
+  return { label: "Pendente", className: "bg-amber-500/15 text-amber-700" };
+}
+
+type CalendarSubscriptionEvent = {
+  id: string;
+  name: string;
+  plan: string;
+  status: string;
+  paymentMethod: string;
+  nextBillingAt: string | null;
+  price: number | null;
+};
+
 function getTrialEndsAt(shop: SuperAdminSalon) {
   const subscription = shop.platformSubscription;
   if (!subscription) return null;
@@ -47,6 +69,10 @@ export function SuperAdminSubscriptionsPage() {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+  const [selectedCalendarDay, setSelectedCalendarDay] = useState<{
+    date: Date;
+    events: CalendarSubscriptionEvent[];
+  } | null>(null);
   const [pixModal, setPixModal] = useState({
     open: false,
     salonId: "",
@@ -212,7 +238,14 @@ export function SuperAdminSubscriptionsPage() {
         {loading ? <div className="flex h-64 items-center justify-center text-sm text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" />Carregando vencimentos...</div> : (
           <div className="grid grid-cols-7">
             {calendarDays.map(({ date, events, currentMonth }) => (
-              <div key={date.toISOString()} className={`min-h-24 border-b border-r border-border p-1.5 sm:min-h-28 ${currentMonth ? "bg-card" : "bg-secondary/20"}`}>
+              <button
+                key={date.toISOString()}
+                type="button"
+                onClick={() => setSelectedCalendarDay({ date, events })}
+                disabled={events.length === 0}
+                className={`min-h-24 border-b border-r border-border p-1.5 text-left sm:min-h-28 ${events.length > 0 ? "cursor-pointer transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary" : "cursor-default"} ${currentMonth ? "bg-card" : "bg-secondary/20"}`}
+                aria-label={events.length > 0 ? `Ver vencimentos de ${date.toLocaleDateString("pt-BR")}` : undefined}
+              >
                 <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${date.toDateString() === todayKey ? "bg-primary font-semibold text-primary-foreground" : currentMonth ? "text-foreground" : "text-muted-foreground/50"}`}>{date.getDate()}</span>
                 <div className="mt-1 space-y-1">
                   {events.slice(0, 3).map((event) => (
@@ -222,7 +255,7 @@ export function SuperAdminSubscriptionsPage() {
                   ))}
                   {events.length > 3 ? <p className="px-1 text-[10px] text-muted-foreground">+{events.length - 3} vencimento(s)</p> : null}
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -299,6 +332,55 @@ export function SuperAdminSubscriptionsPage() {
           </table>
         </div>
       </div>
+
+      {selectedCalendarDay && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setSelectedCalendarDay(null)}>
+          <div className="w-full max-w-2xl rounded-xl border border-border bg-card shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-border p-5">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Mensalidades do dia</h3>
+                <p className="text-sm text-muted-foreground">
+                  {selectedCalendarDay.date.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+                </p>
+              </div>
+              <button type="button" onClick={() => setSelectedCalendarDay(null)} className="rounded border border-border px-3 py-1 text-sm text-muted-foreground hover:bg-secondary">Fechar</button>
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto p-5">
+              {selectedCalendarDay.events.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma mensalidade com vencimento neste dia.</p>
+              ) : (
+                <div className="space-y-3">
+                  {selectedCalendarDay.events.map((event) => {
+                    const paymentStatus = getPaymentStatus(event.status, event.nextBillingAt);
+                    return (
+                      <div key={event.id} className="rounded-lg border border-border bg-background p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="font-semibold text-foreground">{event.name}</p>
+                            <p className="text-sm text-muted-foreground">{event.plan}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {event.paymentMethod === "pix" ? "Pagamento manual via PIX"
+                                : event.paymentMethod === "credit_card" ? "Recorrencia automatica no cartao"
+                                : "Forma de pagamento nao informada"}
+                            </p>
+                          </div>
+                          <div className="text-left sm:text-right">
+                            <p className="text-lg font-semibold text-foreground">{fmtCurrency(event.price)}</p>
+                            <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${paymentStatus.className}`}>
+                              {paymentStatus.label}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {pixModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={closePixModal}>

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   ArrowRight,
   BarChart3,
+  BellRing,
   Cake,
   Calendar,
   CreditCard,
@@ -32,6 +33,7 @@ import { getCashClosingPreview, type CashClosingSummary } from "@/service/cashCl
 import { listUsers, type UserProfile } from "@/service/userService";
 import { listActiveFeatureUpdates, type FeatureUpdate } from "@/service/featureUpdateService";
 import { getHomeInfo, type HomeInfo } from "@/service/homeInfoService";
+import { getSalonPlatformSubscription, type PlatformSubscription } from "@/service/platformSubscriptionService";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -60,10 +62,11 @@ const shortcuts = [
 
 const urgentReminderStoragePrefix = "adminDashboard:urgentReminder";
 const birthdayLookaheadDays = 7;
+const subscriptionLookaheadDays = 7;
 const reminderRefreshMs = 60000;
 const defaultBusinessClosingHour = 18;
 
-type ReminderModal = "cash" | "birthdays" | "features";
+type ReminderModal = "cash" | "subscription" | "birthdays" | "features";
 type CashReminderPhase = "morning" | "closing";
 
 interface BirthdayReminder {
@@ -72,6 +75,13 @@ interface BirthdayReminder {
   phone?: string | null;
   birthDate: string;
   daysUntil: number;
+}
+
+interface SubscriptionReminder {
+  subscription: PlatformSubscription;
+  dueAt: string;
+  daysUntil: number;
+  isTrial: boolean;
 }
 
 interface OpenCashSession {
@@ -110,6 +120,27 @@ function getBirthdayReminderSignature(birthdays: BirthdayReminder[]) {
 
 function getFeatureUpdateSignature(updates: FeatureUpdate[]) {
   return updates.map((update) => update.id).sort().join(",");
+}
+
+function buildSubscriptionReminder(subscription?: PlatformSubscription | null): SubscriptionReminder | null {
+  if (!subscription || !["active", "trialing", "past_due"].includes(subscription.status)) return null;
+  const isTrial = subscription.status === "trialing";
+  const dueAt = subscription.nextBillingDate;
+  if (!dueAt) return null;
+
+  const dueDate = new Date(dueAt);
+  if (Number.isNaN(dueDate.getTime())) return null;
+  const today = new Date();
+  const localToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const localDueDate = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+  const daysUntil = Math.round((localDueDate.getTime() - localToday.getTime()) / 86400000);
+  if (daysUntil > subscriptionLookaheadDays) return null;
+
+  return { subscription, dueAt, daysUntil, isTrial };
+}
+
+function getSubscriptionReminderSignature(reminder: SubscriptionReminder | null) {
+  return reminder ? `${reminder.subscription.id}:${reminder.dueAt}:${reminder.subscription.status}` : "";
 }
 
 function parseTimeParts(value: string) {
@@ -334,6 +365,57 @@ function CashClosingReminderDialog({
   );
 }
 
+function SubscriptionReminderDialog({
+  open,
+  onOpenChange,
+  reminder,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  reminder: SubscriptionReminder | null;
+}) {
+  if (!reminder) return null;
+  const { subscription, dueAt, daysUntil, isTrial } = reminder;
+  const timingLabel = daysUntil < 0
+    ? `Vencida ha ${Math.abs(daysUntil)} dia${Math.abs(daysUntil) > 1 ? "s" : ""}`
+    : daysUntil === 0
+      ? "Vence hoje"
+      : `Vence em ${daysUntil} dia${daysUntil > 1 ? "s" : ""}`;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Vencimento do seu plano</DialogTitle>
+          <DialogDescription>
+            {isTrial ? "Seu periodo gratuito esta chegando ao fim." : "A mensalidade do SalaOne esta proxima do vencimento."}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="rounded-lg border border-border p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600">
+              <BellRing size={19} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-foreground">{subscription.plan?.name ?? subscription.selectedPlan}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {isTrial ? "Fim do periodo gratis" : "Proxima cobranca"}: {new Date(dueAt).toLocaleDateString("pt-BR")}
+              </p>
+              {subscription.amount != null ? <p className="mt-1 text-sm text-muted-foreground">Valor: {formatCurrency(subscription.amount)}</p> : null}
+              <Badge variant="outline" className={`mt-3 ${daysUntil <= 0 ? "border-red-500/20 bg-red-500/10 text-red-600" : "border-amber-500/20 bg-amber-500/10 text-amber-600"}`}>
+                {timingLabel}
+              </Badge>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)}>Entendi</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function BirthdayReminderDialog({
   open,
   onOpenChange,
@@ -455,6 +537,7 @@ export function AdminDashboard() {
   const [cashPreview, setCashPreview] = useState<CashClosingSummary | null>(null);
   const [openCashSession, setOpenCashSession] = useState<OpenCashSession | null>(null);
   const [cashReminderPhase, setCashReminderPhase] = useState<CashReminderPhase | null>(null);
+  const [subscriptionReminder, setSubscriptionReminder] = useState<SubscriptionReminder | null>(null);
   const [birthdays, setBirthdays] = useState<BirthdayReminder[]>([]);
   const [featureUpdates, setFeatureUpdates] = useState<FeatureUpdate[]>([]);
   const [activeReminderModal, setActiveReminderModal] = useState<ReminderModal | null>(null);
@@ -493,8 +576,9 @@ export function AdminDashboard() {
   const loadUrgentReminders = useCallback(async () => {
     if (!isAdmin || !user?.id) return;
 
-    const [cashResult, customersResult, featureUpdatesResult, homeInfoResult] = await Promise.allSettled([
+    const [cashResult, subscriptionResult, customersResult, featureUpdatesResult, homeInfoResult] = await Promise.allSettled([
       getCashClosingPreview(),
+      getSalonPlatformSubscription(),
       listUsers({ role: "client", page: 1, limit: 200 }),
       listActiveFeatureUpdates(),
       getHomeInfo(),
@@ -504,6 +588,9 @@ export function AdminDashboard() {
     const loadedOpenCashSession = getStoredOpenCashSession();
     const loadedHomeInfo = homeInfoResult.status === "fulfilled" ? homeInfoResult.value : null;
     const loadedCashReminderPhase = getCashReminderPhase(loadedOpenCashSession, loadedHomeInfo);
+    const loadedSubscriptionReminder = subscriptionResult.status === "fulfilled"
+      ? buildSubscriptionReminder(subscriptionResult.value.subscription)
+      : null;
     const loadedBirthdays =
       customersResult.status === "fulfilled"
         ? buildBirthdayReminders(customersResult.value.items)
@@ -515,6 +602,7 @@ export function AdminDashboard() {
     setCashPreview(loadedCashPreview);
     setOpenCashSession(loadedOpenCashSession);
     setCashReminderPhase(loadedCashReminderPhase);
+    setSubscriptionReminder(loadedSubscriptionReminder);
     setBirthdays(loadedBirthdays);
     setFeatureUpdates(loadedFeatureUpdates);
 
@@ -523,6 +611,14 @@ export function AdminDashboard() {
       sessionStorage.getItem(getReminderStorageKey("cash", user.id, `${getTodayKey()}:${loadedCashReminderPhase}`)) !== "dismissed"
     ) {
       nextQueue.push("cash");
+    }
+
+    const subscriptionSignature = getSubscriptionReminderSignature(loadedSubscriptionReminder);
+    if (
+      loadedSubscriptionReminder &&
+      sessionStorage.getItem(getReminderStorageKey("subscription", user.id, `${getTodayKey()}:${subscriptionSignature}`)) !== "dismissed"
+    ) {
+      nextQueue.push("subscription");
     }
 
     const birthdaySignature = getBirthdayReminderSignature(loadedBirthdays);
@@ -575,6 +671,12 @@ export function AdminDashboard() {
     if (modal === "features") {
       const featureSignature = getFeatureUpdateSignature(featureUpdates);
       sessionStorage.setItem(getReminderStorageKey("features", user.id, featureSignature), "dismissed");
+    } else if (modal === "subscription") {
+      const subscriptionSignature = getSubscriptionReminderSignature(subscriptionReminder);
+      sessionStorage.setItem(
+        getReminderStorageKey("subscription", user.id, `${getTodayKey()}:${subscriptionSignature}`),
+        "dismissed",
+      );
     } else if (modal === "birthdays") {
       const birthdaySignature = getBirthdayReminderSignature(birthdays);
       sessionStorage.setItem(
@@ -610,6 +712,11 @@ export function AdminDashboard() {
             onOpenChange={(open) => handleReminderOpenChange("cash", open)}
             cashPreview={cashPreview}
             openCashSession={openCashSession}
+          />
+          <SubscriptionReminderDialog
+            open={activeReminderModal === "subscription"}
+            onOpenChange={(open) => handleReminderOpenChange("subscription", open)}
+            reminder={subscriptionReminder}
           />
           <BirthdayReminderDialog
             open={activeReminderModal === "birthdays"}

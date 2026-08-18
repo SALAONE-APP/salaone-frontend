@@ -56,6 +56,12 @@ type TypeFilter = "all" | PaymentType;
 type SplitMethod = "pix" | "debito" | "credito" | "dinheiro";
 type SplitPart = { method: SplitMethod; amount: string };
 
+function editablePaymentMethod(method: PaymentMethod): SplitMethod {
+  return ["pix", "debito", "credito", "dinheiro"].includes(method)
+    ? method as SplitMethod
+    : "dinheiro";
+}
+
 const statusLabels: Record<PaymentStatus, string> = {
   pending: "Pendente",
   approved: "Aprovado",
@@ -312,7 +318,7 @@ export function PaymentsPage() {
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
   async function changePaymentStatus(payment: PaymentWithType, status: PaymentStatus) {
-    if (status === "paid" && payment.method === "local") {
+    if (status === "paid") {
       openLocalPaymentDialog(payment);
       return;
     }
@@ -356,8 +362,9 @@ export function PaymentsPage() {
   }
 
   function openLocalPaymentDialog(payment: PaymentWithType) {
-    setSelectedLocalMethod("dinheiro");
-    setSplitParts([{ method: "dinheiro", amount: payment.amount.toFixed(2) }]);
+    const method = editablePaymentMethod(payment.method);
+    setSelectedLocalMethod(method);
+    setSplitParts([{ method, amount: payment.amount.toFixed(2) }]);
     setAdjustedAmount(formatCurrency(payment.amount));
     setDiscountInput(formatCurrency(0));
     setLocalPaymentDialog(payment);
@@ -743,9 +750,9 @@ export function PaymentsPage() {
       <Dialog open={Boolean(localPaymentDialog)} onOpenChange={(open) => { if (!open) setLocalPaymentDialog(null); }}>
         <DialogContent className="w-[calc(100vw-2rem)] max-w-lg overflow-hidden sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Como foi realizado o pagamento?</DialogTitle>
+            <DialogTitle>Confirmar pagamento</DialogTitle>
             <DialogDescription>
-              Selecione a forma de pagamento usada no local para{" "}
+              Ajuste o valor, aplique desconto ou acrescimo e confirme a forma de pagamento de{" "}
               <span className="font-medium text-foreground">
                 {localPaymentDialog?.user?.name ?? "este cliente"}
               </span>
