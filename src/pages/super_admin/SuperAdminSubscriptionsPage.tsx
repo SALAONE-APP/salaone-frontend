@@ -132,11 +132,11 @@ export function SuperAdminSubscriptionsPage() {
         nextBillingDate: pixModal.nextBillingDate || undefined,
         amount,
       });
-      toast.success("Assinatura PIX liberada e salão ativada.");
+      toast.success("Ciclo PIX renovado e salao ativado.");
       closePixModal();
       await loadData();
     } catch {
-      toast.error("Nao foi possivel liberar a assinatura PIX.");
+      toast.error("Nao foi possivel renovar o ciclo PIX.");
       setPixModal((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
@@ -188,7 +188,7 @@ export function SuperAdminSubscriptionsPage() {
     <div className="space-y-4">
       <div>
         <h3 className="text-base font-semibold text-foreground">Gestao de Assinaturas</h3>
-        <p className="text-sm text-muted-foreground">Visualize o resumo de planos e situacao atual das assinaturas.</p>
+        <p className="text-sm text-muted-foreground">Renove ciclos PIX manualmente e acompanhe a recorrencia automatica dos cartoes.</p>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
@@ -271,19 +271,27 @@ export function SuperAdminSubscriptionsPage() {
                         : row.status}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-muted-foreground">{row.paymentMethod === "pix" ? "PIX" : row.paymentMethod}</td>
+                  <td className="px-5 py-3 text-muted-foreground">
+                    {row.paymentMethod === "pix" ? "PIX (manual)"
+                      : row.paymentMethod === "credit_card" ? "Cartao (automatico)"
+                      : row.paymentMethod}
+                  </td>
                   <td className="px-5 py-3 text-muted-foreground">{fmtDate(row.trialEndsAt)}</td>
                   <td className="px-5 py-3 text-muted-foreground">{fmtDate(row.nextBillingAt)}</td>
                   <td className="px-5 py-3 font-medium text-foreground">{fmtCurrency(row.price)}</td>
                   <td className="px-5 py-3">
-                    <button
-                      type="button"
-                      onClick={() => openPixModal(row.shop)}
-                      disabled={plans.length === 0}
-                      className="rounded bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Liberar PIX
-                    </button>
+                    {row.paymentMethod === "credit_card" ? (
+                      <span className="text-xs font-medium text-muted-foreground">Renovacao automatica</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openPixModal(row.shop)}
+                        disabled={plans.length === 0}
+                        className="rounded bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Renovar ciclo PIX
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -297,7 +305,7 @@ export function SuperAdminSubscriptionsPage() {
           <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-foreground">Liberar assinatura PIX</h3>
+                <h3 className="text-lg font-semibold text-foreground">Renovar ciclo PIX</h3>
                 <p className="text-sm text-muted-foreground">{pixModal.salonName}</p>
               </div>
               <button type="button" onClick={closePixModal} className="rounded border border-border px-3 py-1 text-sm text-muted-foreground hover:bg-secondary">Fechar</button>
@@ -358,7 +366,7 @@ export function SuperAdminSubscriptionsPage() {
                 disabled={pixModal.isSubmitting}
                 className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
-                {pixModal.isSubmitting ? "Liberando..." : "Confirmar pagamento"}
+                {pixModal.isSubmitting ? "Renovando..." : "Confirmar pagamento e renovar"}
               </button>
             </div>
           </div>
