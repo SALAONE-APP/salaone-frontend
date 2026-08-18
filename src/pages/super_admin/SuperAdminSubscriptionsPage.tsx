@@ -25,6 +25,20 @@ function fmtCurrency(value?: number | null) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function getTrialEndsAt(shop: SuperAdminSalon) {
+  const subscription = shop.platformSubscription;
+  if (!subscription) return null;
+  if (subscription.trial_ends_at) return subscription.trial_ends_at;
+
+  const trialDays = Number(subscription.platform_plans?.trial_period_days ?? 0);
+  const startedAt = subscription.start_date ?? subscription.created_at;
+  const start = new Date(startedAt);
+  if (subscription.status !== "trialing" || trialDays <= 0 || Number.isNaN(start.getTime())) return null;
+
+  start.setDate(start.getDate() + trialDays);
+  return start.toISOString();
+}
+
 export function SuperAdminSubscriptionsPage() {
   const [salons, setSalons] = useState<SuperAdminSalon[]>([]);
   const [plans, setPlans] = useState<PlatformPlan[]>([]);
@@ -128,16 +142,21 @@ export function SuperAdminSubscriptionsPage() {
   };
 
   const rows = useMemo(() =>
-    salons.map((shop) => ({
-      id: shop.id,
-      name: shop.name,
-      shop,
-      plan: shop.platformSubscription?.platform_plans?.name ?? shop.platformSubscription?.selected_plan ?? "Sem plano",
-      status: shop.platformSubscription?.status ?? "none",
-      paymentMethod: shop.platformSubscription?.payment_method ?? "-",
-      nextBillingAt: shop.platformSubscription?.next_billing_date ?? null,
-      price: shop.platformSubscription?.amount ?? shop.platformSubscription?.platform_plans?.price ?? null,
-    })),
+    salons.map((shop) => {
+      const trialEndsAt = getTrialEndsAt(shop);
+      return {
+        id: shop.id,
+        name: shop.name,
+        shop,
+        plan: shop.platformSubscription?.platform_plans?.name ?? shop.platformSubscription?.selected_plan ?? "Sem plano",
+        status: shop.platformSubscription?.status ?? "none",
+        paymentMethod: shop.platformSubscription?.payment_method ?? "-",
+        trialEndsAt,
+        nextBillingAt: shop.platformSubscription?.next_billing_date
+          ?? (shop.platformSubscription?.status === "trialing" ? trialEndsAt : null),
+        price: shop.platformSubscription?.amount ?? shop.platformSubscription?.platform_plans?.price ?? null,
+      };
+    }),
     [salons]
   );
 
@@ -219,6 +238,7 @@ export function SuperAdminSubscriptionsPage() {
                 <th className="px-5 py-3">Plano</th>
                 <th className="px-5 py-3">Status</th>
                 <th className="px-5 py-3">Pagamento</th>
+                <th className="px-5 py-3">Fim do periodo gratis</th>
                 <th className="px-5 py-3">Proxima cobranca</th>
                 <th className="px-5 py-3">Valor</th>
                 <th className="px-5 py-3">Acoes</th>
@@ -226,11 +246,11 @@ export function SuperAdminSubscriptionsPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">
+                <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">
                   <Loader2 className="mx-auto mb-2 animate-spin" size={20} />Carregando...
                 </td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={7} className="p-8 text-center text-sm text-muted-foreground">Nenhuma assinatura encontrada.</td></tr>
+                <tr><td colSpan={8} className="p-8 text-center text-sm text-muted-foreground">Nenhuma assinatura encontrada.</td></tr>
               ) : rows.map((row) => (
                 <tr key={row.id} className="border-b border-border last:border-0 hover:bg-secondary/30">
                   <td className="px-5 py-3 font-medium text-foreground">{row.name}</td>
@@ -252,6 +272,7 @@ export function SuperAdminSubscriptionsPage() {
                     </span>
                   </td>
                   <td className="px-5 py-3 text-muted-foreground">{row.paymentMethod === "pix" ? "PIX" : row.paymentMethod}</td>
+                  <td className="px-5 py-3 text-muted-foreground">{fmtDate(row.trialEndsAt)}</td>
                   <td className="px-5 py-3 text-muted-foreground">{fmtDate(row.nextBillingAt)}</td>
                   <td className="px-5 py-3 font-medium text-foreground">{fmtCurrency(row.price)}</td>
                   <td className="px-5 py-3">
