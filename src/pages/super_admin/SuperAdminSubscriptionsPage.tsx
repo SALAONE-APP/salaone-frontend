@@ -203,6 +203,26 @@ export function SuperAdminSubscriptionsPage() {
     });
   }, [calendarMonth, rows]);
 
+  const subscriptionSummary = useMemo(() => {
+    const calendarYear = calendarMonth.getFullYear();
+    const calendarMonthIndex = calendarMonth.getMonth();
+    const monthRows = rows.filter((row) => {
+      if (!row.nextBillingAt) return false;
+      const dueDate = new Date(row.nextBillingAt);
+      return !Number.isNaN(dueDate.getTime())
+        && dueDate.getFullYear() === calendarYear
+        && dueDate.getMonth() === calendarMonthIndex;
+    });
+
+    return {
+      monthReceivables: monthRows.reduce((total, row) => total + Number(row.price || 0), 0),
+      activeReceivables: monthRows
+        .filter((row) => row.status === "active")
+        .reduce((total, row) => total + Number(row.price || 0), 0),
+      monthCharges: monthRows.length,
+    };
+  }, [calendarMonth, rows]);
+
   const monthLabel = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(calendarMonth);
   const todayKey = new Date().toDateString();
 
@@ -215,6 +235,23 @@ export function SuperAdminSubscriptionsPage() {
       <div>
         <h3 className="text-base font-semibold text-foreground">Gestao de Assinaturas</h3>
         <p className="text-sm text-muted-foreground">Renove ciclos PIX manualmente e acompanhe a recorrencia automatica dos cartoes.</p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-sm text-muted-foreground">Recebiveis no mes</p>
+          <p className="mt-1 text-2xl font-semibold text-foreground">{fmtCurrency(subscriptionSummary.monthReceivables)}</p>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-sm text-muted-foreground">Recebiveis ativos</p>
+          <p className="mt-1 text-2xl font-semibold text-emerald-600">{fmtCurrency(subscriptionSummary.activeReceivables)}</p>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-sm text-muted-foreground">Cobrancas no mes</p>
+          <p className="mt-1 text-2xl font-semibold text-foreground">{subscriptionSummary.monthCharges}</p>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
