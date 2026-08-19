@@ -51,7 +51,7 @@ import {
 
 type PaymentWithType = PaymentRecord & { paymentType: PaymentType };
 type ApiPaymentWithType = PaymentRecord & { paymentType: PaymentType | "extra" };
-type StatusFilter = "all" | PaymentStatus;
+type StatusFilter = "all" | "confirmed" | PaymentStatus;
 type TypeFilter = "all" | PaymentType;
 type SplitMethod = "pix" | "debito" | "credito" | "dinheiro";
 type SplitPart = { method: SplitMethod; amount: string };
@@ -124,6 +124,24 @@ function formatDateTime(value?: string | null) {
   }).format(date);
 }
 
+function localDateKey(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function paymentDisplayDate(payment: PaymentWithType) {
+  return payment.paidAt || payment.appointment?.startAt || payment.createdAt;
+}
+
+function paymentDateKey(payment: PaymentWithType) {
+  const value = paymentDisplayDate(payment);
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value.slice(0, 10) : localDateKey(date);
+}
+
 function normalizeText(value: string) {
   return value
     .normalize("NFD")
@@ -187,7 +205,7 @@ function downloadCsv(payments: PaymentWithType[]) {
     String(payment.amount).replace(".", ","),
     methodLabels[payment.method] || payment.method,
     statusLabels[payment.status] || payment.status,
-    formatDateTime(payment.paidAt || payment.createdAt),
+    formatDateTime(paymentDisplayDate(payment)),
   ]);
 
   const csv = [header, ...rows]
@@ -208,8 +226,9 @@ export function PaymentsPage() {
   const [total, setTotal] = useState(0);
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("confirmed");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [dateFilter, setDateFilter] = useState(() => localDateKey(new Date()));
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -230,7 +249,9 @@ export function PaymentsPage() {
 
     try {
       const result = await listAllPayments({
-        status: statusFilter === "all" ? undefined : statusFilter,
+        status: statusFilter === "all" || statusFilter === "confirmed" ? undefined : statusFilter,
+        dateFrom: dateFilter || undefined,
+        dateTo: dateFilter || undefined,
         page,
         limit,
       });
@@ -247,7 +268,7 @@ export function PaymentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [dateFilter, page, statusFilter]);
 
   useEffect(() => {
     void loadPayments();
@@ -257,6 +278,8 @@ export function PaymentsPage() {
     const term = normalizeText(search.trim());
 
     return payments.filter((payment) => {
+      if (dateFilter && paymentDateKey(payment) !== dateFilter) return false;
+      if (statusFilter === "confirmed" && payment.status !== "paid" && payment.status !== "approved") return false;
       if (typeFilter !== "all" && payment.paymentType !== typeFilter) return false;
       if (!term) return true;
 
@@ -276,7 +299,7 @@ export function PaymentsPage() {
 
       return haystack.includes(term);
     });
-  }, [payments, search, typeFilter]);
+  }, [dateFilter, payments, search, statusFilter, typeFilter]);
 
   const { selectedRows, toggleRow, toggleAll } = useTableSelection(
     filteredPayments.map((payment) => payment.id),
@@ -351,6 +374,7 @@ export function PaymentsPage() {
         method: selectedLocalMethod,
         amount: finalAmount,
         discountAmount: Math.max(0, payment.amount - finalAmount),
+        paidAt: new Date().toISOString(),
       });
       toast.success("Pagamento confirmado.");
       await loadPayments();
@@ -410,7 +434,7 @@ export function PaymentsPage() {
       await splitPayment(payment.id, splitParts.map((part) => ({
         method: part.method,
         amount: Number(part.amount.replace(",", ".")),
-      })), finalAmount, discountAmount);
+      })), finalAmount, discountAmount, new Date().toISOString());
       toast.success("Pagamento dividido confirmado.");
       await loadPayments();
     } catch (err) {
@@ -471,6 +495,22 @@ export function PaymentsPage() {
           <h3 className="text-base font-medium text-foreground">Todos Pagamentos</h3>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative">
+              <Calendar
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                size={14}
+              />
+              <Input
+                type="date"
+                value={dateFilter}
+                onChange={(event) => {
+                  setDateFilter(event.target.value);
+                  setPage(1);
+                }}
+                aria-label="Filtrar pagamentos por data"
+                className="h-9 w-full bg-secondary pl-9 text-sm sm:w-40"
+              />
+            </div>
+            <div className="relative">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                 size={14}
@@ -498,6 +538,7 @@ export function PaymentsPage() {
                     setPage(1);
                   }}
                 >
+                  <DropdownMenuRadioItem value="confirmed">Confirmados</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="all">Todos</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="pending">Pendentes</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="approved">Aprovados</DropdownMenuRadioItem>
@@ -649,7 +690,7 @@ export function PaymentsPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Calendar size={14} />
-                          {formatDateTime(payment.paidAt || payment.createdAt)}
+                          {formatDateTime(paymentDisplayDate(payment))}
                         </div>
                       </td>
                       <td className="px-4 py-3">
