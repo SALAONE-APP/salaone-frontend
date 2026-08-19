@@ -74,6 +74,8 @@ export interface ListPaymentsParams {
   userId?: string;
   status?: PaymentStatus;
   method?: PaymentMethod;
+  dateFrom?: string;
+  dateTo?: string;
   page?: number;
   limit?: number;
 }
@@ -172,8 +174,8 @@ export interface SplitPaymentPart {
   amount: number;
 }
 
-export async function splitPayment(paymentId: string, parts: SplitPaymentPart[], totalAmount: number, discountAmount: number) {
-  const response = await api.post<PaymentRecord[]>(`/payments/${paymentId}/split`, { parts, totalAmount, discountAmount });
+export async function splitPayment(paymentId: string, parts: SplitPaymentPart[], totalAmount: number, discountAmount: number, paidAt?: string) {
+  const response = await api.post<PaymentRecord[]>(`/payments/${paymentId}/split`, { parts, totalAmount, discountAmount, paidAt });
   return response.data;
 }
 
