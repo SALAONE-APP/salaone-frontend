@@ -5,6 +5,8 @@ import {
   Cell,
   CartesianGrid,
   Legend,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -367,23 +369,35 @@ export function RelationshipDashboardPage() {
             )}
           </Panel>
 
-          <Panel title="Recuperados x encerrados por mês" subtitle="Tendência de resolução ao longo do tempo">
+          <Panel title="Evolução mensal (R$)" subtitle="Valor recuperado, perdido e o saldo, mês a mês">
             {dashboard.monthlyTrend.length === 0 ? (
               <EmptyPanel message="Nenhum card resolvido no período." />
             ) : (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dashboard.monthlyTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <LineChart data={dashboard.monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                     <XAxis dataKey="monthLabel" axisLine={false} tickLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} allowDecimals={false} />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                      tickFormatter={(v: number) => (Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(0)}mil` : String(v))}
+                    />
                     <Tooltip
                       contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
+                      formatter={(value: number) => formatCurrency(value)}
                     />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="recovered" name="Recuperados" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                    <Bar dataKey="closed" name="Encerrados" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                  </BarChart>
+                    <Legend
+                      wrapperStyle={{ fontSize: 12 }}
+                      formatter={(value) =>
+                        value === "recoveredValue" ? "Recuperado" : value === "lostValue" ? "Perdido" : "Saldo"
+                      }
+                    />
+                    <Line type="monotone" dataKey="recoveredValue" name="recoveredValue" stroke="hsl(var(--success))" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="lostValue" name="lostValue" stroke="hsl(var(--destructive))" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="saldo" name="saldo" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
                 </ResponsiveContainer>
               </div>
             )}

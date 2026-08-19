@@ -245,8 +245,9 @@ export interface RelationshipDashboardReason {
 export interface RelationshipDashboardMonth {
   month: string;
   monthLabel: string;
-  recovered: number;
-  closed: number;
+  recoveredValue: number;
+  lostValue: number;
+  saldo: number;
 }
 
 export interface RelationshipDashboardValueImpact {
