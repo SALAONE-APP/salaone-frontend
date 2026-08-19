@@ -12,10 +12,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Loader2, TrendingDown, TrendingUp } from "lucide-react";
+import { Loader2, Target, TrendingDown, TrendingUp, Users, type LucideIcon } from "lucide-react";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import {
   getRelationshipDashboard,
   listRelationshipPipelines,
@@ -39,8 +40,59 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(value);
 }
 
+// null quando não há base de comparação (período anterior sem nenhum caso) -
+// dividir por zero não tem uma % que faça sentido mostrar.
+function pctChange(current: number, previous: number): number | null {
+  if (previous === 0) return null;
+  return ((current - previous) / previous) * 100;
+}
+
 function EmptyPanel({ message }: { message: string }) {
   return <div className="flex h-full min-h-[180px] items-center justify-center text-center text-sm text-muted-foreground">{message}</div>;
+}
+
+function StatTile({
+  icon: Icon,
+  colorVar,
+  label,
+  value,
+  delta,
+  invertDelta,
+}: {
+  icon: LucideIcon;
+  colorVar: string;
+  label: string;
+  value: string;
+  delta?: number | null;
+  invertDelta?: boolean;
+}) {
+  const isGood = delta === null || delta === undefined ? null : invertDelta ? delta <= 0 : delta >= 0;
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
+      <div
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+        style={{ background: `hsl(var(${colorVar}) / 0.12)`, color: `hsl(var(${colorVar}))` }}
+      >
+        <Icon size={18} />
+      </div>
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate text-xs text-muted-foreground">{label}</span>
+        <span className="text-lg font-semibold text-foreground">{value}</span>
+        {delta !== null && delta !== undefined && (
+          <span
+            className={cn(
+              "flex items-center gap-1 text-xs font-medium",
+              isGood ? "text-[hsl(var(--success))]" : "text-destructive",
+            )}
+          >
+            {isGood ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+            {delta >= 0 ? "+" : ""}
+            {Math.round(delta)}% vs. período anterior
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // Funil desenhado à mão com clip-path em vez do componente Funnel do recharts:
@@ -161,6 +213,24 @@ export function RelationshipDashboardPage() {
 
   const netImpact = dashboard ? dashboard.valueImpact.recoveredValue - dashboard.valueImpact.lostValue : 0;
 
+  const summary = useMemo(() => {
+    if (!dashboard) return null;
+    const activeCount = dashboard.funnel.reduce((sum, stage) => sum + stage.count, 0);
+    const { recoveredCount, lostCount } = dashboard.valueImpact;
+    const { recoveredCount: prevRecoveredCount, lostCount: prevLostCount } = dashboard.previousValueImpact;
+    const rate = recoveredCount + lostCount > 0 ? (recoveredCount / (recoveredCount + lostCount)) * 100 : null;
+    const prevRate = prevRecoveredCount + prevLostCount > 0 ? (prevRecoveredCount / (prevRecoveredCount + prevLostCount)) * 100 : null;
+    return {
+      activeCount,
+      recoveredCount,
+      lostCount,
+      recoveredDelta: pctChange(recoveredCount, prevRecoveredCount),
+      lostDelta: pctChange(lostCount, prevLostCount),
+      rate,
+      rateDelta: rate !== null && prevRate !== null ? rate - prevRate : null,
+    };
+  }, [dashboard]);
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -200,8 +270,34 @@ export function RelationshipDashboardPage() {
         </div>
       ) : error ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">{error}</div>
-      ) : !dashboard ? null : (
+      ) : !dashboard || !summary ? null : (
         <>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatTile icon={Users} colorVar="--primary" label="Clientes em relacionamento" value={String(summary.activeCount)} />
+            <StatTile
+              icon={TrendingUp}
+              colorVar="--success"
+              label="Recuperados"
+              value={String(summary.recoveredCount)}
+              delta={summary.recoveredDelta}
+            />
+            <StatTile
+              icon={TrendingDown}
+              colorVar="--destructive"
+              label="Perdidos"
+              value={String(summary.lostCount)}
+              delta={summary.lostDelta}
+              invertDelta
+            />
+            <StatTile
+              icon={Target}
+              colorVar="--info"
+              label="Taxa de recuperação"
+              value={summary.rate === null ? "-" : `${Math.round(summary.rate)}%`}
+              delta={summary.rateDelta}
+            />
+          </div>
+
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Panel title="Recuperado x em risco" subtitle={`Valor histórico de clientes resolvidos nos últimos ${dashboard.windowMonths} meses`}>
               <div className="grid grid-cols-2 gap-3">

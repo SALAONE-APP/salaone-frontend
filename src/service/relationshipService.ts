@@ -271,6 +271,7 @@ export interface RelationshipDashboard {
   reasons: RelationshipDashboardReason[];
   monthlyTrend: RelationshipDashboardMonth[];
   valueImpact: RelationshipDashboardValueImpact;
+  previousValueImpact: RelationshipDashboardValueImpact;
   responsiblePerformance: RelationshipDashboardResponsible[];
 }
 
