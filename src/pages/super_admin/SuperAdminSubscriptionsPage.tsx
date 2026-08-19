@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
@@ -13,9 +13,22 @@ import {
 
 function fmtDate(value?: string | null) {
   if (!value) return "-";
-  const d = new Date(value);
+  const d = parseDate(value);
   if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleDateString("pt-BR");
+}
+
+// Datas sem horario representam um dia do calendario, nao um instante UTC.
+// Interpretar "2026-09-18" com new Date() desloca a exibicao para 17/09 no Brasil.
+function parseDate(value: string) {
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (dateOnly) return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+  return new Date(value);
+}
+
+function startOfToday() {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate());
 }
 
 function fmtCurrency(value?: number | null) {
@@ -23,6 +36,39 @@ function fmtCurrency(value?: number | null) {
   const n = Number(value);
   if (!Number.isFinite(n)) return "-";
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function getPaymentStatus(status: CalendarSubscriptionEvent["billingStatus"], dueAt: string) {
+  if (status === "paid") return { label: "Pago", className: "bg-emerald-500/10 text-emerald-700" };
+  const dueDate = parseDate(dueAt);
+  if (dueDate.getTime() < startOfToday().getTime()) {
+    return { label: "Em atraso", className: "bg-destructive/10 text-destructive" };
+  }
+  return { label: "Pendente", className: "bg-amber-500/15 text-amber-700" };
+}
+
+type CalendarSubscriptionEvent = {
+  id: string;
+  name: string;
+  plan: string;
+  billingStatus: "paid" | "pending";
+  paymentMethod: string;
+  occursAt: string;
+  price: number | null;
+};
+
+function getTrialEndsAt(shop: SuperAdminSalon) {
+  const subscription = shop.platformSubscription;
+  if (!subscription) return null;
+  if (subscription.trial_ends_at) return subscription.trial_ends_at;
+
+  const trialDays = Number(subscription.platform_plans?.trial_period_days ?? 0);
+  const startedAt = subscription.start_date ?? subscription.created_at;
+  const start = new Date(startedAt);
+  if (subscription.status !== "trialing" || trialDays <= 0 || Number.isNaN(start.getTime())) return null;
+
+  start.setDate(start.getDate() + trialDays);
+  return start.toISOString();
 }
 
 export function SuperAdminSubscriptionsPage() {
@@ -33,6 +79,11 @@ export function SuperAdminSubscriptionsPage() {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+  const [selectedCalendarDay, setSelectedCalendarDay] = useState<{
+    date: Date;
+    events: CalendarSubscriptionEvent[];
+  } | null>(null);
+  const [showDefaulters, setShowDefaulters] = useState(false);
   const [pixModal, setPixModal] = useState({
     open: false,
     salonId: "",
@@ -118,28 +169,51 @@ export function SuperAdminSubscriptionsPage() {
         nextBillingDate: pixModal.nextBillingDate || undefined,
         amount,
       });
-      toast.success("Assinatura PIX liberada e salão ativada.");
+      toast.success("Ciclo PIX renovado e salao ativado.");
       closePixModal();
       await loadData();
     } catch {
-      toast.error("Nao foi possivel liberar a assinatura PIX.");
+      toast.error("Nao foi possivel renovar o ciclo PIX.");
       setPixModal((prev) => ({ ...prev, isSubmitting: false }));
     }
   };
 
   const rows = useMemo(() =>
-    salons.map((shop) => ({
-      id: shop.id,
-      name: shop.name,
-      shop,
-      plan: shop.platformSubscription?.platform_plans?.name ?? shop.platformSubscription?.selected_plan ?? "Sem plano",
-      status: shop.platformSubscription?.status ?? "none",
-      paymentMethod: shop.platformSubscription?.payment_method ?? "-",
-      nextBillingAt: shop.platformSubscription?.next_billing_date ?? null,
-      price: shop.platformSubscription?.amount ?? shop.platformSubscription?.platform_plans?.price ?? null,
-    })),
+    salons.map((shop) => {
+      const trialEndsAt = getTrialEndsAt(shop);
+      return {
+        id: shop.id,
+        name: shop.name,
+        shop,
+        plan: shop.platformSubscription?.platform_plans?.name ?? shop.platformSubscription?.selected_plan ?? "Sem plano",
+        status: shop.platformSubscription?.status ?? "none",
+        paymentMethod: shop.platformSubscription?.payment_method ?? "-",
+        trialEndsAt,
+        startedAt: shop.platformSubscription?.start_date ?? null,
+        nextBillingAt: shop.platformSubscription?.next_billing_date
+          ?? (shop.platformSubscription?.status === "trialing" ? trialEndsAt : null),
+        price: shop.platformSubscription?.amount ?? shop.platformSubscription?.platform_plans?.price ?? null,
+      };
+    }),
     [salons]
   );
+
+  const calendarEvents = useMemo<CalendarSubscriptionEvent[]>(() => rows.flatMap((row) => {
+    const events: CalendarSubscriptionEvent[] = [];
+    // O inicio do ciclo ativo e a competencia que acabou de ser paga.
+    if (row.status === "active" && row.startedAt) {
+      events.push({ id: `${row.id}-paid-${row.startedAt}`, name: row.name, plan: row.plan, billingStatus: "paid", paymentMethod: row.paymentMethod, occursAt: row.startedAt, price: row.price });
+    }
+    // A proxima cobranca nunca esta paga antecipadamente apenas porque a assinatura esta ativa.
+    if (row.nextBillingAt) {
+      events.push({ id: `${row.id}-due-${row.nextBillingAt}`, name: row.name, plan: row.plan, billingStatus: "pending", paymentMethod: row.paymentMethod, occursAt: row.nextBillingAt, price: row.price });
+    }
+    return events;
+  }), [rows]);
+
+  const defaulters = useMemo(() => calendarEvents.filter((event) =>
+    event.billingStatus === "pending" && parseDate(event.occursAt).getTime() < startOfToday().getTime()
+  ), [calendarEvents]);
 
   const calendarDays = useMemo(() => {
     const year = calendarMonth.getFullYear();
@@ -149,14 +223,31 @@ export function SuperAdminSubscriptionsPage() {
     return Array.from({ length: 42 }, (_, index) => {
       const date = new Date(gridStart);
       date.setDate(gridStart.getDate() + index);
-      const events = rows.filter((row) => {
-        if (!row.nextBillingAt) return false;
-        const due = new Date(row.nextBillingAt);
+      const events = calendarEvents.filter((event) => {
+        const due = parseDate(event.occursAt);
         return due.getFullYear() === date.getFullYear() && due.getMonth() === date.getMonth() && due.getDate() === date.getDate();
       });
       return { date, events, currentMonth: date.getMonth() === month };
     });
-  }, [calendarMonth, rows]);
+  }, [calendarMonth, calendarEvents]);
+
+  const subscriptionSummary = useMemo(() => {
+    const calendarYear = calendarMonth.getFullYear();
+    const calendarMonthIndex = calendarMonth.getMonth();
+    const monthEvents = calendarEvents.filter((event) => {
+      const eventDate = parseDate(event.occursAt);
+      return !Number.isNaN(eventDate.getTime())
+        && eventDate.getFullYear() === calendarYear
+        && eventDate.getMonth() === calendarMonthIndex;
+    });
+    const payments = monthEvents.filter((event) => event.billingStatus === "paid");
+
+    return {
+      monthReceivables: monthEvents.reduce((total, event) => total + Number(event.price || 0), 0),
+      received: payments.reduce((total, event) => total + Number(event.price || 0), 0),
+      monthCharges: monthEvents.length,
+    };
+  }, [calendarMonth, calendarEvents]);
 
   const monthLabel = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(calendarMonth);
   const todayKey = new Date().toDateString();
@@ -169,7 +260,33 @@ export function SuperAdminSubscriptionsPage() {
     <div className="space-y-4">
       <div>
         <h3 className="text-base font-semibold text-foreground">Gestao de Assinaturas</h3>
-        <p className="text-sm text-muted-foreground">Visualize o resumo de planos e situacao atual das assinaturas.</p>
+        <p className="text-sm text-muted-foreground">Renove ciclos PIX manualmente e acompanhe a recorrencia automatica dos cartoes.</p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-sm text-muted-foreground">Recebiveis no mes</p>
+          <p className="mt-1 text-2xl font-semibold text-foreground">{fmtCurrency(subscriptionSummary.monthReceivables)}</p>
+        </div>
+
+        <button type="button" onClick={() => setShowDefaulters(true)} className="rounded-xl border border-border bg-card p-5 text-left transition-colors hover:bg-destructive/5">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">Inadimplentes</p>
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+          </div>
+          <p className="mt-1 text-2xl font-semibold text-destructive">{defaulters.length}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Clique para visualizar</p>
+        </button>
+
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-sm text-muted-foreground">Recebidos no mes</p>
+          <p className="mt-1 text-2xl font-semibold text-emerald-600">{fmtCurrency(subscriptionSummary.received)}</p>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-sm text-muted-foreground">Cobrancas no mes</p>
+          <p className="mt-1 text-2xl font-semibold text-foreground">{subscriptionSummary.monthCharges}</p>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
@@ -193,17 +310,24 @@ export function SuperAdminSubscriptionsPage() {
         {loading ? <div className="flex h-64 items-center justify-center text-sm text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" />Carregando vencimentos...</div> : (
           <div className="grid grid-cols-7">
             {calendarDays.map(({ date, events, currentMonth }) => (
-              <div key={date.toISOString()} className={`min-h-24 border-b border-r border-border p-1.5 sm:min-h-28 ${currentMonth ? "bg-card" : "bg-secondary/20"}`}>
+              <button
+                key={date.toISOString()}
+                type="button"
+                onClick={() => setSelectedCalendarDay({ date, events })}
+                disabled={events.length === 0}
+                className={`min-h-24 border-b border-r border-border p-1.5 text-left sm:min-h-28 ${events.length > 0 ? "cursor-pointer transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary" : "cursor-default"} ${currentMonth ? "bg-card" : "bg-secondary/20"}`}
+                aria-label={events.length > 0 ? `Ver vencimentos de ${date.toLocaleDateString("pt-BR")}` : undefined}
+              >
                 <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${date.toDateString() === todayKey ? "bg-primary font-semibold text-primary-foreground" : currentMonth ? "text-foreground" : "text-muted-foreground/50"}`}>{date.getDate()}</span>
                 <div className="mt-1 space-y-1">
                   {events.slice(0, 3).map((event) => (
-                    <div key={event.id} title={`${event.name} - ${event.plan} - ${fmtCurrency(event.price)}`} className={`truncate rounded px-1.5 py-1 text-[10px] font-medium sm:text-xs ${event.status === "active" ? "bg-emerald-500/10 text-emerald-700" : event.status === "past_due" ? "bg-amber-500/15 text-amber-700" : "bg-destructive/10 text-destructive"}`}>
+                    <div key={event.id} title={`${event.name} - ${event.plan} - ${fmtCurrency(event.price)}`} className={`truncate rounded px-1.5 py-1 text-[10px] font-medium sm:text-xs ${getPaymentStatus(event.billingStatus, event.occursAt).className}`}>
                       {event.name}
                     </div>
                   ))}
                   {events.length > 3 ? <p className="px-1 text-[10px] text-muted-foreground">+{events.length - 3} vencimento(s)</p> : null}
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -219,6 +343,7 @@ export function SuperAdminSubscriptionsPage() {
                 <th className="px-5 py-3">Plano</th>
                 <th className="px-5 py-3">Status</th>
                 <th className="px-5 py-3">Pagamento</th>
+                <th className="px-5 py-3">Fim do periodo gratis</th>
                 <th className="px-5 py-3">Proxima cobranca</th>
                 <th className="px-5 py-3">Valor</th>
                 <th className="px-5 py-3">Acoes</th>
@@ -226,11 +351,11 @@ export function SuperAdminSubscriptionsPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">
+                <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">
                   <Loader2 className="mx-auto mb-2 animate-spin" size={20} />Carregando...
                 </td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={7} className="p-8 text-center text-sm text-muted-foreground">Nenhuma assinatura encontrada.</td></tr>
+                <tr><td colSpan={8} className="p-8 text-center text-sm text-muted-foreground">Nenhuma assinatura encontrada.</td></tr>
               ) : rows.map((row) => (
                 <tr key={row.id} className="border-b border-border last:border-0 hover:bg-secondary/30">
                   <td className="px-5 py-3 font-medium text-foreground">{row.name}</td>
@@ -251,18 +376,27 @@ export function SuperAdminSubscriptionsPage() {
                         : row.status}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-muted-foreground">{row.paymentMethod === "pix" ? "PIX" : row.paymentMethod}</td>
+                  <td className="px-5 py-3 text-muted-foreground">
+                    {row.paymentMethod === "pix" ? "PIX (manual)"
+                      : row.paymentMethod === "credit_card" ? "Cartao (automatico)"
+                      : row.paymentMethod}
+                  </td>
+                  <td className="px-5 py-3 text-muted-foreground">{fmtDate(row.trialEndsAt)}</td>
                   <td className="px-5 py-3 text-muted-foreground">{fmtDate(row.nextBillingAt)}</td>
                   <td className="px-5 py-3 font-medium text-foreground">{fmtCurrency(row.price)}</td>
                   <td className="px-5 py-3">
-                    <button
-                      type="button"
-                      onClick={() => openPixModal(row.shop)}
-                      disabled={plans.length === 0}
-                      className="rounded bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Liberar PIX
-                    </button>
+                    {row.paymentMethod === "credit_card" ? (
+                      <span className="text-xs font-medium text-muted-foreground">Renovacao automatica</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openPixModal(row.shop)}
+                        disabled={plans.length === 0}
+                        className="rounded bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Renovar ciclo PIX
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -271,12 +405,95 @@ export function SuperAdminSubscriptionsPage() {
         </div>
       </div>
 
+      {selectedCalendarDay && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setSelectedCalendarDay(null)}>
+          <div className="w-full max-w-2xl rounded-xl border border-border bg-card shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-border p-5">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Mensalidades do dia</h3>
+                <p className="text-sm text-muted-foreground">
+                  {selectedCalendarDay.date.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+                </p>
+              </div>
+              <button type="button" onClick={() => setSelectedCalendarDay(null)} className="rounded border border-border px-3 py-1 text-sm text-muted-foreground hover:bg-secondary">Fechar</button>
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto p-5">
+              {selectedCalendarDay.events.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma mensalidade com vencimento neste dia.</p>
+              ) : (
+                <div className="space-y-3">
+                  {selectedCalendarDay.events.map((event) => {
+                    const paymentStatus = getPaymentStatus(event.billingStatus, event.occursAt);
+                    return (
+                      <div key={event.id} className="rounded-lg border border-border bg-background p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="font-semibold text-foreground">{event.name}</p>
+                            <p className="text-sm text-muted-foreground">{event.plan}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {event.paymentMethod === "pix" ? "Pagamento manual via PIX"
+                                : event.paymentMethod === "credit_card" ? "Recorrencia automatica no cartao"
+                                : "Forma de pagamento nao informada"}
+                            </p>
+                          </div>
+                          <div className="text-left sm:text-right">
+                            <p className="text-lg font-semibold text-foreground">{fmtCurrency(event.price)}</p>
+                            <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${paymentStatus.className}`}>
+                              {paymentStatus.label}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDefaulters && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowDefaulters(false)}>
+          <div className="w-full max-w-2xl rounded-xl border border-border bg-card shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-border p-5">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Assinaturas inadimplentes</h3>
+                <p className="text-sm text-muted-foreground">Mensalidades cujo vencimento ja passou e ainda estao pendentes.</p>
+              </div>
+              <button type="button" onClick={() => setShowDefaulters(false)} className="rounded border border-border px-3 py-1 text-sm text-muted-foreground hover:bg-secondary">Fechar</button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto p-5">
+              {defaulters.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma assinatura inadimplente.</p>
+              ) : (
+                <div className="space-y-3">
+                  {defaulters.map((event) => (
+                    <div key={event.id} className="flex flex-col justify-between gap-2 rounded-lg border border-border bg-background p-4 sm:flex-row sm:items-center">
+                      <div>
+                        <p className="font-semibold text-foreground">{event.name}</p>
+                        <p className="text-sm text-muted-foreground">{event.plan} · Vencimento em {fmtDate(event.occursAt)}</p>
+                      </div>
+                      <div className="sm:text-right">
+                        <p className="font-semibold text-foreground">{fmtCurrency(event.price)}</p>
+                        <span className="text-xs font-medium text-destructive">Em atraso</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {pixModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={closePixModal}>
           <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-foreground">Liberar assinatura PIX</h3>
+                <h3 className="text-lg font-semibold text-foreground">Renovar ciclo PIX</h3>
                 <p className="text-sm text-muted-foreground">{pixModal.salonName}</p>
               </div>
               <button type="button" onClick={closePixModal} className="rounded border border-border px-3 py-1 text-sm text-muted-foreground hover:bg-secondary">Fechar</button>
@@ -337,7 +554,7 @@ export function SuperAdminSubscriptionsPage() {
                 disabled={pixModal.isSubmitting}
                 className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
-                {pixModal.isSubmitting ? "Liberando..." : "Confirmar pagamento"}
+                {pixModal.isSubmitting ? "Renovando..." : "Confirmar pagamento e renovar"}
               </button>
             </div>
           </div>
