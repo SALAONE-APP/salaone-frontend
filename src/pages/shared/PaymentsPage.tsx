@@ -226,7 +226,7 @@ export function PaymentsPage() {
   const [total, setTotal] = useState(0);
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("confirmed");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [dateFilter, setDateFilter] = useState(() => localDateKey(new Date()));
   const [page, setPage] = useState(1);
