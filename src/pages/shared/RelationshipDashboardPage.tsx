@@ -4,9 +4,6 @@ import {
   BarChart,
   Cell,
   CartesianGrid,
-  Funnel,
-  FunnelChart,
-  LabelList,
   Legend,
   Pie,
   PieChart,
@@ -24,6 +21,7 @@ import {
   listRelationshipPipelines,
   reasonLabel,
   type RelationshipDashboard,
+  type RelationshipDashboardFunnelStage,
   type RelationshipPipeline,
 } from "@/service/relationshipService";
 
@@ -43,6 +41,70 @@ function formatCurrency(value: number) {
 
 function EmptyPanel({ message }: { message: string }) {
   return <div className="flex h-full min-h-[180px] items-center justify-center text-center text-sm text-muted-foreground">{message}</div>;
+}
+
+// Funil desenhado à mão com clip-path em vez do componente Funnel do recharts:
+// naquela versão da lib os labels só aparecem depois que a animação "termina" e
+// o callback correspondente nunca dispara, então os rótulos simplesmente não
+// renderizavam. Construir os trapézios manualmente também dá controle total
+// sobre a proporção (a versão via recharts ficava desproporcional/"estourada").
+function RelationshipFunnel({ stages }: { stages: RelationshipDashboardFunnelStage[] }) {
+  const maxCount = Math.max(1, ...stages.map((stage) => stage.count));
+  const MIN_WIDTH_PCT = 24;
+  const widthFor = (count: number) => Math.max(MIN_WIDTH_PCT, (count / maxCount) * 100);
+
+  const topStage = stages.reduce((best, stage) => (stage.count > best.count ? stage : best), stages[0]);
+
+  // Cards podem ser arrastados pra qualquer etapa, então a contagem nem
+  // sempre é decrescente de uma etapa pra próxima (ex.: uma etapa "de trás"
+  // com mais cards que uma "da frente"). Sem essa clamp, o funil "ampliava"
+  // de novo depois de estreitar, virando uma ampulheta. Forçando a largura a
+  // nunca crescer, a forma continua sempre um funil - a legenda ao lado é
+  // quem carrega o número exato, a forma é só leitura visual de tendência.
+  const clampedWidths: number[] = [];
+  stages.forEach((stage, i) => {
+    const raw = widthFor(stage.count);
+    clampedWidths.push(i === 0 ? raw : Math.min(raw, clampedWidths[i - 1]));
+  });
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-8">
+        <div className="flex flex-1 flex-col">
+          {stages.map((stage, i) => {
+            const topWidth = clampedWidths[i];
+            const bottomWidth = i < stages.length - 1 ? clampedWidths[i + 1] : clampedWidths[i] * 0.55;
+            return (
+              <div
+                key={stage.stageKey}
+                className="h-14"
+                style={{
+                  background: PALETTE[i % PALETTE.length],
+                  clipPath: `polygon(${(100 - topWidth) / 2}% 0%, ${(100 + topWidth) / 2}% 0%, ${(100 + bottomWidth) / 2}% 100%, ${(100 - bottomWidth) / 2}% 100%)`,
+                }}
+              />
+            );
+          })}
+        </div>
+        <ul className="flex w-56 shrink-0 flex-col gap-2.5 text-sm">
+          {stages.map((stage, i) => (
+            <li key={stage.stageKey} className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: PALETTE[i % PALETTE.length] }} />
+              <span className="flex-1 truncate text-foreground">{stage.label}</span>
+              <span className="text-muted-foreground">{stage.count}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {topStage.count > 0 && (
+        <div className="flex items-center gap-2 rounded-lg bg-muted/60 px-3 py-2 text-sm">
+          <TrendingUp size={14} className="shrink-0 text-primary" />
+          <span className="text-muted-foreground">Maior concentração em</span>
+          <span className="font-medium text-foreground">{topStage.label}</span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Panel({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
@@ -205,26 +267,7 @@ export function RelationshipDashboardPage() {
             {dashboard.funnel.length === 0 ? (
               <EmptyPanel message="Nenhum card ativo neste pipeline." />
             ) : (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <FunnelChart margin={{ top: 10, right: 140, bottom: 10, left: 10 }}>
-                    <Tooltip
-                      contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
-                    />
-                    <Funnel
-                      data={dashboard.funnel.map((stage) => ({ ...stage, displayLabel: `${stage.label} (${stage.count})` }))}
-                      dataKey="count"
-                      nameKey="label"
-                      isAnimationActive={false}
-                    >
-                      {dashboard.funnel.map((_, i) => (
-                        <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
-                      ))}
-                      <LabelList dataKey="displayLabel" position="right" fill="hsl(var(--foreground))" stroke="none" fontSize={13} />
-                    </Funnel>
-                  </FunnelChart>
-                </ResponsiveContainer>
-              </div>
+              <RelationshipFunnel stages={dashboard.funnel} />
             )}
           </Panel>
 
