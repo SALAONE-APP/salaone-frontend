@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
@@ -13,9 +13,22 @@ import {
 
 function fmtDate(value?: string | null) {
   if (!value) return "-";
-  const d = new Date(value);
+  const d = parseDate(value);
   if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleDateString("pt-BR");
+}
+
+// Datas sem horario representam um dia do calendario, nao um instante UTC.
+// Interpretar "2026-09-18" com new Date() desloca a exibicao para 17/09 no Brasil.
+function parseDate(value: string) {
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (dateOnly) return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+  return new Date(value);
+}
+
+function startOfToday() {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate());
 }
 
 function fmtCurrency(value?: number | null) {
@@ -25,13 +38,10 @@ function fmtCurrency(value?: number | null) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function getPaymentStatus(status: string, dueAt?: string | null) {
-  const normalizedStatus = String(status || "").toLowerCase();
-  const dueDate = dueAt ? new Date(dueAt) : null;
-  const isOverdue = dueDate && !Number.isNaN(dueDate.getTime()) && dueDate.getTime() < new Date().setHours(0, 0, 0, 0);
-
-  if (normalizedStatus === "active") return { label: "Pago", className: "bg-emerald-500/10 text-emerald-700" };
-  if (normalizedStatus === "past_due" || normalizedStatus === "expired" || isOverdue) {
+function getPaymentStatus(status: CalendarSubscriptionEvent["billingStatus"], dueAt: string) {
+  if (status === "paid") return { label: "Pago", className: "bg-emerald-500/10 text-emerald-700" };
+  const dueDate = parseDate(dueAt);
+  if (dueDate.getTime() < startOfToday().getTime()) {
     return { label: "Em atraso", className: "bg-destructive/10 text-destructive" };
   }
   return { label: "Pendente", className: "bg-amber-500/15 text-amber-700" };
@@ -41,9 +51,9 @@ type CalendarSubscriptionEvent = {
   id: string;
   name: string;
   plan: string;
-  status: string;
+  billingStatus: "paid" | "pending";
   paymentMethod: string;
-  nextBillingAt: string | null;
+  occursAt: string;
   price: number | null;
 };
 
@@ -73,6 +83,7 @@ export function SuperAdminSubscriptionsPage() {
     date: Date;
     events: CalendarSubscriptionEvent[];
   } | null>(null);
+  const [showDefaulters, setShowDefaulters] = useState(false);
   const [pixModal, setPixModal] = useState({
     open: false,
     salonId: "",
@@ -178,6 +189,7 @@ export function SuperAdminSubscriptionsPage() {
         status: shop.platformSubscription?.status ?? "none",
         paymentMethod: shop.platformSubscription?.payment_method ?? "-",
         trialEndsAt,
+        startedAt: shop.platformSubscription?.start_date ?? null,
         nextBillingAt: shop.platformSubscription?.next_billing_date
           ?? (shop.platformSubscription?.status === "trialing" ? trialEndsAt : null),
         price: shop.platformSubscription?.amount ?? shop.platformSubscription?.platform_plans?.price ?? null,
@@ -185,6 +197,23 @@ export function SuperAdminSubscriptionsPage() {
     }),
     [salons]
   );
+
+  const calendarEvents = useMemo<CalendarSubscriptionEvent[]>(() => rows.flatMap((row) => {
+    const events: CalendarSubscriptionEvent[] = [];
+    // O inicio do ciclo ativo e a competencia que acabou de ser paga.
+    if (row.status === "active" && row.startedAt) {
+      events.push({ id: `${row.id}-paid-${row.startedAt}`, name: row.name, plan: row.plan, billingStatus: "paid", paymentMethod: row.paymentMethod, occursAt: row.startedAt, price: row.price });
+    }
+    // A proxima cobranca nunca esta paga antecipadamente apenas porque a assinatura esta ativa.
+    if (row.nextBillingAt) {
+      events.push({ id: `${row.id}-due-${row.nextBillingAt}`, name: row.name, plan: row.plan, billingStatus: "pending", paymentMethod: row.paymentMethod, occursAt: row.nextBillingAt, price: row.price });
+    }
+    return events;
+  }), [rows]);
+
+  const defaulters = useMemo(() => calendarEvents.filter((event) =>
+    event.billingStatus === "pending" && parseDate(event.occursAt).getTime() < startOfToday().getTime()
+  ), [calendarEvents]);
 
   const calendarDays = useMemo(() => {
     const year = calendarMonth.getFullYear();
@@ -194,34 +223,31 @@ export function SuperAdminSubscriptionsPage() {
     return Array.from({ length: 42 }, (_, index) => {
       const date = new Date(gridStart);
       date.setDate(gridStart.getDate() + index);
-      const events = rows.filter((row) => {
-        if (!row.nextBillingAt) return false;
-        const due = new Date(row.nextBillingAt);
+      const events = calendarEvents.filter((event) => {
+        const due = parseDate(event.occursAt);
         return due.getFullYear() === date.getFullYear() && due.getMonth() === date.getMonth() && due.getDate() === date.getDate();
       });
       return { date, events, currentMonth: date.getMonth() === month };
     });
-  }, [calendarMonth, rows]);
+  }, [calendarMonth, calendarEvents]);
 
   const subscriptionSummary = useMemo(() => {
     const calendarYear = calendarMonth.getFullYear();
     const calendarMonthIndex = calendarMonth.getMonth();
-    const monthRows = rows.filter((row) => {
-      if (!row.nextBillingAt) return false;
-      const dueDate = new Date(row.nextBillingAt);
-      return !Number.isNaN(dueDate.getTime())
-        && dueDate.getFullYear() === calendarYear
-        && dueDate.getMonth() === calendarMonthIndex;
+    const monthEvents = calendarEvents.filter((event) => {
+      const eventDate = parseDate(event.occursAt);
+      return !Number.isNaN(eventDate.getTime())
+        && eventDate.getFullYear() === calendarYear
+        && eventDate.getMonth() === calendarMonthIndex;
     });
+    const payments = monthEvents.filter((event) => event.billingStatus === "paid");
 
     return {
-      monthReceivables: monthRows.reduce((total, row) => total + Number(row.price || 0), 0),
-      activeReceivables: monthRows
-        .filter((row) => row.status === "active")
-        .reduce((total, row) => total + Number(row.price || 0), 0),
-      monthCharges: monthRows.length,
+      monthReceivables: monthEvents.reduce((total, event) => total + Number(event.price || 0), 0),
+      received: payments.reduce((total, event) => total + Number(event.price || 0), 0),
+      monthCharges: monthEvents.length,
     };
-  }, [calendarMonth, rows]);
+  }, [calendarMonth, calendarEvents]);
 
   const monthLabel = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(calendarMonth);
   const todayKey = new Date().toDateString();
@@ -237,15 +263,24 @@ export function SuperAdminSubscriptionsPage() {
         <p className="text-sm text-muted-foreground">Renove ciclos PIX manualmente e acompanhe a recorrencia automatica dos cartoes.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-sm text-muted-foreground">Recebiveis no mes</p>
           <p className="mt-1 text-2xl font-semibold text-foreground">{fmtCurrency(subscriptionSummary.monthReceivables)}</p>
         </div>
 
+        <button type="button" onClick={() => setShowDefaulters(true)} className="rounded-xl border border-border bg-card p-5 text-left transition-colors hover:bg-destructive/5">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">Inadimplentes</p>
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+          </div>
+          <p className="mt-1 text-2xl font-semibold text-destructive">{defaulters.length}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Clique para visualizar</p>
+        </button>
+
         <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-sm text-muted-foreground">Recebiveis ativos</p>
-          <p className="mt-1 text-2xl font-semibold text-emerald-600">{fmtCurrency(subscriptionSummary.activeReceivables)}</p>
+          <p className="text-sm text-muted-foreground">Recebidos no mes</p>
+          <p className="mt-1 text-2xl font-semibold text-emerald-600">{fmtCurrency(subscriptionSummary.received)}</p>
         </div>
 
         <div className="rounded-xl border border-border bg-card p-5">
@@ -286,7 +321,7 @@ export function SuperAdminSubscriptionsPage() {
                 <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${date.toDateString() === todayKey ? "bg-primary font-semibold text-primary-foreground" : currentMonth ? "text-foreground" : "text-muted-foreground/50"}`}>{date.getDate()}</span>
                 <div className="mt-1 space-y-1">
                   {events.slice(0, 3).map((event) => (
-                    <div key={event.id} title={`${event.name} - ${event.plan} - ${fmtCurrency(event.price)}`} className={`truncate rounded px-1.5 py-1 text-[10px] font-medium sm:text-xs ${event.status === "active" ? "bg-emerald-500/10 text-emerald-700" : event.status === "past_due" ? "bg-amber-500/15 text-amber-700" : "bg-destructive/10 text-destructive"}`}>
+                    <div key={event.id} title={`${event.name} - ${event.plan} - ${fmtCurrency(event.price)}`} className={`truncate rounded px-1.5 py-1 text-[10px] font-medium sm:text-xs ${getPaymentStatus(event.billingStatus, event.occursAt).className}`}>
                       {event.name}
                     </div>
                   ))}
@@ -389,7 +424,7 @@ export function SuperAdminSubscriptionsPage() {
               ) : (
                 <div className="space-y-3">
                   {selectedCalendarDay.events.map((event) => {
-                    const paymentStatus = getPaymentStatus(event.status, event.nextBillingAt);
+                    const paymentStatus = getPaymentStatus(event.billingStatus, event.occursAt);
                     return (
                       <div key={event.id} className="rounded-lg border border-border bg-background p-4">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -412,6 +447,40 @@ export function SuperAdminSubscriptionsPage() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDefaulters && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowDefaulters(false)}>
+          <div className="w-full max-w-2xl rounded-xl border border-border bg-card shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-border p-5">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Assinaturas inadimplentes</h3>
+                <p className="text-sm text-muted-foreground">Mensalidades cujo vencimento ja passou e ainda estao pendentes.</p>
+              </div>
+              <button type="button" onClick={() => setShowDefaulters(false)} className="rounded border border-border px-3 py-1 text-sm text-muted-foreground hover:bg-secondary">Fechar</button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto p-5">
+              {defaulters.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma assinatura inadimplente.</p>
+              ) : (
+                <div className="space-y-3">
+                  {defaulters.map((event) => (
+                    <div key={event.id} className="flex flex-col justify-between gap-2 rounded-lg border border-border bg-background p-4 sm:flex-row sm:items-center">
+                      <div>
+                        <p className="font-semibold text-foreground">{event.name}</p>
+                        <p className="text-sm text-muted-foreground">{event.plan} · Vencimento em {fmtDate(event.occursAt)}</p>
+                      </div>
+                      <div className="sm:text-right">
+                        <p className="font-semibold text-foreground">{fmtCurrency(event.price)}</p>
+                        <span className="text-xs font-medium text-destructive">Em atraso</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
