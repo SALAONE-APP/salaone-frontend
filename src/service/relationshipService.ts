@@ -230,3 +230,51 @@ export async function updateRelationshipPipeline(
 export async function deleteRelationshipPipeline(id: string) {
   await api.delete(`/relationship/pipelines/${id}`);
 }
+
+export interface RelationshipDashboardFunnelStage {
+  stageKey: string;
+  label: string;
+  count: number;
+}
+
+export interface RelationshipDashboardReason {
+  reason: string;
+  count: number;
+}
+
+export interface RelationshipDashboardMonth {
+  month: string;
+  monthLabel: string;
+  recovered: number;
+  closed: number;
+}
+
+export interface RelationshipDashboardValueImpact {
+  recoveredValue: number;
+  recoveredCount: number;
+  lostValue: number;
+  lostCount: number;
+}
+
+export interface RelationshipDashboardResponsible {
+  responsibleId: string | null;
+  responsibleName: string;
+  resolvedCount: number;
+  avgResolutionDays: number | null;
+}
+
+export interface RelationshipDashboard {
+  pipelineId: string;
+  pipelineName: string;
+  windowMonths: number;
+  funnel: RelationshipDashboardFunnelStage[];
+  reasons: RelationshipDashboardReason[];
+  monthlyTrend: RelationshipDashboardMonth[];
+  valueImpact: RelationshipDashboardValueImpact;
+  responsiblePerformance: RelationshipDashboardResponsible[];
+}
+
+export async function getRelationshipDashboard(params: { pipelineId?: string; months?: number } = {}) {
+  const response = await api.get<{ dashboard: RelationshipDashboard }>("/relationship/dashboard", { params });
+  return response.data.dashboard;
+}
