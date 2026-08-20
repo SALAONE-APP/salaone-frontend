@@ -46,6 +46,64 @@ export const DEFAULT_STAGE_TEMPLATE: RelationshipStageDefinition[] = [
   { key: "encerrado", label: "Encerrado", sortOrder: 5, isTerminal: true, terminalOutcome: "encerrado" },
 ];
 
+export interface RelationshipPipelineTemplate {
+  id: string;
+  name: string;
+  description: string;
+  stages: RelationshipStageDefinition[];
+}
+
+// Pontos de partida por família de tratamento - cada uma tem um ciclo de
+// manutenção diferente (retoque de raiz, alisamento, cílios), então as
+// etapas mudam de nome/quantidade. O usuário escolhe o mais parecido e edita
+// livremente depois, igual já acontece com o template Padrão.
+export const PIPELINE_TEMPLATES: RelationshipPipelineTemplate[] = [
+  {
+    id: "padrao",
+    name: "Padrão",
+    description: "Fluxo genérico de recuperação, para qualquer motivo.",
+    stages: DEFAULT_STAGE_TEMPLATE,
+  },
+  {
+    id: "pos_mecha_coloracao",
+    name: "Pós Mecha / Coloração",
+    description: "Acompanhamento até o retorno de manutenção (retoque de raiz).",
+    stages: [
+      { key: "contato_pos_atendimento", label: "Contato pós-atendimento", sortOrder: 0, isTerminal: false, terminalOutcome: null },
+      { key: "home_care_enviado", label: "Recomendação de home care enviada", sortOrder: 1, isTerminal: false, terminalOutcome: null },
+      { key: "aproximando_retoque", label: "Aproximando da janela de retoque", sortOrder: 2, isTerminal: false, terminalOutcome: null },
+      { key: "retorno_agendado", label: "Retorno de manutenção agendado", sortOrder: 3, isTerminal: false, terminalOutcome: null },
+      { key: "recuperado", label: "Recuperado", sortOrder: 4, isTerminal: true, terminalOutcome: "recuperado" },
+      { key: "encerrado", label: "Encerrado", sortOrder: 5, isTerminal: true, terminalOutcome: "encerrado" },
+    ],
+  },
+  {
+    id: "pos_progressiva",
+    name: "Pós Progressiva / Alisamento",
+    description: "Ciclo de manutenção mais longo (cerca de 90 dias).",
+    stages: [
+      { key: "contato_pos_atendimento", label: "Contato pós-atendimento", sortOrder: 0, isTerminal: false, terminalOutcome: null },
+      { key: "home_care_enviado", label: "Recomendação de home care enviada", sortOrder: 1, isTerminal: false, terminalOutcome: null },
+      { key: "aproximando_manutencao", label: "Aproximando da manutenção (~90 dias)", sortOrder: 2, isTerminal: false, terminalOutcome: null },
+      { key: "retorno_agendado", label: "Retorno de manutenção agendado", sortOrder: 3, isTerminal: false, terminalOutcome: null },
+      { key: "recuperado", label: "Recuperado", sortOrder: 4, isTerminal: true, terminalOutcome: "recuperado" },
+      { key: "encerrado", label: "Encerrado", sortOrder: 5, isTerminal: true, terminalOutcome: "encerrado" },
+    ],
+  },
+  {
+    id: "pos_cilios",
+    name: "Pós Extensão de Cílios",
+    description: "Ciclo curto de manutenção (cerca de 20-25 dias).",
+    stages: [
+      { key: "contato_pos_atendimento", label: "Contato pós-atendimento", sortOrder: 0, isTerminal: false, terminalOutcome: null },
+      { key: "aproximando_manutencao", label: "Aproximando da manutenção (~20 dias)", sortOrder: 1, isTerminal: false, terminalOutcome: null },
+      { key: "manutencao_agendada", label: "Manutenção agendada", sortOrder: 2, isTerminal: false, terminalOutcome: null },
+      { key: "recuperado", label: "Recuperado", sortOrder: 3, isTerminal: true, terminalOutcome: "recuperado" },
+      { key: "encerrado", label: "Encerrado", sortOrder: 4, isTerminal: true, terminalOutcome: "encerrado" },
+    ],
+  },
+];
+
 export const REASON_LABELS: Record<string, string> = {
   retorno_atrasado: "Retorno atrasado",
   primeiro_atendimento_sem_retorno: "1º atendimento sem retorno",

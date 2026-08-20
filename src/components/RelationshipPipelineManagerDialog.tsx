@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, Pencil, Plus, Star, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Pencil, Plus, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -20,12 +20,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  DEFAULT_STAGE_TEMPLATE,
+  PIPELINE_TEMPLATES,
   createRelationshipPipeline,
   deleteRelationshipPipeline,
   updateRelationshipPipeline,
   type RelationshipCard,
   type RelationshipPipeline,
+  type RelationshipPipelineTemplate,
   type RelationshipStageDefinition,
 } from "@/service/relationshipService";
 
@@ -73,7 +74,7 @@ export function RelationshipPipelineManagerDialog({
   cardsInActivePipeline,
   onChanged,
 }: Props) {
-  const [mode, setMode] = useState<"list" | "edit">("list");
+  const [mode, setMode] = useState<"list" | "template" | "edit">("list");
   const [editingPipeline, setEditingPipeline] = useState<RelationshipPipeline | null>(null);
   const [name, setName] = useState("");
   const [stages, setStages] = useState<DraftStage[]>([]);
@@ -88,10 +89,10 @@ export function RelationshipPipelineManagerDialog({
     }
   }, [open]);
 
-  function openCreate() {
+  function selectTemplate(template: RelationshipPipelineTemplate) {
     setEditingPipeline(null);
-    setName("");
-    setStages(toDraftStages(DEFAULT_STAGE_TEMPLATE).map((stage) => ({ ...stage, isNew: true, draftId: nextTempId() })));
+    setName(template.name === "Padrão" ? "" : template.name);
+    setStages(toDraftStages(template.stages).map((stage) => ({ ...stage, isNew: true, draftId: nextTempId() })));
     setMode("edit");
   }
 
@@ -288,10 +289,37 @@ export function RelationshipPipelineManagerDialog({
                 ))}
               </div>
 
-              <Button variant="outline" className="w-fit gap-2" onClick={openCreate}>
+              <Button variant="outline" className="w-fit gap-2" onClick={() => setMode("template")}>
                 <Plus size={14} />
                 Novo pipeline
               </Button>
+            </>
+          ) : mode === "template" ? (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="icon" className="h-7 w-7 -ml-1" onClick={() => setMode("list")}>
+                    <ArrowLeft size={15} />
+                  </Button>
+                  <DialogTitle>Ponto de partida</DialogTitle>
+                </div>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                Escolha o modelo mais parecido com o que você precisa — dá pra ajustar nome e etapas depois.
+              </p>
+              <div className="flex flex-col gap-2">
+                {PIPELINE_TEMPLATES.map((template) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    onClick={() => selectTemplate(template)}
+                    className="rounded-lg border border-border p-3 text-left transition-colors hover:border-primary hover:bg-secondary/40"
+                  >
+                    <span className="block text-sm font-medium text-foreground">{template.name}</span>
+                    <span className="block text-xs text-muted-foreground">{template.description}</span>
+                  </button>
+                ))}
+              </div>
             </>
           ) : (
             <>
