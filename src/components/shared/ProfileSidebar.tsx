@@ -48,7 +48,6 @@ function getStoredSalon() {
 }
 
 export function ProfileSidebar({ title, homeHref, sections }: ProfileSidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [salon, setSalon] = useState<StoredSalon | null>(() =>
     getStoredSalon()
@@ -56,7 +55,12 @@ export function ProfileSidebar({ title, homeHref, sections }: ProfileSidebarProp
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
-  const { open: mobileOpen, setOpen: setMobileOpen } = useSidebarMobile();
+  const {
+    open: mobileOpen,
+    setOpen: setMobileOpen,
+    collapsed,
+    setCollapsed,
+  } = useSidebarMobile();
   const { can } = usePermissions();
 
   const sidebarTitle = salon?.name?.trim() || title;
@@ -153,11 +157,12 @@ export function ProfileSidebar({ title, homeHref, sections }: ProfileSidebarProp
         mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       )}
     >
-      <div className="flex min-w-0 items-center gap-2 border-b border-sidebar-border p-4">
+      <div className="flex min-w-0 items-center gap-2 overflow-hidden border-b border-sidebar-border p-4">
         <Link
           to={homeHref}
           className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden"
           onClick={closeMobile}
+          title={sidebarTitle}
         >
           <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary">
             {logoUrl ? (
@@ -169,7 +174,7 @@ export function ProfileSidebar({ title, homeHref, sections }: ProfileSidebarProp
             )}
           </div>
           {!collapsed && (
-            <span className="min-w-0 truncate font-semibold text-sidebar-foreground">
+            <span className="block min-w-0 flex-1 whitespace-normal break-words [overflow-wrap:anywhere] font-semibold leading-snug text-sidebar-foreground">
               {sidebarTitle}
             </span>
           )}

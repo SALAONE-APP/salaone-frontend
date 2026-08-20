@@ -903,7 +903,7 @@ export function BookingsPage() {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
-        <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border p-4 xl:flex-row xl:items-center xl:justify-between">
           <h3 className="text-base font-medium text-foreground">
             {statusFilter === "active"
               ? "Agendamentos Ativos"
@@ -921,7 +921,7 @@ export function BookingsPage() {
                             : "Nao compareceu"
                   }`}
           </h3>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center xl:justify-end">
             {selectedRows.length > 0 && (
               <Button
                 size="sm"
@@ -933,7 +933,7 @@ export function BookingsPage() {
                 Confirmar selecionados ({appointmentsToConfirm.length})
               </Button>
             )}
-            <div className="relative">
+            <div className="relative min-w-0 sm:flex-1 xl:flex-none">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                 size={14}
@@ -942,10 +942,10 @@ export function BookingsPage() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Buscar..."
-                className="h-9 w-full bg-secondary pl-9 text-sm sm:w-56"
+                className="h-9 w-full bg-secondary pl-9 text-sm xl:w-56"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               <Input
                 type="date"
                 value={dateFrom}
@@ -955,7 +955,7 @@ export function BookingsPage() {
                   setPage(1);
                 }}
                 aria-label="Data inicial"
-                className="h-9 w-[145px]"
+                className="h-9 min-w-[135px] flex-1 sm:w-[145px] sm:flex-none"
               />
               <span className="text-xs text-muted-foreground">até</span>
               <Input
@@ -967,7 +967,7 @@ export function BookingsPage() {
                   setPage(1);
                 }}
                 aria-label="Data final"
-                className="h-9 w-[145px]"
+                className="h-9 min-w-[135px] flex-1 sm:w-[145px] sm:flex-none"
               />
             </div>
             <DropdownMenu>
