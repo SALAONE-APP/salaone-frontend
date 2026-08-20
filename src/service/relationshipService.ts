@@ -264,6 +264,12 @@ export interface RelationshipDashboardResponsible {
   avgResolutionDays: number | null;
 }
 
+export interface RelationshipDashboardAttentionItems {
+  overdueNextAction: number;
+  noContactInDays: number;
+  lowRatingWithoutContact: number;
+}
+
 export interface RelationshipDashboard {
   pipelineId: string;
   pipelineName: string;
@@ -274,6 +280,7 @@ export interface RelationshipDashboard {
   valueImpact: RelationshipDashboardValueImpact;
   previousValueImpact: RelationshipDashboardValueImpact;
   responsiblePerformance: RelationshipDashboardResponsible[];
+  attentionItems: RelationshipDashboardAttentionItems;
 }
 
 export async function getRelationshipDashboard(params: { pipelineId?: string; months?: number } = {}) {

@@ -14,7 +14,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Loader2, Target, TrendingDown, TrendingUp, Users, type LucideIcon } from "lucide-react";
+import { CalendarClock, Clock, Loader2, Star, Target, TrendingDown, TrendingUp, Users, type LucideIcon } from "lucide-react";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -361,13 +361,65 @@ export function RelationshipDashboardPage() {
             </Panel>
           </div>
 
-          <Panel title="Cards ativos por etapa" subtitle="Onde os casos em aberto estão parados agora, no funil do pipeline">
-            {dashboard.funnel.length === 0 ? (
-              <EmptyPanel message="Nenhum card ativo neste pipeline." />
-            ) : (
-              <RelationshipFunnel stages={dashboard.funnel} />
-            )}
-          </Panel>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Panel title="Cards ativos por etapa" subtitle="Onde os casos em aberto estão parados agora, no funil do pipeline">
+              {dashboard.funnel.length === 0 ? (
+                <EmptyPanel message="Nenhum card ativo neste pipeline." />
+              ) : (
+                <RelationshipFunnel stages={dashboard.funnel} />
+              )}
+            </Panel>
+
+            <Panel title="Precisa de atenção hoje" subtitle="Casos ativos que provavelmente estão parados na fila de alguém">
+              {(() => {
+                const items = [
+                  {
+                    key: "overdue",
+                    icon: CalendarClock,
+                    label: "Retornos vencidos",
+                    description: "Próxima ação marcada para uma data que já passou",
+                    count: dashboard.attentionItems.overdueNextAction,
+                  },
+                  {
+                    key: "noContact",
+                    icon: Clock,
+                    label: "Sem contato há mais de 7 dias",
+                    description: "Nenhum contato registrado na última semana",
+                    count: dashboard.attentionItems.noContactInDays,
+                  },
+                  {
+                    key: "lowRating",
+                    icon: Star,
+                    label: "Avaliação baixa sem tratativa",
+                    description: "Motivo é avaliação baixa e ainda não teve nenhum contato",
+                    count: dashboard.attentionItems.lowRatingWithoutContact,
+                  },
+                ];
+                const total = items.reduce((sum, item) => sum + item.count, 0);
+                if (total === 0) {
+                  return <EmptyPanel message="Tudo em dia por aqui — nenhum caso pedindo atenção agora." />;
+                }
+                return (
+                  <ul className="flex flex-col gap-1">
+                    {items.map((item) => (
+                      <li key={item.key} className="flex items-center gap-3 rounded-lg px-2 py-2.5">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--warning))]/12 text-[hsl(var(--warning))]">
+                          <item.icon size={16} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-foreground">{item.label}</p>
+                          <p className="truncate text-xs text-muted-foreground">{item.description}</p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-sm font-semibold text-foreground">
+                          {item.count}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
+            </Panel>
+          </div>
 
           <Panel title="Evolução mensal (R$)" subtitle="Valor recuperado, perdido e o saldo, mês a mês">
             {dashboard.monthlyTrend.length === 0 ? (
