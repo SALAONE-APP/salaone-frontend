@@ -25,10 +25,17 @@
 
 /* ── Scroll shell ── */
 .calendar-grid-scroll-shell {
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: auto;
+  max-height: 68vh;
   margin-top: 12px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
 }
+
+.calendar-grid-scroll-shell::-webkit-scrollbar { width: 6px; height: 6px; }
+.calendar-grid-scroll-shell::-webkit-scrollbar-track { background: transparent; }
+.calendar-grid-scroll-shell::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
 
 .calendar-grid-inner {
   position: relative;
@@ -110,16 +117,8 @@
 
 /* ── Scroll area ── */
 .calendar-grid-scroll-area {
-  overflow-y: auto;
-  max-height: 68vh;
   position: relative;
-  scrollbar-width: thin;
-  scrollbar-color: hsl(var(--border)) transparent;
 }
-
-.calendar-grid-scroll-area::-webkit-scrollbar { width: 6px; }
-.calendar-grid-scroll-area::-webkit-scrollbar-track { background: transparent; }
-.calendar-grid-scroll-area::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
 
 /* ── Body ── */
 .calendar-grid-body {
