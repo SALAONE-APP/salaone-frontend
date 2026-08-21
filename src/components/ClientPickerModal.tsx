@@ -64,12 +64,12 @@ export function ClientPickerModal({ open, onClose, onSelect }: ClientPickerModal
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="flex h-[90dvh] max-h-[42rem] flex-col overflow-hidden sm:max-w-2xl">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Selecionar Cliente</DialogTitle>
         </DialogHeader>
 
-        <div className="relative">
+        <div className="relative shrink-0">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar por nome, e-mail ou telefone..."
@@ -80,7 +80,7 @@ export function ClientPickerModal({ open, onClose, onSelect }: ClientPickerModal
           />
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-border">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-md border border-border">
           {loading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 size={20} className="animate-spin text-muted-foreground" />
@@ -113,7 +113,7 @@ export function ClientPickerModal({ open, onClose, onSelect }: ClientPickerModal
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-border pt-3 text-sm text-muted-foreground">
+        <div className="flex shrink-0 items-center justify-between border-t border-border pt-3 text-sm text-muted-foreground">
           <span>{total} cliente{total !== 1 ? "s" : ""}</span>
           <div className="flex items-center gap-2">
             <Button
