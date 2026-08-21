@@ -626,7 +626,7 @@ export function ServicesPage() {
       </div>
 
       <Dialog open={Boolean(catalogService)} onOpenChange={(open) => { if (!open) setCatalogService(null); }}>
-        <DialogContent className="overflow-hidden p-0 sm:max-w-md">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto overscroll-contain p-0 sm:max-w-md">
           {catalogService && (
             <>
               <div className="aspect-[16/9] w-full overflow-hidden bg-secondary">
