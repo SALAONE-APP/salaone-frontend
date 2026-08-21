@@ -626,17 +626,17 @@ export function ServicesPage() {
       </div>
 
       <Dialog open={Boolean(catalogService)} onOpenChange={(open) => { if (!open) setCatalogService(null); }}>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto overscroll-contain p-0 sm:max-w-md">
+        <DialogContent className="flex h-[calc(100dvh-2rem)] max-h-[42rem] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
           {catalogService && (
             <>
-              <div className="aspect-[16/9] w-full overflow-hidden bg-secondary">
+              <div className="aspect-[16/9] w-full shrink-0 overflow-hidden bg-secondary">
                 {catalogService.imageUrl ? (
                   <img src={catalogService.imageUrl} alt={catalogService.name} className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full items-center justify-center"><Scissors className="h-12 w-12 text-muted-foreground" /></div>
                 )}
               </div>
-              <div className="space-y-4 p-6 pt-4">
+              <div className="min-h-0 flex-1 touch-pan-y space-y-4 overflow-y-auto overscroll-contain p-6 pt-4 [-webkit-overflow-scrolling:touch]">
                 <DialogHeader>
                   <DialogTitle>{catalogService.name}</DialogTitle>
                   <DialogDescription className="whitespace-pre-wrap text-left">
