@@ -643,11 +643,7 @@ export function ServicesPage() {
                     {catalogService.description?.trim() || "Consulte os detalhes deste servico com o salao."}
                   </DialogDescription>
                 </DialogHeader>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border bg-secondary/30 p-3">
-                    <p className="text-xs text-muted-foreground">Duracao</p>
-                    <p className="mt-1 flex items-center gap-1.5 font-medium"><Clock size={15} />{catalogService.durationMinutes} min</p>
-                  </div>
+                <div>
                   <div className="rounded-lg border bg-secondary/30 p-3">
                     <p className="text-xs text-muted-foreground">Valor</p>
                     {Number(catalogService.promotionalPrice ?? 0) > 0 ? (
