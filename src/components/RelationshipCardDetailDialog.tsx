@@ -163,14 +163,10 @@ export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onCha
       toast.error("Selecione um canal de contato ou escreva uma observação.");
       return;
     }
-    if (contactType && !contactOutcome.trim()) {
-      toast.error("Preencha o resultado do contato (ex.: respondeu, sem resposta).");
-      return;
-    }
     try {
       await createRelationshipEvent(card.id, {
         contactType: contactType || undefined,
-        outcome: contactType ? contactOutcome.trim() || undefined : undefined,
+        outcome: contactOutcome.trim() || undefined,
         notes: contactNotes.trim() || null,
       });
       setEvents(await listRelationshipEvents(card.id));
@@ -364,7 +360,7 @@ export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onCha
                     </SelectContent>
                   </Select>
                   <Input
-                    placeholder={contactType ? "Resultado (obrigatório, ex.: respondeu, sem resposta)" : "Resultado (ex.: respondeu, sem resposta)"}
+                    placeholder="Resultado, se já souber (ex.: respondeu, sem resposta)"
                     value={contactOutcome}
                     onChange={(e) => setContactOutcome(e.target.value)}
                     disabled={!contactType}
