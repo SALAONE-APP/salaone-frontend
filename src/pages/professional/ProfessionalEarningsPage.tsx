@@ -269,9 +269,6 @@ export function ProfessionalEarningsPage({
       ]);
       const summaryRow = summaryRes.items[0] ?? null;
       const serviceTabAttendances = summaryRow?.serviceTabAttendances ?? [];
-      const tabAppointmentIds = new Set(
-        serviceTabAttendances.map((item) => item.appointmentId),
-      );
       const tabAttendances: Appointment[] = serviceTabAttendances.map((item) => ({
         id: `service-tab-${item.id}`,
         professionalId: professional.id,
@@ -297,9 +294,7 @@ export function ProfessionalEarningsPage({
         commissionAmount: item.commissionAmount,
       }));
       setAppointments([
-        ...appointmentsRes.items.filter(
-          (appointment) => !tabAppointmentIds.has(appointment.id),
-        ),
+        ...appointmentsRes.items,
         ...tabAttendances,
       ]);
       setRow(summaryRow);

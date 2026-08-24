@@ -59,6 +59,8 @@ export interface PaymentRecord {
       unitPrice: number;
       quantity: number;
       total: number;
+      original?: boolean;
+      paid?: boolean;
     }>;
   } | null;
   amount: number;
