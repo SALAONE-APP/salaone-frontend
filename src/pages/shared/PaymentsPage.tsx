@@ -670,8 +670,14 @@ export function PaymentsPage() {
                             <div className="mt-2 space-y-1 rounded-md border bg-secondary/30 p-2">
                               {payment.serviceTab.items.map((item) => (
                                 <div key={item.id} className="flex justify-between gap-3 text-xs">
-                                  <span>{item.quantity}× {item.name}</span>
-                                  <span className="whitespace-nowrap font-medium">{formatCurrency(item.total)}</span>
+                                  <span>
+                                    {item.quantity}× {item.name}
+                                    {item.original ? " (serviço original)" : ""}
+                                  </span>
+                                  <span className="flex items-center gap-2 whitespace-nowrap font-medium">
+                                    {item.paid && <span className="text-emerald-600">Pago</span>}
+                                    {formatCurrency(item.total)}
+                                  </span>
                                 </div>
                               ))}
                             </div>

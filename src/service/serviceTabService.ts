@@ -21,6 +21,8 @@ export interface ServiceTab {
   status: "open" | "paid" | "cancelled";
   notes?: string | null;
   total: number;
+  paidTotal: number;
+  pendingTotal: number;
   openedAt: string;
   closedAt?: string | null;
   appointment: {
@@ -30,6 +32,15 @@ export interface ServiceTab {
     client: { id: string; name: string };
     professional: { id: string; displayName: string };
   };
+  originalServices: Array<{
+    id: string;
+    serviceId: string;
+    name: string;
+    unitPrice: number;
+    quantity: number;
+    total: number;
+    paid: boolean;
+  }>;
   items: ServiceTabItem[];
 }
 
@@ -76,7 +87,7 @@ export async function cancelServiceTab(tabId: string) {
   return response.data;
 }
 
-export async function payServiceTab(tabId: string, method: "pix" | "debito" | "credito" | "dinheiro") {
-  const response = await api.post<ServiceTab>(`/service-tabs/${tabId}/pay`, { method });
+export async function finishServiceTab(tabId: string) {
+  const response = await api.post<ServiceTab>(`/service-tabs/${tabId}/finish`);
   return response.data;
 }
