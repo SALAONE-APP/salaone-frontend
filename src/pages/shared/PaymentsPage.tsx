@@ -265,6 +265,7 @@ export function PaymentsPage() {
   const [splitParts, setSplitParts] = useState<SplitPart[]>([]);
   const [adjustedAmount, setAdjustedAmount] = useState("");
   const [discountInput, setDiscountInput] = useState("");
+  const [surchargeInput, setSurchargeInput] = useState("");
   const [methodPaymentDialog, setMethodPaymentDialog] = useState<PaymentWithType | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>("dinheiro");
 
@@ -420,6 +421,7 @@ export function PaymentsPage() {
     setSplitParts([{ method, amount: payment.amount.toFixed(2) }]);
     setAdjustedAmount(formatCurrency(payment.amount));
     setDiscountInput(formatCurrency(0));
+    setSurchargeInput(formatCurrency(0));
     setLocalPaymentDialog(payment);
   }
 
@@ -433,15 +435,24 @@ export function PaymentsPage() {
 
   async function confirmItemizedPayment() {
     if (!localPaymentDialog || pendingTabItems.length === 0) return;
-    const parts = pendingTabItems.map((item) => ({
-      method: itemPaymentMethods[item.id] ?? "dinheiro",
-      amount: item.total,
-    }));
-    const total = parts.reduce((sum, part) => sum + part.amount, 0);
-    if (Math.abs(total - localPaymentDialog.amount) > 0.005) {
-      toast.error("A soma dos itens pendentes não corresponde ao saldo da comanda.");
+    if (!(finalAmount > 0)) {
+      toast.error("Informe um valor final maior que zero.");
       return;
     }
+    const originalTotal = pendingTabItems.reduce((sum, item) => sum + item.total, 0);
+    let allocatedCents = 0;
+    const finalCents = Math.round(finalAmount * 100);
+    const parts = pendingTabItems.map((item, index) => {
+      const amountCents = index === pendingTabItems.length - 1
+        ? finalCents - allocatedCents
+        : Math.round((item.total / originalTotal) * finalCents);
+      allocatedCents += amountCents;
+      return {
+        method: itemPaymentMethods[item.id] ?? "dinheiro",
+        amount: amountCents / 100,
+      };
+    });
+    const total = parts.reduce((sum, part) => sum + part.amount, 0);
     const payment = localPaymentDialog;
     setLocalPaymentDialog(null);
     setUpdatingId(payment.id);
@@ -451,10 +462,11 @@ export function PaymentsPage() {
           status: "paid",
           method: parts[0].method,
           amount: parts[0].amount,
+          discountAmount,
           paidAt: new Date().toISOString(),
         });
       } else {
-        await splitPayment(payment.id, parts, total, 0, new Date().toISOString());
+        await splitPayment(payment.id, parts, total, discountAmount, new Date().toISOString());
       }
       toast.success("Itens da comanda pagos com os métodos informados.");
       await loadPayments();
@@ -479,8 +491,17 @@ export function PaymentsPage() {
   function changeDiscount(value: string) {
     const discount = parseCurrencyInput(value);
     setDiscountInput(formatCurrency(discount));
+    setSurchargeInput(formatCurrency(0));
     if (!localPaymentDialog) return;
     changeFinalAmount(Math.max(0, localPaymentDialog.amount - discount).toFixed(2), false);
+  }
+
+  function changeSurcharge(value: string) {
+    const surcharge = parseCurrencyInput(value);
+    setSurchargeInput(formatCurrency(surcharge));
+    setDiscountInput(formatCurrency(0));
+    if (!localPaymentDialog) return;
+    changeFinalAmount((localPaymentDialog.amount + surcharge).toFixed(2), false);
   }
 
   async function confirmSplitPayment() {
@@ -894,17 +915,20 @@ export function PaymentsPage() {
               <span className="text-muted-foreground">Valor original</span>
               <span className="font-medium">{formatCurrency(localPaymentDialog?.amount ?? 0)}</span>
             </div>
-            {pendingTabItems.length === 0 && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="min-w-0 space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Desconto</label>
                 <Input className="min-w-0 w-full" inputMode="numeric" value={discountInput} onChange={(event) => changeDiscount(event.target.value)} />
               </div>
               <div className="min-w-0 space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Valor final</label>
-                <Input className="min-w-0 w-full" inputMode="numeric" value={adjustedAmount} onChange={(event) => changeFinalAmount(event.target.value)} />
+                <label className="text-xs font-medium text-muted-foreground">Acréscimo</label>
+                <Input className="min-w-0 w-full" inputMode="numeric" value={surchargeInput} onChange={(event) => changeSurcharge(event.target.value)} />
               </div>
-            </div>}
-            {pendingTabItems.length === 0 && finalAmount > (localPaymentDialog?.amount ?? 0) && <p className="mt-2 text-xs text-amber-600">Acréscimo de {formatCurrency(finalAmount - (localPaymentDialog?.amount ?? 0))}</p>}
+              <div className="min-w-0 space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Valor final</label>
+                <Input className="min-w-0 w-full" inputMode="numeric" value={adjustedAmount} readOnly />
+              </div>
+            </div>
           </div>
           {pendingTabItems.length > 0 ? (
             <div className="max-h-[45vh] space-y-3 overflow-y-auto py-2">
