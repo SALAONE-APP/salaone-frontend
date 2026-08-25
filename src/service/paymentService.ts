@@ -61,6 +61,7 @@ export interface PaymentRecord {
       total: number;
       original?: boolean;
       paid?: boolean;
+      paymentMethods?: PaymentMethod[];
     }>;
   } | null;
   amount: number;
