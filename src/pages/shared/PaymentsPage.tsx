@@ -436,17 +436,17 @@ export function PaymentsPage() {
   function changeDiscount(value: string) {
     const discount = parseCurrencyInput(value);
     setDiscountInput(formatCurrency(discount));
-    setSurchargeInput(formatCurrency(0));
     if (!localPaymentDialog) return;
-    changeFinalAmount(Math.max(0, localPaymentDialog.amount - discount).toFixed(2), false);
+    const surcharge = parseCurrencyInput(surchargeInput);
+    changeFinalAmount(Math.max(0, localPaymentDialog.amount + surcharge - discount).toFixed(2), false);
   }
 
   function changeSurcharge(value: string) {
     const surcharge = parseCurrencyInput(value);
     setSurchargeInput(formatCurrency(surcharge));
-    setDiscountInput(formatCurrency(0));
     if (!localPaymentDialog) return;
-    changeFinalAmount((localPaymentDialog.amount + surcharge).toFixed(2), false);
+    const discount = parseCurrencyInput(discountInput);
+    changeFinalAmount(Math.max(0, localPaymentDialog.amount + surcharge - discount).toFixed(2), false);
   }
 
   async function confirmSplitPayment() {
