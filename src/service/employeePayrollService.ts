@@ -112,6 +112,12 @@ export interface EmployeePayrollRow {
     startAt: string;
     paidAt: string;
   }>;
+  appointmentAdjustments?: Array<{
+    appointmentId: string;
+    adjustment: number;
+    totalAmount: number;
+    commissionAmount: number;
+  }>;
 }
 
 export interface PayrollSummaryResponse {

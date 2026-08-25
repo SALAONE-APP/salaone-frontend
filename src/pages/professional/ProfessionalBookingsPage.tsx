@@ -630,7 +630,7 @@ export function ProfessionalBookingsPage() {
                                 onClick={() => changeStatus(appt, "completed")}
                               >
                                 <CheckCircle2 size={14} />
-                                Finalizar
+                                Finalizar atendimento
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 disabled={appt.status === "no_show"}

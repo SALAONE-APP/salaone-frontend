@@ -38,7 +38,6 @@ import { listProfessionals, type Professional } from "@/service/professionalServ
 import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
 import { getHomeInfo } from "@/service/homeInfoService";
 import { listServices, type Service } from "@/service/serviceService";
-import { openServiceTab } from "@/service/serviceTabService";
 import {
   buildCalendarAppointmentsByProfessional,
   buildCalendarFreeSlotsByProfessional,
@@ -809,7 +808,6 @@ export function FitAppointmentPage() {
             onStartAttendance={async (appointmentId) => {
               try {
                 await updateAppointment(appointmentId, { status: "in_service" });
-                await openServiceTab(appointmentId);
                 toast.success("Atendimento iniciado e comanda aberta.");
                 await loadAppointments();
                 navigate("/service-tabs");

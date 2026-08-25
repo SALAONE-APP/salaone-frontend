@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Coffee, Loader2, Minus, Package, Pencil, Plus, ReceiptText, Scissors, Trash2, XCircle } from "lucide-react";
+import { Calendar, CheckCircle2, Coffee, CreditCard, Loader2, Minus, Package, Pencil, Plus, Scissors, Trash2, XCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/hooks/useAuth";
 import { listAppointments, type Appointment } from "@/service/appointmentService";
 import { listProducts, type Product } from "@/service/productService";
 import { listBookableProfessionals, type Professional } from "@/service/professionalService";
@@ -19,7 +21,7 @@ import {
   cancelServiceTab,
   listServiceTabs,
   openServiceTab,
-  payServiceTab,
+  finishServiceTab,
   removeServiceTabItem,
   updateServiceTabItem,
   type ServiceTab,
@@ -33,6 +35,18 @@ function money(value: number) {
 function parseMoneyInput(value: string) {
   const digits = value.replace(/\D/g, "");
   return digits ? Number(digits) / 100 : 0;
+}
+
+function localDateKey(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateKey(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value.slice(0, 10) : localDateKey(date);
 }
 
 function message(error: unknown) {
@@ -50,6 +64,8 @@ const emptyItem = {
 };
 
 export function ServiceTabsPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [tabs, setTabs] = useState<ServiceTab[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -60,10 +76,9 @@ export function ServiceTabsPage() {
   const [itemTab, setItemTab] = useState<ServiceTab | null>(null);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [cancelTab, setCancelTab] = useState<ServiceTab | null>(null);
-  const [payTab, setPayTab] = useState<ServiceTab | null>(null);
   const [newTabOpen, setNewTabOpen] = useState(false);
   const [itemForm, setItemForm] = useState(emptyItem);
-  const [paymentMethod, setPaymentMethod] = useState<"pix" | "debito" | "credito" | "dinheiro">("dinheiro");
+  const [dateFilter, setDateFilter] = useState(() => localDateKey(new Date()));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,11 +104,13 @@ export function ServiceTabsPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const openTabs = tabs.filter((tab) => tab.status === "open");
-  const paidTabs = tabs.filter((tab) => tab.status === "paid");
-  const cancelledTabs = tabs.filter((tab) => tab.status === "cancelled");
+  const filteredTabs = tabs.filter((tab) => dateKey(tab.appointment.startAt) === dateFilter);
+  const filteredAppointments = appointments.filter((appointment) => dateKey(appointment.startAt) === dateFilter);
+  const openTabs = filteredTabs.filter((tab) => tab.status === "open");
+  const paidTabs = filteredTabs.filter((tab) => tab.status === "paid");
+  const cancelledTabs = filteredTabs.filter((tab) => tab.status === "cancelled");
   const tabAppointmentIds = useMemo(() => new Set(tabs.map((tab) => tab.appointmentId)), [tabs]);
-  const availableAppointments = appointments.filter((appointment) => !tabAppointmentIds.has(appointment.id));
+  const availableAppointments = filteredAppointments.filter((appointment) => !tabAppointmentIds.has(appointment.id));
 
   async function handleOpen(appointmentId: string) {
     setBusy(true);
@@ -193,13 +210,11 @@ export function ServiceTabsPage() {
     }
   }
 
-  async function handlePay() {
-    if (!payTab) return;
+  async function handleFinish(tab: ServiceTab) {
     setBusy(true);
     try {
-      await payServiceTab(payTab.id, paymentMethod);
-      toast.success("Comanda paga e encerrada.");
-      setPayTab(null);
+      await finishServiceTab(tab.id);
+      toast.success("Comanda finalizada.");
       await load();
     } catch (error) {
       toast.error(message(error));
@@ -209,6 +224,9 @@ export function ServiceTabsPage() {
   }
 
   function renderTab(tab: ServiceTab, readOnly = false) {
+    const fullTotal = tab.originalServices.reduce((sum, item) => sum + item.total, 0)
+      + tab.items.reduce((sum, item) => sum + item.total, 0);
+    const tabItemsPaid = tab.pendingTotal <= 0.005;
     return (
       <div key={tab.id} className="rounded-xl border border-border bg-card">
         <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -223,17 +241,44 @@ export function ServiceTabsPage() {
               {tab.appointment.professional.displayName} · {new Date(tab.appointment.startAt).toLocaleString("pt-BR")}
             </p>
           </div>
-          <strong className="text-xl text-foreground">{money(tab.total)}</strong>
+          <div className="text-right">
+            <p className="text-xs text-muted-foreground">Total da comanda: {money(fullTotal)}</p>
+            <strong className={tab.pendingTotal > 0 ? "text-xl text-amber-600" : "text-xl text-emerald-600"}>
+              Pendente: {money(tab.pendingTotal)}
+            </strong>
+          </div>
         </div>
         <div className="divide-y divide-border">
+          {tab.originalServices.map((item) => (
+            <div key={`original-${item.id}`} className="flex items-center justify-between gap-3 bg-primary/5 p-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <Scissors size={18} />
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium text-foreground">{item.name}</p>
+                    <Badge variant="outline">Serviço original</Badge>
+                    <Badge className={item.paid ? "border-0 bg-emerald-500/10 text-emerald-600" : "border-0 bg-amber-500/10 text-amber-600"}>
+                      {item.paid ? "Pago" : "Pendente"}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{item.quantity} × {money(item.unitPrice)}</p>
+                  <p className="text-xs text-muted-foreground">Responsável: {tab.appointment.professional.displayName}</p>
+                </div>
+              </div>
+              <span className="font-medium">{money(item.total)}</span>
+            </div>
+          ))}
           {tab.items.length === 0 ? (
-            <p className="p-5 text-center text-sm text-muted-foreground">Nenhum consumo adicionado.</p>
+            <p className="p-5 text-center text-sm text-muted-foreground">Nenhum item adicional.</p>
           ) : tab.items.map((item) => (
             <div key={item.id} className="flex items-center justify-between gap-3 p-4">
               <div className="flex min-w-0 items-center gap-3">
                 {item.type === "service" ? <Scissors size={18} /> : item.type === "product" ? <Package size={18} /> : <Coffee size={18} />}
                 <div>
                   <p className="font-medium text-foreground">{item.name}</p>
+                  <Badge className={tabItemsPaid ? "border-0 bg-emerald-500/10 text-emerald-600" : "border-0 bg-amber-500/10 text-amber-600"}>
+                    {tabItemsPaid ? "Pago" : "Pendente"}
+                  </Badge>
                   <p className="text-xs text-muted-foreground">{item.quantity} × {money(item.unitPrice)}</p>
                   {(item.type === "service" || item.type === "consumption") && item.professional && (
                     <p className="text-xs text-muted-foreground">Responsável: {item.professional.displayName}</p>
@@ -255,9 +300,15 @@ export function ServiceTabsPage() {
             <Button variant="outline" onClick={() => { setItemTab(tab); setItemForm({ ...emptyItem, professionalId: tab.appointment.professional.id }); }}>
               <Plus className="mr-2 h-4 w-4" /> Adicionar item
             </Button>
-            <Button disabled={tab.total <= 0 || busy} onClick={() => setPayTab(tab)}>
-              <ReceiptText className="mr-2 h-4 w-4" /> Receber e fechar
+            {tab.pendingTotal > 0.005 && (
+              <Button onClick={() => navigate(user?.role === "professional" ? "/financial-payments" : "/payments")} disabled={busy}>
+                <CreditCard className="mr-2 h-4 w-4" /> Ir para pagamentos
+              </Button>
+            )}
+            <Button disabled={tab.pendingTotal > 0.005 || busy} onClick={() => void handleFinish(tab)}>
+              <CheckCircle2 className="mr-2 h-4 w-4" /> Finalizar
             </Button>
+            {tab.pendingTotal > 0.005 && <p className="self-center text-xs text-muted-foreground">Confirme o pagamento na aba Pagamentos para finalizar.</p>}
           </div>
         )}
       </div>
@@ -273,16 +324,28 @@ export function ServiceTabsPage() {
             Abra uma comanda para um cliente que já está em atendimento.
           </p>
         </div>
-        <Button onClick={() => setNewTabOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nova comanda
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="date"
+              value={dateFilter}
+              onChange={(event) => setDateFilter(event.target.value)}
+              aria-label="Filtrar comandas por data"
+              className="w-full pl-9 sm:w-44"
+            />
+          </div>
+          <Button onClick={() => setNewTabOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nova comanda
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border bg-card p-5"><p className="text-sm text-muted-foreground">Em atendimento</p><strong className="text-2xl">{appointments.length}</strong></div>
+        <div className="rounded-xl border bg-card p-5"><p className="text-sm text-muted-foreground">Em atendimento</p><strong className="text-2xl">{filteredAppointments.length}</strong></div>
         <div className="rounded-xl border bg-card p-5"><p className="text-sm text-muted-foreground">Comandas abertas</p><strong className="text-2xl">{openTabs.length}</strong></div>
-        <div className="rounded-xl border bg-card p-5"><p className="text-sm text-muted-foreground">Valor em aberto</p><strong className="text-2xl">{money(openTabs.reduce((sum, tab) => sum + tab.total, 0))}</strong></div>
+        <div className="rounded-xl border bg-card p-5"><p className="text-sm text-muted-foreground">Valor em aberto</p><strong className="text-2xl">{money(openTabs.reduce((sum, tab) => sum + tab.pendingTotal, 0))}</strong></div>
       </div>
 
       <Tabs defaultValue="open">
@@ -371,14 +434,6 @@ export function ServiceTabsPage() {
 
       <AlertDialog open={Boolean(cancelTab)} onOpenChange={(open) => { if (!open) setCancelTab(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Cancelar esta comanda?</AlertDialogTitle><AlertDialogDescription>Esta ação encerra a comanda como cancelada. Os produtos lançados serão devolvidos ao estoque e o registro continuará disponível no histórico.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={busy}>Voltar</AlertDialogCancel><AlertDialogAction disabled={busy} onClick={(event) => { event.preventDefault(); void handleCancel(); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Cancelar comanda</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 
-      <Dialog open={Boolean(payTab)} onOpenChange={(open) => { if (!open) setPayTab(null); }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Receber comanda</DialogTitle></DialogHeader>
-          <div className="rounded-lg border bg-secondary/30 p-4"><p className="text-sm text-muted-foreground">Total</p><strong className="text-3xl">{money(payTab?.total ?? 0)}</strong></div>
-          <div className="space-y-2"><Label>Forma de pagamento</Label><Select value={paymentMethod} onValueChange={(value: typeof paymentMethod) => setPaymentMethod(value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="dinheiro">Dinheiro</SelectItem><SelectItem value="pix">PIX</SelectItem><SelectItem value="debito">Debito</SelectItem><SelectItem value="credito">Credito</SelectItem></SelectContent></Select></div>
-          <DialogFooter><Button variant="outline" onClick={() => setPayTab(null)}>Cancelar</Button><Button onClick={() => void handlePay()} disabled={busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmar pagamento</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

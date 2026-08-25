@@ -268,10 +268,26 @@ export function ProfessionalEarningsPage({
           : getMyPayrollSummary({ periodStart: periodStartStr, periodEnd: periodEndStr }),
       ]);
       const summaryRow = summaryRes.items[0] ?? null;
-      const serviceTabAttendances = summaryRow?.serviceTabAttendances ?? [];
-      const tabAppointmentIds = new Set(
-        serviceTabAttendances.map((item) => item.appointmentId),
+      const adjustments = new Map(
+        (summaryRow?.appointmentAdjustments ?? []).map(item => [item.appointmentId, item]),
       );
+      const adjustedAppointments = appointmentsRes.items.map(appointment => {
+        const adjustment = adjustments.get(appointment.id);
+        if (!adjustment || appointment.services.length === 0) return appointment;
+        const originalTotal = calcServicesTotal(appointment);
+        const factor = originalTotal > 0 ? adjustment.totalAmount / originalTotal : 1;
+        return {
+          ...appointment,
+          totalAmount: adjustment.totalAmount,
+          commissionAmount: adjustment.commissionAmount,
+          services: appointment.services.map(service => ({
+            ...service,
+            unitPrice: service.unitPrice * factor,
+            totalPrice: service.totalPrice * factor,
+          })),
+        };
+      });
+      const serviceTabAttendances = summaryRow?.serviceTabAttendances ?? [];
       const tabAttendances: Appointment[] = serviceTabAttendances.map((item) => ({
         id: `service-tab-${item.id}`,
         professionalId: professional.id,
@@ -297,9 +313,7 @@ export function ProfessionalEarningsPage({
         commissionAmount: item.commissionAmount,
       }));
       setAppointments([
-        ...appointmentsRes.items.filter(
-          (appointment) => !tabAppointmentIds.has(appointment.id),
-        ),
+        ...adjustedAppointments,
         ...tabAttendances,
       ]);
       setRow(summaryRow);

@@ -52,6 +52,11 @@ export interface PaymentRecord {
     id: string;
     code: string;
     status: string;
+    total?: number;
+    payments?: Array<{
+      method: PaymentMethod;
+      amount: number;
+    }>;
     items: Array<{
       id: string;
       type: "service" | "product" | "consumption";
@@ -59,6 +64,9 @@ export interface PaymentRecord {
       unitPrice: number;
       quantity: number;
       total: number;
+      original?: boolean;
+      paid?: boolean;
+      paymentMethods?: PaymentMethod[];
     }>;
   } | null;
   amount: number;

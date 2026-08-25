@@ -91,6 +91,28 @@ const methodLabels: Record<PaymentMethod, string> = {
   subscription: "Assinatura",
 };
 
+function paymentMethodDisplay(payment: PaymentWithType) {
+  const tabPayments = payment.serviceTab?.payments ?? [];
+  if (payment.paymentType !== "service_tab" || tabPayments.length === 0) {
+    return methodLabels[payment.method] || payment.method;
+  }
+  const totals = tabPayments.reduce<Partial<Record<PaymentMethod, number>>>((result, item) => {
+    result[item.method] = (result[item.method] ?? 0) + item.amount;
+    return result;
+  }, {});
+  return Object.entries(totals)
+    .map(([method, amount]) => `${formatCurrency(amount)} ${methodLabels[method as PaymentMethod] || method}`)
+    .join(" + ");
+}
+
+function paymentTotalAmount(payment: PaymentWithType) {
+  if (payment.paymentType === "service_tab" && payment.serviceTab) {
+    return payment.serviceTab.total
+      ?? payment.serviceTab.items.reduce((total, item) => total + Number(item.total || 0), 0);
+  }
+  return payment.amount;
+}
+
 const typeLabels: Record<PaymentType, string> = {
   appointment: "Agendamento",
   subscription: "Assinatura",
@@ -238,6 +260,7 @@ export function PaymentsPage() {
   const [splitParts, setSplitParts] = useState<SplitPart[]>([]);
   const [adjustedAmount, setAdjustedAmount] = useState("");
   const [discountInput, setDiscountInput] = useState("");
+  const [surchargeInput, setSurchargeInput] = useState("");
   const [methodPaymentDialog, setMethodPaymentDialog] = useState<PaymentWithType | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>("dinheiro");
 
@@ -391,6 +414,7 @@ export function PaymentsPage() {
     setSplitParts([{ method, amount: payment.amount.toFixed(2) }]);
     setAdjustedAmount(formatCurrency(payment.amount));
     setDiscountInput(formatCurrency(0));
+    setSurchargeInput(formatCurrency(0));
     setLocalPaymentDialog(payment);
   }
 
@@ -398,7 +422,6 @@ export function PaymentsPage() {
   const finalAmount = parseCurrencyInput(adjustedAmount);
   const discountAmount = Math.max(0, (localPaymentDialog?.amount ?? 0) - finalAmount);
   const splitDifference = finalAmount - splitTotal;
-
   function changeFinalAmount(value: string, syncDiscount = true) {
     const nextTotal = parseCurrencyInput(value);
     setAdjustedAmount(formatCurrency(nextTotal));
@@ -414,7 +437,16 @@ export function PaymentsPage() {
     const discount = parseCurrencyInput(value);
     setDiscountInput(formatCurrency(discount));
     if (!localPaymentDialog) return;
-    changeFinalAmount(Math.max(0, localPaymentDialog.amount - discount).toFixed(2), false);
+    const surcharge = parseCurrencyInput(surchargeInput);
+    changeFinalAmount(Math.max(0, localPaymentDialog.amount + surcharge - discount).toFixed(2), false);
+  }
+
+  function changeSurcharge(value: string) {
+    const surcharge = parseCurrencyInput(value);
+    setSurchargeInput(formatCurrency(surcharge));
+    if (!localPaymentDialog) return;
+    const discount = parseCurrencyInput(discountInput);
+    changeFinalAmount(Math.max(0, localPaymentDialog.amount + surcharge - discount).toFixed(2), false);
   }
 
   async function confirmSplitPayment() {
@@ -607,10 +639,10 @@ export function PaymentsPage() {
                     Origem
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Valor
+                    Metodo
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Metodo
+                    Valor total
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Data
@@ -670,22 +702,33 @@ export function PaymentsPage() {
                             <div className="mt-2 space-y-1 rounded-md border bg-secondary/30 p-2">
                               {payment.serviceTab.items.map((item) => (
                                 <div key={item.id} className="flex justify-between gap-3 text-xs">
-                                  <span>{item.quantity}× {item.name}</span>
-                                  <span className="whitespace-nowrap font-medium">{formatCurrency(item.total)}</span>
+                                  <span>
+                                    {item.quantity}× {item.name}
+                                    {item.original ? " (serviço original)" : ""}
+                                  </span>
+                                  <span className="flex items-center gap-2 whitespace-nowrap font-medium">
+                                    {formatCurrency(item.total)}
+                                    {item.paid && <span className="text-emerald-600">PAGO</span>}
+                                  </span>
                                 </div>
                               ))}
                             </div>
                           ) : null}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm font-medium text-foreground">
-                        {formatCurrency(payment.amount)}
-                      </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2 text-sm text-foreground">
-                          <CreditCard size={14} className="text-muted-foreground" />
-                          {methodLabels[payment.method] || payment.method}
-                        </div>
+                        {(() => {
+                          const display = paymentMethodDisplay(payment);
+                          return (
+                            <div className="flex items-center gap-2 text-sm text-foreground">
+                              <CreditCard size={14} className="shrink-0 text-muted-foreground" />
+                              {display}
+                            </div>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-foreground">
+                        {formatCurrency(paymentTotalAmount(payment))}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -805,17 +848,20 @@ export function PaymentsPage() {
               <span className="text-muted-foreground">Valor original</span>
               <span className="font-medium">{formatCurrency(localPaymentDialog?.amount ?? 0)}</span>
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="min-w-0 space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Desconto</label>
                 <Input className="min-w-0 w-full" inputMode="numeric" value={discountInput} onChange={(event) => changeDiscount(event.target.value)} />
               </div>
               <div className="min-w-0 space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Acréscimo</label>
+                <Input className="min-w-0 w-full" inputMode="numeric" value={surchargeInput} onChange={(event) => changeSurcharge(event.target.value)} />
+              </div>
+              <div className="min-w-0 space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Valor final</label>
-                <Input className="min-w-0 w-full" inputMode="numeric" value={adjustedAmount} onChange={(event) => changeFinalAmount(event.target.value)} />
+                <Input className="min-w-0 w-full" inputMode="numeric" value={adjustedAmount} readOnly />
               </div>
             </div>
-            {finalAmount > (localPaymentDialog?.amount ?? 0) && <p className="mt-2 text-xs text-amber-600">Acréscimo de {formatCurrency(finalAmount - (localPaymentDialog?.amount ?? 0))}</p>}
           </div>
           {splitParts.length === 1 ? <div className="grid grid-cols-2 gap-3 py-2">
             {(
