@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { CheckCircle2, Coffee, Loader2, Minus, Package, Pencil, Plus, Scissors, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Coffee, CreditCard, Loader2, Minus, Package, Pencil, Plus, Scissors, Trash2, XCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/hooks/useAuth";
 import { listAppointments, type Appointment } from "@/service/appointmentService";
 import { listProducts, type Product } from "@/service/productService";
 import { listBookableProfessionals, type Professional } from "@/service/professionalService";
@@ -50,6 +52,8 @@ const emptyItem = {
 };
 
 export function ServiceTabsPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [tabs, setTabs] = useState<ServiceTab[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -281,6 +285,11 @@ export function ServiceTabsPage() {
             <Button variant="outline" onClick={() => { setItemTab(tab); setItemForm({ ...emptyItem, professionalId: tab.appointment.professional.id }); }}>
               <Plus className="mr-2 h-4 w-4" /> Adicionar item
             </Button>
+            {tab.pendingTotal > 0.005 && (
+              <Button onClick={() => navigate(user?.role === "professional" ? "/financial-payments" : "/payments")} disabled={busy}>
+                <CreditCard className="mr-2 h-4 w-4" /> Ir para pagamentos
+              </Button>
+            )}
             <Button disabled={tab.pendingTotal > 0.005 || busy} onClick={() => void handleFinish(tab)}>
               <CheckCircle2 className="mr-2 h-4 w-4" /> Finalizar
             </Button>

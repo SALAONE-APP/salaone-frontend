@@ -90,7 +90,6 @@ import { isFitAppointment } from "@/utils/fitAppointment";
 import { ClientPickerModal } from "@/components/ClientPickerModal";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { hasWhatsAppPhone, sendAppointmentWhatsApp } from "@/utils/whatsapp";
-import { openServiceTab } from "@/service/serviceTabService";
 
 type StatusFilter = "all" | "active" | AppointmentStatus;
 
@@ -752,7 +751,6 @@ export function BookingsPage() {
       if (appointment.status !== "in_service") {
         await updateAppointment(appointment.id, { status: "in_service" });
       }
-      await openServiceTab(appointment.id);
       toast.success("Atendimento iniciado e comanda aberta.");
       await loadAppointments();
       navigate("/service-tabs");
@@ -1252,7 +1250,7 @@ export function BookingsPage() {
                                   ) : (
                                     <ReceiptText size={14} />
                                   )}
-                                  {appointment.status === "in_service" ? "Abrir comanda" : "Iniciar atendimento e abrir comanda"}
+                                  {appointment.status === "in_service" ? "Ver comanda" : "Iniciar atendimento"}
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuItem
@@ -1263,7 +1261,7 @@ export function BookingsPage() {
                                 }
                               >
                                 <CheckCircle2 size={14} />
-                                Finalizar
+                                Finalizar atendimento
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 disabled={appointment.status === "no_show"}
