@@ -92,27 +92,23 @@ const methodLabels: Record<PaymentMethod, string> = {
 };
 
 function paymentMethodDisplay(payment: PaymentWithType) {
-  const itemMethods = payment.serviceTab?.items.flatMap((item) => item.paymentMethods ?? []) ?? [];
-  const uniqueMethods = [...new Set(itemMethods)];
-  if (payment.paymentType !== "service_tab" || uniqueMethods.length <= 1) {
-    const method = uniqueMethods[0] ?? payment.method;
-    return { summary: methodLabels[method] || method, details: [] };
+  const tabPayments = payment.serviceTab?.payments ?? [];
+  if (payment.paymentType !== "service_tab" || tabPayments.length === 0) {
+    return methodLabels[payment.method] || payment.method;
   }
-  return {
-    summary: "Pagamento misto",
-    details: payment.serviceTab?.items
-      .filter((item) => item.paymentMethods?.length)
-      .map((item) => ({
-        id: item.id,
-        name: item.name,
-        methods: item.paymentMethods!.map((method) => methodLabels[method] || method).join(" + "),
-      })) ?? [],
-  };
+  const totals = tabPayments.reduce<Partial<Record<PaymentMethod, number>>>((result, item) => {
+    result[item.method] = (result[item.method] ?? 0) + item.amount;
+    return result;
+  }, {});
+  return Object.entries(totals)
+    .map(([method, amount]) => `${formatCurrency(amount)} ${methodLabels[method as PaymentMethod] || method}`)
+    .join(" + ");
 }
 
 function paymentTotalAmount(payment: PaymentWithType) {
   if (payment.paymentType === "service_tab" && payment.serviceTab) {
-    return payment.serviceTab.items.reduce((total, item) => total + Number(item.total || 0), 0);
+    return payment.serviceTab.total
+      ?? payment.serviceTab.items.reduce((total, item) => total + Number(item.total || 0), 0);
   }
   return payment.amount;
 }
@@ -261,7 +257,6 @@ export function PaymentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [localPaymentDialog, setLocalPaymentDialog] = useState<PaymentWithType | null>(null);
   const [selectedLocalMethod, setSelectedLocalMethod] = useState<PaymentMethod>("dinheiro");
-  const [itemPaymentMethods, setItemPaymentMethods] = useState<Record<string, SplitMethod>>({});
   const [splitParts, setSplitParts] = useState<SplitPart[]>([]);
   const [adjustedAmount, setAdjustedAmount] = useState("");
   const [discountInput, setDiscountInput] = useState("");
@@ -415,9 +410,7 @@ export function PaymentsPage() {
 
   function openLocalPaymentDialog(payment: PaymentWithType) {
     const method = editablePaymentMethod(payment.method);
-    const pendingItems = payment.serviceTab?.items.filter((item) => !item.paid) ?? [];
     setSelectedLocalMethod(method);
-    setItemPaymentMethods(Object.fromEntries(pendingItems.map((item) => [item.id, method])));
     setSplitParts([{ method, amount: payment.amount.toFixed(2) }]);
     setAdjustedAmount(formatCurrency(payment.amount));
     setDiscountInput(formatCurrency(0));
@@ -429,54 +422,6 @@ export function PaymentsPage() {
   const finalAmount = parseCurrencyInput(adjustedAmount);
   const discountAmount = Math.max(0, (localPaymentDialog?.amount ?? 0) - finalAmount);
   const splitDifference = finalAmount - splitTotal;
-  const pendingTabItems = localPaymentDialog?.paymentType === "service_tab"
-    ? localPaymentDialog.serviceTab?.items.filter((item) => !item.paid) ?? []
-    : [];
-
-  async function confirmItemizedPayment() {
-    if (!localPaymentDialog || pendingTabItems.length === 0) return;
-    if (!(finalAmount > 0)) {
-      toast.error("Informe um valor final maior que zero.");
-      return;
-    }
-    const originalTotal = pendingTabItems.reduce((sum, item) => sum + item.total, 0);
-    let allocatedCents = 0;
-    const finalCents = Math.round(finalAmount * 100);
-    const parts = pendingTabItems.map((item, index) => {
-      const amountCents = index === pendingTabItems.length - 1
-        ? finalCents - allocatedCents
-        : Math.round((item.total / originalTotal) * finalCents);
-      allocatedCents += amountCents;
-      return {
-        method: itemPaymentMethods[item.id] ?? "dinheiro",
-        amount: amountCents / 100,
-      };
-    });
-    const total = parts.reduce((sum, part) => sum + part.amount, 0);
-    const payment = localPaymentDialog;
-    setLocalPaymentDialog(null);
-    setUpdatingId(payment.id);
-    try {
-      if (parts.length === 1) {
-        await updatePayment(payment, {
-          status: "paid",
-          method: parts[0].method,
-          amount: parts[0].amount,
-          discountAmount,
-          paidAt: new Date().toISOString(),
-        });
-      } else {
-        await splitPayment(payment.id, parts, total, discountAmount, new Date().toISOString());
-      }
-      toast.success("Itens da comanda pagos com os métodos informados.");
-      await loadPayments();
-    } catch (err) {
-      toast.error(getApiMessage(err));
-    } finally {
-      setUpdatingId(null);
-    }
-  }
-
   function changeFinalAmount(value: string, syncDiscount = true) {
     const nextTotal = parseCurrencyInput(value);
     setAdjustedAmount(formatCurrency(nextTotal));
@@ -775,21 +720,9 @@ export function PaymentsPage() {
                         {(() => {
                           const display = paymentMethodDisplay(payment);
                           return (
-                            <div className="text-sm text-foreground">
-                              <div className="flex items-center gap-2">
-                                <CreditCard size={14} className="text-muted-foreground" />
-                                {display.summary}
-                              </div>
-                              {display.details.length > 0 && (
-                                <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                                  {display.details.map((detail) => (
-                                    <div key={detail.id}>
-                                      <span className="font-medium text-foreground">{detail.name}:</span>{" "}
-                                      {detail.methods}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
+                            <div className="flex items-center gap-2 text-sm text-foreground">
+                              <CreditCard size={14} className="shrink-0 text-muted-foreground" />
+                              {display}
                             </div>
                           );
                         })()}
@@ -930,35 +863,7 @@ export function PaymentsPage() {
               </div>
             </div>
           </div>
-          {pendingTabItems.length > 0 ? (
-            <div className="max-h-[45vh] space-y-3 overflow-y-auto py-2">
-              <p className="text-sm font-medium">Forma de pagamento por item</p>
-              {pendingTabItems.map((item) => (
-                <div key={item.id} className="grid grid-cols-[minmax(0,1fr)_170px] items-center gap-3 rounded-lg border p-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.quantity}× {formatCurrency(item.unitPrice)} · {formatCurrency(item.total)}
-                    </p>
-                  </div>
-                  <select
-                    value={itemPaymentMethods[item.id] ?? "dinheiro"}
-                    onChange={(event) => setItemPaymentMethods((methods) => ({
-                      ...methods,
-                      [item.id]: event.target.value as SplitMethod,
-                    }))}
-                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    aria-label={`Método de pagamento de ${item.name}`}
-                  >
-                    <option value="dinheiro">Dinheiro</option>
-                    <option value="pix">PIX</option>
-                    <option value="credito">Crédito</option>
-                    <option value="debito">Débito</option>
-                  </select>
-                </div>
-              ))}
-            </div>
-          ) : splitParts.length === 1 ? <div className="grid grid-cols-2 gap-3 py-2">
+          {splitParts.length === 1 ? <div className="grid grid-cols-2 gap-3 py-2">
             {(
               [
                 { value: "dinheiro", label: "Dinheiro" },
@@ -1027,14 +932,14 @@ export function PaymentsPage() {
             <Button className="w-full sm:w-auto" variant="outline" onClick={() => setLocalPaymentDialog(null)}>
               Cancelar
             </Button>
-            {pendingTabItems.length === 0 && splitParts.length === 1 && (
+            {splitParts.length === 1 && (
               <Button className="w-full sm:w-auto" variant="outline" onClick={() => {
                 const half = finalAmount / 2;
                 setSplitParts([{ method: selectedLocalMethod as SplitMethod, amount: half.toFixed(2) }, { method: "pix", amount: (finalAmount - half).toFixed(2) }]);
               }}>Dividir pagamento</Button>
             )}
-            <Button className="w-full sm:w-auto" onClick={pendingTabItems.length > 0 ? confirmItemizedPayment : splitParts.length > 1 ? confirmSplitPayment : confirmLocalPayment}>
-              {pendingTabItems.length > 0 ? "Confirmar itens" : splitParts.length > 1 ? "Confirmar divisão" : "Confirmar pagamento"}
+            <Button className="w-full sm:w-auto" onClick={splitParts.length > 1 ? confirmSplitPayment : confirmLocalPayment}>
+              {splitParts.length > 1 ? "Confirmar divisão" : "Confirmar pagamento"}
             </Button>
           </DialogFooter>
         </DialogContent>
