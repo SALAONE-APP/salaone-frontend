@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { CheckCircle2, Coffee, CreditCard, Loader2, Minus, Package, Pencil, Plus, Scissors, Trash2, XCircle } from "lucide-react";
+import { Calendar, CheckCircle2, Coffee, CreditCard, Loader2, Minus, Package, Pencil, Plus, Scissors, Trash2, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -37,6 +37,18 @@ function parseMoneyInput(value: string) {
   return digits ? Number(digits) / 100 : 0;
 }
 
+function localDateKey(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateKey(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value.slice(0, 10) : localDateKey(date);
+}
+
 function message(error: unknown) {
   const data = (error as { response?: { data?: { message?: string } } })?.response?.data;
   return data?.message || (error instanceof Error ? error.message : "Nao foi possivel concluir a operacao.");
@@ -66,6 +78,7 @@ export function ServiceTabsPage() {
   const [cancelTab, setCancelTab] = useState<ServiceTab | null>(null);
   const [newTabOpen, setNewTabOpen] = useState(false);
   const [itemForm, setItemForm] = useState(emptyItem);
+  const [dateFilter, setDateFilter] = useState(() => localDateKey(new Date()));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -91,11 +104,13 @@ export function ServiceTabsPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const openTabs = tabs.filter((tab) => tab.status === "open");
-  const paidTabs = tabs.filter((tab) => tab.status === "paid");
-  const cancelledTabs = tabs.filter((tab) => tab.status === "cancelled");
+  const filteredTabs = tabs.filter((tab) => dateKey(tab.appointment.startAt) === dateFilter);
+  const filteredAppointments = appointments.filter((appointment) => dateKey(appointment.startAt) === dateFilter);
+  const openTabs = filteredTabs.filter((tab) => tab.status === "open");
+  const paidTabs = filteredTabs.filter((tab) => tab.status === "paid");
+  const cancelledTabs = filteredTabs.filter((tab) => tab.status === "cancelled");
   const tabAppointmentIds = useMemo(() => new Set(tabs.map((tab) => tab.appointmentId)), [tabs]);
-  const availableAppointments = appointments.filter((appointment) => !tabAppointmentIds.has(appointment.id));
+  const availableAppointments = filteredAppointments.filter((appointment) => !tabAppointmentIds.has(appointment.id));
 
   async function handleOpen(appointmentId: string) {
     setBusy(true);
@@ -309,14 +324,26 @@ export function ServiceTabsPage() {
             Abra uma comanda para um cliente que já está em atendimento.
           </p>
         </div>
-        <Button onClick={() => setNewTabOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nova comanda
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="date"
+              value={dateFilter}
+              onChange={(event) => setDateFilter(event.target.value)}
+              aria-label="Filtrar comandas por data"
+              className="w-full pl-9 sm:w-44"
+            />
+          </div>
+          <Button onClick={() => setNewTabOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nova comanda
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border bg-card p-5"><p className="text-sm text-muted-foreground">Em atendimento</p><strong className="text-2xl">{appointments.length}</strong></div>
+        <div className="rounded-xl border bg-card p-5"><p className="text-sm text-muted-foreground">Em atendimento</p><strong className="text-2xl">{filteredAppointments.length}</strong></div>
         <div className="rounded-xl border bg-card p-5"><p className="text-sm text-muted-foreground">Comandas abertas</p><strong className="text-2xl">{openTabs.length}</strong></div>
         <div className="rounded-xl border bg-card p-5"><p className="text-sm text-muted-foreground">Valor em aberto</p><strong className="text-2xl">{money(openTabs.reduce((sum, tab) => sum + tab.pendingTotal, 0))}</strong></div>
       </div>
