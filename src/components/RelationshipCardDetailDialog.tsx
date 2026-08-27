@@ -75,6 +75,7 @@ export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onCha
   const [responsibleOptions, setResponsibleOptions] = useState<UserProfile[]>([]);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
+  const [stage, setStage] = useState("");
   const [responsibleId, setResponsibleId] = useState("none");
   const [nextAction, setNextAction] = useState("");
   const [nextActionAt, setNextActionAt] = useState("");
@@ -92,6 +93,7 @@ export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onCha
       const [cardData, eventsData] = await Promise.all([getRelationshipCard(id), listRelationshipEvents(id)]);
       setCard(cardData);
       setEvents(eventsData);
+      setStage(cardData.stage);
       setResponsibleId(cardData.responsibleSalonUserId ?? "none");
       setNextAction(cardData.nextAction ?? "");
       setNextActionAt(toDateTimeLocalInput(cardData.nextActionAt));
@@ -119,12 +121,15 @@ export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onCha
     setSaving(true);
     try {
       const updated = await updateRelationshipCard(card.id, {
+        stage: stage || undefined,
         responsibleSalonUserId: responsibleId === "none" ? null : responsibleId,
         nextAction: nextAction.trim() || null,
         nextActionAt: nextActionAt ? new Date(nextActionAt).toISOString() : null,
         notes: notes.trim() || null,
       });
       setCard(updated);
+      setStage(updated.stage);
+      setEvents(await listRelationshipEvents(card.id));
       onChanged();
       toast.success("Card atualizado.");
     } catch (error) {
@@ -297,6 +302,24 @@ export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onCha
               </div>
 
               <div className="flex flex-col gap-3">
+                <div>
+                  <Label>Etapa</Label>
+                  <Select value={stage} onValueChange={setStage}>
+                    <SelectTrigger className="mt-1.5">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[...(cardStages ?? [])]
+                        .sort((a, b) => a.sortOrder - b.sortOrder)
+                        .map((item) => (
+                          <SelectItem key={item.key} value={item.key}>
+                            {item.label}
+                            {item.isTerminal ? " (etapa final)" : ""}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div>
                   <div className="flex items-center justify-between">
                     <Label>Responsável</Label>
