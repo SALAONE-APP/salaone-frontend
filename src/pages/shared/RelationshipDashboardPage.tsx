@@ -78,7 +78,7 @@ function StatTile({
         <Icon size={18} />
       </div>
       <div className="flex min-w-0 flex-col">
-        <span className="truncate text-xs text-muted-foreground">{label}</span>
+        <span className="truncate text-xs text-muted-foreground" title={label}>{label}</span>
         <span className="text-lg font-semibold text-foreground">{value}</span>
         {delta !== null && delta !== undefined && (
           <span
@@ -144,7 +144,7 @@ function RelationshipFunnel({ stages }: { stages: RelationshipDashboardFunnelSta
           {stages.map((stage, i) => (
             <li key={stage.stageKey} className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: PALETTE[i % PALETTE.length] }} />
-              <span className="flex-1 truncate text-foreground">{stage.label}</span>
+              <span className="flex-1 truncate text-foreground" title={stage.label}>{stage.label}</span>
               <span className="text-muted-foreground">{stage.count}</span>
             </li>
           ))}
@@ -407,8 +407,8 @@ export function RelationshipDashboardPage() {
                           <item.icon size={16} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-foreground">{item.label}</p>
-                          <p className="truncate text-xs text-muted-foreground">{item.description}</p>
+                          <p className="truncate text-sm font-medium text-foreground" title={item.label}>{item.label}</p>
+                          <p className="truncate text-xs text-muted-foreground" title={item.description}>{item.description}</p>
                         </div>
                         <span className="shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-sm font-semibold text-foreground">
                           {item.count}
