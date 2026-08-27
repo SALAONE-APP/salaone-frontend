@@ -341,6 +341,7 @@ async function downloadCashClosingsPdf(closings: CashClosing[], selectedPeriodLa
     { header: "Tipo", getValue: ({ payment }) => payment ? getCashPaymentTypeLabel(payment) : "Fechamento", align: "center" },
     { header: "Categoria", getValue: ({ payment }) => payment ? getCashPaymentCategoryLabel(payment) : "-", align: "center" },
     { header: "Descricao", getValue: ({ closing, payment }) => payment ? getCashPaymentReportDescription(payment) : `Fechamento #${closing.id.slice(0, 8)}` },
+    { header: "Observacao", getValue: ({ payment }) => payment?.adjustmentNote || "-" },
     { header: "Forma", getValue: ({ closing, payment }) => payment ? methodLabels[payment.method] || payment.method : getClosingMethodsLabel(closing), align: "center" },
     { header: "Status", getValue: ({ payment }) => payment?.status || "fechado", align: "center" },
     { header: "Valor", getValue: ({ closing, payment }) => formatCurrency(payment?.amount ?? closing.totalAmount), align: "right" },
@@ -385,6 +386,7 @@ function downloadCashClosingsCsv(closings: CashClosing[]) {
     "Tipo",
     "Categoria",
     "Descricao",
+    "Observacao",
     "Valor",
     "Metodo",
     "Status",
@@ -406,6 +408,7 @@ function downloadCashClosingsCsv(closings: CashClosing[]) {
       payment ? getCashPaymentTypeLabel(payment) : "Fechamento",
       payment ? getCashPaymentCategoryLabel(payment) : "-",
       payment ? getCashPaymentReportDescription(payment) : `Fechamento #${closing.id.slice(0, 8)}`,
+      payment?.adjustmentNote || "",
       String(payment?.amount ?? closing.totalAmount).replace(".", ","),
       payment ? methodLabels[payment.method] || payment.method : getClosingMethodsLabel(closing),
       payment?.status || "fechado",
@@ -911,6 +914,11 @@ export function CashClosingPage() {
                           <p className="text-xs text-muted-foreground">
                             {getCashPaymentClientLabel(payment)}
                           </p>
+                          {payment.adjustmentNote ? (
+                            <p className="mt-1 max-w-md text-xs text-amber-700 dark:text-amber-300" title={payment.adjustmentNote}>
+                              Observacao: {payment.adjustmentNote}
+                            </p>
+                          ) : null}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm text-muted-foreground">
                           {methodLabels[payment.method] || payment.method}
