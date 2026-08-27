@@ -73,6 +73,7 @@ export interface PaymentRecord {
   method: PaymentMethod;
   status: PaymentStatus;
   statusRaw?: string | null;
+  adjustmentNote?: string | null;
   paidAt?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -170,7 +171,7 @@ export async function listAllPayments(params: ListPaymentsParams = {}): Promise<
 
 export async function updatePayment(
   payment: Pick<PaymentRecord, "id" | "appointmentId">,
-  data: { status?: PaymentStatus; method?: PaymentMethod; amount?: number; discountAmount?: number | null; paidAt?: string; noShow?: boolean },
+  data: { status?: PaymentStatus; method?: PaymentMethod; amount?: number; discountAmount?: number | null; adjustmentNote?: string | null; paidAt?: string; noShow?: boolean },
 ) {
   const response = await api.patch<PaymentRecord>(`/payments/${payment.id}`, data);
 
@@ -182,8 +183,8 @@ export interface SplitPaymentPart {
   amount: number;
 }
 
-export async function splitPayment(paymentId: string, parts: SplitPaymentPart[], totalAmount: number, discountAmount: number, paidAt?: string) {
-  const response = await api.post<PaymentRecord[]>(`/payments/${paymentId}/split`, { parts, totalAmount, discountAmount, paidAt });
+export async function splitPayment(paymentId: string, parts: SplitPaymentPart[], totalAmount: number, discountAmount: number, adjustmentNote?: string | null, paidAt?: string) {
+  const response = await api.post<PaymentRecord[]>(`/payments/${paymentId}/split`, { parts, totalAmount, discountAmount, adjustmentNote, paidAt });
   return response.data;
 }
 
