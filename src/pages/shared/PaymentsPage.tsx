@@ -37,6 +37,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useTableSelection } from "@/hooks/useTableSelection";
 import {
   listAllPayments,
@@ -55,6 +56,7 @@ type StatusFilter = "all" | "confirmed" | PaymentStatus;
 type TypeFilter = "all" | PaymentType;
 type SplitMethod = "pix" | "debito" | "credito" | "dinheiro";
 type SplitPart = { method: SplitMethod; amount: string };
+const MAX_ADJUSTMENT_NOTE_LENGTH = 200;
 
 function editablePaymentMethod(method: PaymentMethod): SplitMethod {
   return ["pix", "debito", "credito", "dinheiro"].includes(method)
@@ -261,6 +263,7 @@ export function PaymentsPage() {
   const [adjustedAmount, setAdjustedAmount] = useState("");
   const [discountInput, setDiscountInput] = useState("");
   const [surchargeInput, setSurchargeInput] = useState("");
+  const [adjustmentNote, setAdjustmentNote] = useState("");
   const [methodPaymentDialog, setMethodPaymentDialog] = useState<PaymentWithType | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>("dinheiro");
 
@@ -313,6 +316,7 @@ export function PaymentsPage() {
           payment.user?.email,
           getPaymentDescription(payment),
           payment.appointment?.professional?.displayName,
+          payment.adjustmentNote,
           methodLabels[payment.method],
           statusLabels[payment.status],
         ]
@@ -389,6 +393,11 @@ export function PaymentsPage() {
       return;
     }
     const payment = localPaymentDialog;
+    const hasAdjustment = parseCurrencyInput(discountInput) > 0 || parseCurrencyInput(surchargeInput) > 0;
+    if (hasAdjustment && !adjustmentNote.trim()) {
+      toast.error("Informe a observacao do desconto ou acrescimo.");
+      return;
+    }
     setLocalPaymentDialog(null);
     setUpdatingId(payment.id);
     try {
@@ -397,6 +406,7 @@ export function PaymentsPage() {
         method: selectedLocalMethod,
         amount: finalAmount,
         discountAmount: Math.max(0, payment.amount - finalAmount),
+        adjustmentNote: hasAdjustment ? adjustmentNote.trim() : null,
         paidAt: new Date().toISOString(),
       });
       toast.success("Pagamento confirmado.");
@@ -415,6 +425,7 @@ export function PaymentsPage() {
     setAdjustedAmount(formatCurrency(payment.amount));
     setDiscountInput(formatCurrency(0));
     setSurchargeInput(formatCurrency(0));
+    setAdjustmentNote("");
     setLocalPaymentDialog(payment);
   }
 
@@ -459,6 +470,11 @@ export function PaymentsPage() {
       toast.error("A soma das partes deve ser igual ao valor do pagamento.");
       return;
     }
+    const hasAdjustment = parseCurrencyInput(discountInput) > 0 || parseCurrencyInput(surchargeInput) > 0;
+    if (hasAdjustment && !adjustmentNote.trim()) {
+      toast.error("Informe a observacao do desconto ou acrescimo.");
+      return;
+    }
     const payment = localPaymentDialog;
     setLocalPaymentDialog(null);
     setUpdatingId(payment.id);
@@ -466,7 +482,7 @@ export function PaymentsPage() {
       await splitPayment(payment.id, splitParts.map((part) => ({
         method: part.method,
         amount: Number(part.amount.replace(",", ".")),
-      })), finalAmount, discountAmount, new Date().toISOString());
+      })), finalAmount, discountAmount, hasAdjustment ? adjustmentNote.trim() : null, new Date().toISOString());
       toast.success("Pagamento dividido confirmado.");
       await loadPayments();
     } catch (err) {
@@ -650,20 +666,23 @@ export function PaymentsPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Status
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Observacao
+                  </th>
                   <th className="w-10 px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-sm text-muted-foreground">
+                    <td colSpan={9} className="p-8 text-center text-sm text-muted-foreground">
                       <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
                       Carregando pagamentos...
                     </td>
                   </tr>
                 ) : filteredPayments.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-sm text-muted-foreground">
+                    <td colSpan={9} className="p-8 text-center text-sm text-muted-foreground">
                       Nenhum pagamento encontrado.
                     </td>
                   </tr>
@@ -746,6 +765,11 @@ export function PaymentsPage() {
                           )}
                           {statusLabels[payment.status] || payment.status}
                         </Badge>
+                      </td>
+                      <td className="max-w-64 px-4 py-3 text-xs text-muted-foreground">
+                        <span className="line-clamp-3" title={payment.adjustmentNote || undefined}>
+                          {payment.adjustmentNote || "-"}
+                        </span>
                       </td>
                       <td className="px-4 py-3">
                         <DropdownMenu>
@@ -863,6 +887,24 @@ export function PaymentsPage() {
               </div>
             </div>
           </div>
+          {(parseCurrencyInput(discountInput) > 0 || parseCurrencyInput(surchargeInput) > 0) && (
+            <div className="space-y-1.5">
+              <label htmlFor="payment-adjustment-note" className="text-xs font-medium text-muted-foreground">
+                Observacao do ajuste
+              </label>
+              <Textarea
+                id="payment-adjustment-note"
+                value={adjustmentNote}
+                onChange={(event) => setAdjustmentNote(event.target.value.slice(0, MAX_ADJUSTMENT_NOTE_LENGTH))}
+                maxLength={MAX_ADJUSTMENT_NOTE_LENGTH}
+                rows={3}
+                placeholder="Explique o motivo do desconto ou acrescimo."
+              />
+              <p className="text-right text-xs text-muted-foreground">
+                {adjustmentNote.length}/{MAX_ADJUSTMENT_NOTE_LENGTH}
+              </p>
+            </div>
+          )}
           {splitParts.length === 1 ? <div className="grid grid-cols-2 gap-3 py-2">
             {(
               [

@@ -15,6 +15,7 @@ export interface CashClosingPayment {
   appointmentStartAt?: string | null;
   subscriptionPlanName?: string | null;
   description?: string | null;
+  adjustmentNote?: string | null;
   cashOutCategory?: "products" | "employees" | "refunds" | "other" | string | null;
   type: "appointment" | "subscription" | "product_order" | "service_tab" | "extra" | "cash_in" | "cash_out";
 }

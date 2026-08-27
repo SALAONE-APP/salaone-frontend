@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useMyProfessional } from "@/hooks/useMyProfessional";
+import { useVisiblePolling } from "@/hooks/useVisiblePolling";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
   cancelAppointment,
@@ -173,6 +174,7 @@ export function ProfessionalBookingsPage() {
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
+  const [dateFilter, setDateFilter] = useState(() => dateToDateString(new Date()));
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -190,13 +192,15 @@ export function ProfessionalBookingsPage() {
   const limit = 20;
 
   const loadAppointments = useCallback(
-    async (professionalId: string) => {
-      setLoading(true);
+    async (professionalId: string, showLoading = true) => {
+      if (showLoading) setLoading(true);
       try {
         const result = await listAppointments({
-          professionalId,
+          professionalId: canManage ? undefined : professionalId,
           allAppointments: true,
           status: statusFilter === "all" ? undefined : statusFilter,
+          dateFrom: dateFilter,
+          dateTo: dateFilter,
           page,
           limit,
         });
@@ -208,10 +212,10 @@ export function ProfessionalBookingsPage() {
       } catch (err) {
         toast.error(getApiMessage(err));
       } finally {
-        setLoading(false);
+        if (showLoading) setLoading(false);
       }
     },
-    [page, statusFilter],
+    [canManage, dateFilter, page, statusFilter],
   );
 
   useEffect(() => {
@@ -225,10 +229,25 @@ export function ProfessionalBookingsPage() {
   useEffect(() => {
     if (!professional?.id) return;
     const today = dateToDateString(new Date());
-    listAppointments({ professionalId: professional.id, allAppointments: true, dateFrom: today, dateTo: today, limit: 1 })
+    listAppointments({ professionalId: canManage ? undefined : professional.id, allAppointments: true, dateFrom: today, dateTo: today, limit: 1 })
       .then((r) => setTodayCount(r.total))
       .catch(() => null);
-  }, [professional?.id]);
+  }, [canManage, professional?.id]);
+
+  const refreshAppointments = useCallback(() => {
+    if (!professional?.id) return;
+    void loadAppointments(professional.id, false);
+    const today = dateToDateString(new Date());
+    void listAppointments({
+      professionalId: canManage ? undefined : professional.id,
+      allAppointments: true,
+      dateFrom: today,
+      dateTo: today,
+      limit: 1,
+    }).then((result) => setTodayCount(result.total)).catch(() => null);
+  }, [canManage, loadAppointments, professional?.id]);
+
+  useVisiblePolling(refreshAppointments, Boolean(professional?.id));
 
   useEffect(() => {
     if (!dialogOpen) return;
@@ -279,7 +298,7 @@ export function ProfessionalBookingsPage() {
     return appointments.filter((appt) => {
       const serviceNames = appt.services.map((s) => s.serviceName).join(" ");
       const haystack = normalizeText(
-        [appt.client?.name, appt.dependent?.name, serviceNames, appt.notes]
+        [appt.client?.name, appt.dependent?.name, appt.professional?.displayName, serviceNames, appt.notes]
           .filter(Boolean)
           .join(" "),
       );
@@ -438,11 +457,9 @@ export function ProfessionalBookingsPage() {
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
           <h3 className="text-base font-medium text-foreground">
-            {statusFilter === "active"
-              ? "Meus Agendamentos Ativos"
-              : statusFilter === "all"
-                ? "Todos Meus Agendamentos"
-                : `Agendamentos — ${statusLabels[statusFilter as AppointmentStatus] ?? statusFilter}`}
+            {dateFilter === dateToDateString(new Date())
+              ? "Agendamentos de hoje"
+              : "Agendamentos da data selecionada"}
           </h3>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative">
@@ -453,6 +470,31 @@ export function ProfessionalBookingsPage() {
                 placeholder="Buscar..."
                 className="h-9 w-full bg-secondary pl-9 text-sm sm:w-56"
               />
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={dateFilter}
+                onChange={(event) => {
+                  setDateFilter(event.target.value || dateToDateString(new Date()));
+                  setPage(1);
+                }}
+                aria-label="Filtrar agendamentos por data"
+                className="h-9 w-full bg-secondary text-sm sm:w-40"
+              />
+              {dateFilter !== dateToDateString(new Date()) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setDateFilter(dateToDateString(new Date()));
+                    setPage(1);
+                  }}
+                >
+                  Hoje
+                </Button>
+              )}
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -503,6 +545,11 @@ export function ProfessionalBookingsPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Cliente
                 </th>
+                {canManage && (
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Profissional
+                  </th>
+                )}
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Servico
                 </th>
@@ -521,14 +568,14 @@ export function ProfessionalBookingsPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={canManage ? 7 : 6} className="p-8 text-center text-sm text-muted-foreground">
                     <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
                     Carregando agendamentos...
                   </td>
                 </tr>
               ) : filteredAppointments.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={canManage ? 7 : 6} className="p-8 text-center text-sm text-muted-foreground">
                     Nenhum agendamento encontrado.
                   </td>
                 </tr>
@@ -562,6 +609,11 @@ export function ProfessionalBookingsPage() {
                           </div>
                         </div>
                       </td>
+                      {canManage && (
+                        <td className="px-4 py-3 text-sm text-foreground">
+                          {appt.professional?.displayName || "Profissional"}
+                        </td>
+                      )}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 text-sm text-foreground">
                           <Scissors size={14} className="text-muted-foreground" />
