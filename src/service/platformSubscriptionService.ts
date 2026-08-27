@@ -28,6 +28,23 @@ export interface PlatformSubscription {
   createdAt: string | null;
 }
 
+export function hasActivePlatformSubscription(
+  subscription: PlatformSubscription | null,
+): boolean {
+  if (!subscription) return false;
+
+  const status = String(subscription.status || '')
+    .trim()
+    .toLowerCase()
+    .replace('canceled', 'cancelled');
+
+  if (status !== 'active' || subscription.canceledAt !== null) return false;
+  if (!subscription.nextBillingDate) return true;
+
+  const nextBillingDate = new Date(subscription.nextBillingDate);
+  return !Number.isNaN(nextBillingDate.getTime()) && nextBillingDate > new Date();
+}
+
 export async function getSalonPlatformSubscription(): Promise<{ subscription: PlatformSubscription | null }> {
   const { data } = await api.get('/pagarme/subscriptions/salon-platform-subscriptions/current');
   return data;

@@ -281,8 +281,13 @@ export function SuperAdminSalonsPage() {
                   <td className="px-5 py-3"><StatusBadge status={shop.status} /></td>
                   <td className="px-5 py-3 text-muted-foreground">{fmtDate(shop.createdAt)}</td>
                   <td className="px-5 py-3">
-                    <small className="block text-muted-foreground">Ag: {shop.metrics?.appointmentsCount ?? 0} | Cli: {shop.metrics?.clientsCount ?? 0} | Func: {shop.metrics?.employeesCount ?? 0}</small>
-                    <small className="block text-muted-foreground">Serv: {shop.metrics?.servicesCount ?? 0} | Prod: {shop.metrics?.productsCount ?? 0}</small>
+                    <div className="grid min-w-56 grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <span className="text-muted-foreground">Agendamentos: <strong className="text-foreground">{shop.metrics?.appointmentsCount ?? 0}</strong></span>
+                      <span className="text-muted-foreground">Clientes: <strong className="text-foreground">{shop.metrics?.clientsCount ?? 0}</strong></span>
+                      <span className="text-muted-foreground">Funcionários: <strong className="text-foreground">{shop.metrics?.employeesCount ?? 0}</strong></span>
+                      <span className="text-muted-foreground">Serviços: <strong className="text-foreground">{shop.metrics?.servicesCount ?? 0}</strong></span>
+                      <span className="text-muted-foreground">Produtos: <strong className="text-foreground">{shop.metrics?.productsCount ?? 0}</strong></span>
+                    </div>
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex flex-wrap gap-1">

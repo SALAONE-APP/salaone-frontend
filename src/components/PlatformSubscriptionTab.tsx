@@ -9,21 +9,13 @@ import {
   getSalonPlatformSubscription,
   cancelSalonPlatformSubscription,
   getPublicPlatformPlans,
+  hasActivePlatformSubscription,
   type PlatformPlan,
   type PlatformSubscription,
 } from '@/service/platformSubscriptionService';
 import { getSalonProfile } from '@/service/salonProfileService';
 
 const TRIAL_PERIOD_DAYS = 14;
-
-function isActivePlatformSubscription(sub: PlatformSubscription | null): boolean {
-  if (!sub) return false;
-  const status = String(sub.status || '').trim().toLowerCase().replace('canceled', 'cancelled');
-  if (status !== 'active') return false;
-  if (sub.canceledAt !== null) return false;
-  if (!sub.nextBillingDate) return true;
-  return new Date(sub.nextBillingDate) > new Date();
-}
 
 function computeTrialInfo(createdAt: string | null | undefined, platformSubscriptionStatus: string | null | undefined) {
   if (!createdAt) return null;
@@ -143,7 +135,7 @@ export function PlatformSubscriptionTab() {
   }, [loadSubscription, loadPlans]);
 
   const normalizedStatus = currentSub ? normalizeStatus(currentSub.status) : '';
-  const hasActiveSub = isActivePlatformSubscription(currentSub);
+  const hasActiveSub = hasActivePlatformSubscription(currentSub);
   const isCurrentPlan = (plan: PlatformPlan) => hasActiveSub && currentSub?.plan?.id === plan.id;
 
   function handleSelectPlan(plan: PlatformPlan, upgrade: boolean) {

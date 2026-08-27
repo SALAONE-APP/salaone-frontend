@@ -8,8 +8,10 @@ import {
   Loader2,
   MoreHorizontal,
   Pencil,
+  Plus,
   RefreshCcw,
   Search,
+  Trash2,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -35,9 +37,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useTableSelection } from "@/hooks/useTableSelection";
 import {
   listAllPayments,
+  splitPayment,
   updatePayment,
   type PaymentMethod,
   type PaymentRecord,
@@ -48,8 +52,17 @@ import {
 
 type PaymentWithType = PaymentRecord & { paymentType: PaymentType };
 type ApiPaymentWithType = PaymentRecord & { paymentType: PaymentType | "extra" };
-type StatusFilter = "all" | PaymentStatus;
+type StatusFilter = "all" | "confirmed" | PaymentStatus;
 type TypeFilter = "all" | PaymentType;
+type SplitMethod = "pix" | "debito" | "credito" | "dinheiro";
+type SplitPart = { method: SplitMethod; amount: string };
+const MAX_ADJUSTMENT_NOTE_LENGTH = 200;
+
+function editablePaymentMethod(method: PaymentMethod): SplitMethod {
+  return ["pix", "debito", "credito", "dinheiro"].includes(method)
+    ? method as SplitMethod
+    : "dinheiro";
+}
 
 const statusLabels: Record<PaymentStatus, string> = {
   pending: "Pendente",
@@ -80,6 +93,28 @@ const methodLabels: Record<PaymentMethod, string> = {
   subscription: "Assinatura",
 };
 
+function paymentMethodDisplay(payment: PaymentWithType) {
+  const tabPayments = payment.serviceTab?.payments ?? [];
+  if (payment.paymentType !== "service_tab" || tabPayments.length === 0) {
+    return methodLabels[payment.method] || payment.method;
+  }
+  const totals = tabPayments.reduce<Partial<Record<PaymentMethod, number>>>((result, item) => {
+    result[item.method] = (result[item.method] ?? 0) + item.amount;
+    return result;
+  }, {});
+  return Object.entries(totals)
+    .map(([method, amount]) => `${formatCurrency(amount)} ${methodLabels[method as PaymentMethod] || method}`)
+    .join(" + ");
+}
+
+function paymentTotalAmount(payment: PaymentWithType) {
+  if (payment.paymentType === "service_tab" && payment.serviceTab) {
+    return payment.serviceTab.total
+      ?? payment.serviceTab.items.reduce((total, item) => total + Number(item.total || 0), 0);
+  }
+  return payment.amount;
+}
+
 const typeLabels: Record<PaymentType, string> = {
   appointment: "Agendamento",
   subscription: "Assinatura",
@@ -91,6 +126,11 @@ function formatCurrency(value: number) {
     style: "currency",
     currency: "BRL",
   }).format(value || 0);
+}
+
+function parseCurrencyInput(value: string) {
+  const digits = value.replace(/\D/g, "");
+  return digits ? Number(digits) / 100 : 0;
 }
 
 function formatDateTime(value?: string | null) {
@@ -106,6 +146,24 @@ function formatDateTime(value?: string | null) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+}
+
+function localDateKey(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function paymentDisplayDate(payment: PaymentWithType) {
+  return payment.paidAt || payment.appointment?.startAt || payment.createdAt;
+}
+
+function paymentDateKey(payment: PaymentWithType) {
+  const value = paymentDisplayDate(payment);
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value.slice(0, 10) : localDateKey(date);
 }
 
 function normalizeText(value: string) {
@@ -171,7 +229,7 @@ function downloadCsv(payments: PaymentWithType[]) {
     String(payment.amount).replace(".", ","),
     methodLabels[payment.method] || payment.method,
     statusLabels[payment.status] || payment.status,
-    formatDateTime(payment.paidAt || payment.createdAt),
+    formatDateTime(paymentDisplayDate(payment)),
   ]);
 
   const csv = [header, ...rows]
@@ -194,12 +252,18 @@ export function PaymentsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [dateFilter, setDateFilter] = useState(() => localDateKey(new Date()));
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [localPaymentDialog, setLocalPaymentDialog] = useState<PaymentWithType | null>(null);
   const [selectedLocalMethod, setSelectedLocalMethod] = useState<PaymentMethod>("dinheiro");
+  const [splitParts, setSplitParts] = useState<SplitPart[]>([]);
+  const [adjustedAmount, setAdjustedAmount] = useState("");
+  const [discountInput, setDiscountInput] = useState("");
+  const [surchargeInput, setSurchargeInput] = useState("");
+  const [adjustmentNote, setAdjustmentNote] = useState("");
   const [methodPaymentDialog, setMethodPaymentDialog] = useState<PaymentWithType | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>("dinheiro");
 
@@ -211,7 +275,9 @@ export function PaymentsPage() {
 
     try {
       const result = await listAllPayments({
-        status: statusFilter === "all" ? undefined : statusFilter,
+        status: statusFilter === "all" || statusFilter === "confirmed" ? undefined : statusFilter,
+        dateFrom: dateFilter || undefined,
+        dateTo: dateFilter || undefined,
         page,
         limit,
       });
@@ -228,7 +294,7 @@ export function PaymentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [dateFilter, page, statusFilter]);
 
   useEffect(() => {
     void loadPayments();
@@ -238,6 +304,8 @@ export function PaymentsPage() {
     const term = normalizeText(search.trim());
 
     return payments.filter((payment) => {
+      if (dateFilter && paymentDateKey(payment) !== dateFilter) return false;
+      if (statusFilter === "confirmed" && payment.status !== "paid" && payment.status !== "approved") return false;
       if (typeFilter !== "all" && payment.paymentType !== typeFilter) return false;
       if (!term) return true;
 
@@ -248,6 +316,7 @@ export function PaymentsPage() {
           payment.user?.email,
           getPaymentDescription(payment),
           payment.appointment?.professional?.displayName,
+          payment.adjustmentNote,
           methodLabels[payment.method],
           statusLabels[payment.status],
         ]
@@ -257,7 +326,7 @@ export function PaymentsPage() {
 
       return haystack.includes(term);
     });
-  }, [payments, search, typeFilter]);
+  }, [dateFilter, payments, search, statusFilter, typeFilter]);
 
   const { selectedRows, toggleRow, toggleAll } = useTableSelection(
     filteredPayments.map((payment) => payment.id),
@@ -299,9 +368,8 @@ export function PaymentsPage() {
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
   async function changePaymentStatus(payment: PaymentWithType, status: PaymentStatus) {
-    if (status === "paid" && payment.method === "local") {
-      setSelectedLocalMethod("dinheiro");
-      setLocalPaymentDialog(payment);
+    if (status === "paid") {
+      openLocalPaymentDialog(payment);
       return;
     }
 
@@ -319,12 +387,103 @@ export function PaymentsPage() {
 
   async function confirmLocalPayment() {
     if (!localPaymentDialog) return;
+    const finalAmount = parseCurrencyInput(adjustedAmount);
+    if (!(finalAmount > 0)) {
+      toast.error("Informe um valor final maior que zero.");
+      return;
+    }
+    const payment = localPaymentDialog;
+    const hasAdjustment = parseCurrencyInput(discountInput) > 0 || parseCurrencyInput(surchargeInput) > 0;
+    if (hasAdjustment && !adjustmentNote.trim()) {
+      toast.error("Informe a observacao do desconto ou acrescimo.");
+      return;
+    }
+    setLocalPaymentDialog(null);
+    setUpdatingId(payment.id);
+    try {
+      await updatePayment(payment, {
+        status: "paid",
+        method: selectedLocalMethod,
+        amount: finalAmount,
+        discountAmount: Math.max(0, payment.amount - finalAmount),
+        adjustmentNote: hasAdjustment ? adjustmentNote.trim() : null,
+        paidAt: new Date().toISOString(),
+      });
+      toast.success("Pagamento confirmado.");
+      await loadPayments();
+    } catch (err) {
+      toast.error(getApiMessage(err));
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  function openLocalPaymentDialog(payment: PaymentWithType) {
+    const method = editablePaymentMethod(payment.method);
+    setSelectedLocalMethod(method);
+    setSplitParts([{ method, amount: payment.amount.toFixed(2) }]);
+    setAdjustedAmount(formatCurrency(payment.amount));
+    setDiscountInput(formatCurrency(0));
+    setSurchargeInput(formatCurrency(0));
+    setAdjustmentNote("");
+    setLocalPaymentDialog(payment);
+  }
+
+  const splitTotal = splitParts.reduce((sum, part) => sum + (Number(part.amount.replace(",", ".")) || 0), 0);
+  const finalAmount = parseCurrencyInput(adjustedAmount);
+  const discountAmount = Math.max(0, (localPaymentDialog?.amount ?? 0) - finalAmount);
+  const splitDifference = finalAmount - splitTotal;
+  function changeFinalAmount(value: string, syncDiscount = true) {
+    const nextTotal = parseCurrencyInput(value);
+    setAdjustedAmount(formatCurrency(nextTotal));
+    if (syncDiscount && localPaymentDialog) setDiscountInput(formatCurrency(Math.max(0, localPaymentDialog.amount - nextTotal)));
+    setSplitParts((parts) => {
+      if (parts.length === 1) return [{ ...parts[0], amount: nextTotal.toFixed(2) }];
+      const previousTotal = parts.slice(0, -1).reduce((sum, part) => sum + (Number(part.amount.replace(",", ".")) || 0), 0);
+      return parts.map((part, index) => index === parts.length - 1 ? { ...part, amount: Math.max(0, nextTotal - previousTotal).toFixed(2) } : part);
+    });
+  }
+
+  function changeDiscount(value: string) {
+    const discount = parseCurrencyInput(value);
+    setDiscountInput(formatCurrency(discount));
+    if (!localPaymentDialog) return;
+    const surcharge = parseCurrencyInput(surchargeInput);
+    changeFinalAmount(Math.max(0, localPaymentDialog.amount + surcharge - discount).toFixed(2), false);
+  }
+
+  function changeSurcharge(value: string) {
+    const surcharge = parseCurrencyInput(value);
+    setSurchargeInput(formatCurrency(surcharge));
+    if (!localPaymentDialog) return;
+    const discount = parseCurrencyInput(discountInput);
+    changeFinalAmount(Math.max(0, localPaymentDialog.amount + surcharge - discount).toFixed(2), false);
+  }
+
+  async function confirmSplitPayment() {
+    if (!localPaymentDialog) return;
+    if (splitParts.length < 2 || splitParts.some((part) => !(Number(part.amount.replace(",", ".")) > 0))) {
+      toast.error("Informe ao menos duas partes com valores maiores que zero.");
+      return;
+    }
+    if (Math.abs(splitDifference) > 0.005) {
+      toast.error("A soma das partes deve ser igual ao valor do pagamento.");
+      return;
+    }
+    const hasAdjustment = parseCurrencyInput(discountInput) > 0 || parseCurrencyInput(surchargeInput) > 0;
+    if (hasAdjustment && !adjustmentNote.trim()) {
+      toast.error("Informe a observacao do desconto ou acrescimo.");
+      return;
+    }
     const payment = localPaymentDialog;
     setLocalPaymentDialog(null);
     setUpdatingId(payment.id);
     try {
-      await updatePayment(payment, { status: "paid", method: selectedLocalMethod });
-      toast.success("Pagamento confirmado.");
+      await splitPayment(payment.id, splitParts.map((part) => ({
+        method: part.method,
+        amount: Number(part.amount.replace(",", ".")),
+      })), finalAmount, discountAmount, hasAdjustment ? adjustmentNote.trim() : null, new Date().toISOString());
+      toast.success("Pagamento dividido confirmado.");
       await loadPayments();
     } catch (err) {
       toast.error(getApiMessage(err));
@@ -384,6 +543,22 @@ export function PaymentsPage() {
           <h3 className="text-base font-medium text-foreground">Todos Pagamentos</h3>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative">
+              <Calendar
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                size={14}
+              />
+              <Input
+                type="date"
+                value={dateFilter}
+                onChange={(event) => {
+                  setDateFilter(event.target.value);
+                  setPage(1);
+                }}
+                aria-label="Filtrar pagamentos por data"
+                className="h-9 w-full bg-secondary pl-9 text-sm sm:w-40"
+              />
+            </div>
+            <div className="relative">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                 size={14}
@@ -411,6 +586,7 @@ export function PaymentsPage() {
                     setPage(1);
                   }}
                 >
+                  <DropdownMenuRadioItem value="confirmed">Confirmados</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="all">Todos</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="pending">Pendentes</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="approved">Aprovados</DropdownMenuRadioItem>
@@ -479,10 +655,10 @@ export function PaymentsPage() {
                     Origem
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Valor
+                    Metodo
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Metodo
+                    Valor total
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Data
@@ -490,20 +666,23 @@ export function PaymentsPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Status
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Observacao
+                  </th>
                   <th className="w-10 px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-sm text-muted-foreground">
+                    <td colSpan={9} className="p-8 text-center text-sm text-muted-foreground">
                       <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
                       Carregando pagamentos...
                     </td>
                   </tr>
                 ) : filteredPayments.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-sm text-muted-foreground">
+                    <td colSpan={9} className="p-8 text-center text-sm text-muted-foreground">
                       Nenhum pagamento encontrado.
                     </td>
                   </tr>
@@ -542,27 +721,38 @@ export function PaymentsPage() {
                             <div className="mt-2 space-y-1 rounded-md border bg-secondary/30 p-2">
                               {payment.serviceTab.items.map((item) => (
                                 <div key={item.id} className="flex justify-between gap-3 text-xs">
-                                  <span>{item.quantity}× {item.name}</span>
-                                  <span className="whitespace-nowrap font-medium">{formatCurrency(item.total)}</span>
+                                  <span>
+                                    {item.quantity}× {item.name}
+                                    {item.original ? " (serviço original)" : ""}
+                                  </span>
+                                  <span className="flex items-center gap-2 whitespace-nowrap font-medium">
+                                    {formatCurrency(item.total)}
+                                    {item.paid && <span className="text-emerald-600">PAGO</span>}
+                                  </span>
                                 </div>
                               ))}
                             </div>
                           ) : null}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm font-medium text-foreground">
-                        {formatCurrency(payment.amount)}
-                      </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2 text-sm text-foreground">
-                          <CreditCard size={14} className="text-muted-foreground" />
-                          {methodLabels[payment.method] || payment.method}
-                        </div>
+                        {(() => {
+                          const display = paymentMethodDisplay(payment);
+                          return (
+                            <div className="flex items-center gap-2 text-sm text-foreground">
+                              <CreditCard size={14} className="shrink-0 text-muted-foreground" />
+                              {display}
+                            </div>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-foreground">
+                        {formatCurrency(paymentTotalAmount(payment))}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Calendar size={14} />
-                          {formatDateTime(payment.paidAt || payment.createdAt)}
+                          {formatDateTime(paymentDisplayDate(payment))}
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -575,6 +765,11 @@ export function PaymentsPage() {
                           )}
                           {statusLabels[payment.status] || payment.status}
                         </Badge>
+                      </td>
+                      <td className="max-w-64 px-4 py-3 text-xs text-muted-foreground">
+                        <span className="line-clamp-3" title={payment.adjustmentNote || undefined}>
+                          {payment.adjustmentNote || "-"}
+                        </span>
                       </td>
                       <td className="px-4 py-3">
                         <DropdownMenu>
@@ -661,18 +856,56 @@ export function PaymentsPage() {
         </div>
       </div>
       <Dialog open={Boolean(localPaymentDialog)} onOpenChange={(open) => { if (!open) setLocalPaymentDialog(null); }}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-lg overflow-hidden sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Como foi realizado o pagamento?</DialogTitle>
+            <DialogTitle>Confirmar pagamento</DialogTitle>
             <DialogDescription>
-              Selecione a forma de pagamento usada no local para{" "}
+              Ajuste o valor, aplique desconto ou acrescimo e confirme a forma de pagamento de{" "}
               <span className="font-medium text-foreground">
                 {localPaymentDialog?.user?.name ?? "este cliente"}
               </span>
               .
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3 py-2">
+          <div className="rounded-lg border border-border bg-secondary/30 p-4">
+            <div className="mb-3 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Valor original</span>
+              <span className="font-medium">{formatCurrency(localPaymentDialog?.amount ?? 0)}</span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="min-w-0 space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Desconto</label>
+                <Input className="min-w-0 w-full" inputMode="numeric" value={discountInput} onChange={(event) => changeDiscount(event.target.value)} />
+              </div>
+              <div className="min-w-0 space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Acréscimo</label>
+                <Input className="min-w-0 w-full" inputMode="numeric" value={surchargeInput} onChange={(event) => changeSurcharge(event.target.value)} />
+              </div>
+              <div className="min-w-0 space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Valor final</label>
+                <Input className="min-w-0 w-full" inputMode="numeric" value={adjustedAmount} readOnly />
+              </div>
+            </div>
+          </div>
+          {(parseCurrencyInput(discountInput) > 0 || parseCurrencyInput(surchargeInput) > 0) && (
+            <div className="space-y-1.5">
+              <label htmlFor="payment-adjustment-note" className="text-xs font-medium text-muted-foreground">
+                Observacao do ajuste
+              </label>
+              <Textarea
+                id="payment-adjustment-note"
+                value={adjustmentNote}
+                onChange={(event) => setAdjustmentNote(event.target.value.slice(0, MAX_ADJUSTMENT_NOTE_LENGTH))}
+                maxLength={MAX_ADJUSTMENT_NOTE_LENGTH}
+                rows={3}
+                placeholder="Explique o motivo do desconto ou acrescimo."
+              />
+              <p className="text-right text-xs text-muted-foreground">
+                {adjustmentNote.length}/{MAX_ADJUSTMENT_NOTE_LENGTH}
+              </p>
+            </div>
+          )}
+          {splitParts.length === 1 ? <div className="grid grid-cols-2 gap-3 py-2">
             {(
               [
                 { value: "dinheiro", label: "Dinheiro" },
@@ -684,7 +917,10 @@ export function PaymentsPage() {
               <button
                 key={value}
                 type="button"
-                onClick={() => setSelectedLocalMethod(value)}
+                onClick={() => {
+                  setSelectedLocalMethod(value);
+                  setSplitParts((parts) => [{ ...parts[0], method: value as SplitMethod }]);
+                }}
                 className={`rounded-lg border px-4 py-3 text-sm font-medium transition-colors ${
                   selectedLocalMethod === value
                     ? "border-primary bg-primary/10 text-primary"
@@ -694,13 +930,58 @@ export function PaymentsPage() {
                 {label}
               </button>
             ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setLocalPaymentDialog(null)}>
+          </div> : (
+            <div className="min-w-0 space-y-3 py-2">
+              {splitParts.map((part, index) => (
+                <div key={index} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2">
+                  <div className="min-w-0 space-y-1">
+                    <label className="text-xs text-muted-foreground">Forma</label>
+                    <select
+                      value={part.method}
+                      onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, method: event.target.value as SplitMethod } : item))}
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      <option value="dinheiro">Dinheiro</option><option value="pix">PIX</option>
+                      <option value="credito">Crédito</option><option value="debito">Débito</option>
+                    </select>
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <label className="text-xs text-muted-foreground">Valor</label>
+                    <Input
+                      className="min-w-0 w-full"
+                      inputMode="decimal"
+                      value={part.amount}
+                      onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, amount: event.target.value } : item))}
+                    />
+                  </div>
+                  <Button type="button" variant="ghost" size="icon" disabled={splitParts.length <= 2} onClick={() => setSplitParts((parts) => parts.filter((_, itemIndex) => itemIndex !== index))}>
+                    <Trash2 size={16} />
+                  </Button>
+                </div>
+              ))}
+              <Button type="button" variant="outline" size="sm" onClick={() => setSplitParts((parts) => [...parts, { method: "pix", amount: "" }])}>
+                <Plus size={15} className="mr-1" /> Adicionar forma
+              </Button>
+              <div className="rounded-md bg-secondary/50 p-3 text-sm">
+                <div className="flex justify-between"><span>Total informado</span><strong>{formatCurrency(splitTotal)}</strong></div>
+                <div className={`mt-1 flex justify-between ${Math.abs(splitDifference) <= 0.005 ? "text-emerald-600" : "text-amber-600"}`}>
+                  <span>{splitDifference >= 0 ? "Falta" : "Excedente"}</span><strong>{formatCurrency(Math.abs(splitDifference))}</strong>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+            <Button className="w-full sm:w-auto" variant="outline" onClick={() => setLocalPaymentDialog(null)}>
               Cancelar
             </Button>
-            <Button onClick={confirmLocalPayment}>
-              Confirmar pagamento
+            {splitParts.length === 1 && (
+              <Button className="w-full sm:w-auto" variant="outline" onClick={() => {
+                const half = finalAmount / 2;
+                setSplitParts([{ method: selectedLocalMethod as SplitMethod, amount: half.toFixed(2) }, { method: "pix", amount: (finalAmount - half).toFixed(2) }]);
+              }}>Dividir pagamento</Button>
+            )}
+            <Button className="w-full sm:w-auto" onClick={splitParts.length > 1 ? confirmSplitPayment : confirmLocalPayment}>
+              {splitParts.length > 1 ? "Confirmar divisão" : "Confirmar pagamento"}
             </Button>
           </DialogFooter>
         </DialogContent>

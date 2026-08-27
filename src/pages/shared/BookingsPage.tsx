@@ -17,6 +17,7 @@ import {
   MoreHorizontal,
   Package,
   Plus,
+  ReceiptText,
   Search,
   Scissors,
   User,
@@ -24,6 +25,7 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 import { AppCalendar } from "@/components/AppCalendar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -58,6 +60,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useTableSelection } from "@/hooks/useTableSelection";
 import {
   cancelAppointment,
@@ -215,11 +218,15 @@ function getServiceDuration(service: Service) {
 
 export function BookingsPage() {
   const { user } = useAuth();
+  const { can } = usePermissions();
+  const navigate = useNavigate();
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
+  const [dateFrom, setDateFrom] = useState(() => dateToDateString(new Date()));
+  const [dateTo, setDateTo] = useState(() => dateToDateString(new Date()));
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -253,6 +260,12 @@ export function BookingsPage() {
   const [sendingWhatsAppId, setSendingWhatsAppId] = useState<string | null>(
     null,
   );
+  const [bulkConfirmDialogOpen, setBulkConfirmDialogOpen] = useState(false);
+  const [bulkConfirming, setBulkConfirming] = useState(false);
+  const [startingAttendanceId, setStartingAttendanceId] = useState<string | null>(null);
+  const [completionAppointment, setCompletionAppointment] = useState<Appointment | null>(null);
+  const [completionTime, setCompletionTime] = useState("");
+  const [completing, setCompleting] = useState(false);
 
   const limit = 20;
 
@@ -264,6 +277,8 @@ export function BookingsPage() {
       const result = await listAppointments({
         allAppointments: true,
         status: statusFilter === "all" ? undefined : statusFilter,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
         page,
         limit,
       });
@@ -280,7 +295,7 @@ export function BookingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [dateFrom, dateTo, page, statusFilter]);
 
   useEffect(() => {
     void loadAppointments();
@@ -528,8 +543,18 @@ export function BookingsPage() {
     };
   }, [appointments]);
 
-  const { selectedRows, toggleRow, toggleAll } = useTableSelection(
+  const { selectedRows, toggleRow, toggleAll, clearSelection } = useTableSelection(
     filteredAppointments.map((appointment) => appointment.id),
+  );
+
+  const selectedAppointments = useMemo(
+    () => appointments.filter((appointment) => selectedRows.includes(appointment.id)),
+    [appointments, selectedRows],
+  );
+
+  const appointmentsToConfirm = useMemo(
+    () => selectedAppointments.filter((appointment) => appointment.status === "scheduled"),
+    [selectedAppointments],
   );
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -684,6 +709,95 @@ export function BookingsPage() {
     }
   }
 
+  function openCompletionDialog(appointment: Appointment) {
+    const now = new Date();
+    setCompletionAppointment(appointment);
+    setCompletionTime(now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false }));
+  }
+
+  async function handleCompleteAppointment() {
+    if (!completionAppointment || !/^\d{2}:\d{2}$/.test(completionTime)) {
+      toast.error("Informe um horario valido.");
+      return;
+    }
+    const appointmentDate = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date(completionAppointment.startAt));
+    const completedAt = new Date(`${appointmentDate}T${completionTime}:00-03:00`);
+    if (completedAt.getTime() <= new Date(completionAppointment.startAt).getTime()) {
+      toast.error("O horario final deve ser posterior ao inicio do atendimento.");
+      return;
+    }
+    if (completedAt.getTime() > Date.now()) {
+      toast.error("O horario final nao pode estar no futuro.");
+      return;
+    }
+    setCompleting(true);
+    try {
+      await updateAppointment(completionAppointment.id, { status: "completed", completedAt: completedAt.toISOString() });
+      toast.success("Atendimento finalizado no horario informado.");
+      setCompletionAppointment(null);
+      await loadAppointments();
+    } catch (err) {
+      toast.error(getApiMessage(err));
+    } finally {
+      setCompleting(false);
+    }
+  }
+
+  async function startAttendanceWithTab(appointment: Appointment) {
+    setStartingAttendanceId(appointment.id);
+    try {
+      if (appointment.status !== "in_service") {
+        await updateAppointment(appointment.id, { status: "in_service" });
+      }
+      toast.success("Atendimento iniciado e comanda aberta.");
+      await loadAppointments();
+      navigate("/service-tabs");
+    } catch (err) {
+      toast.error(getApiMessage(err));
+      await loadAppointments();
+    } finally {
+      setStartingAttendanceId(null);
+    }
+  }
+
+  async function handleBulkConfirm() {
+    if (appointmentsToConfirm.length === 0) return;
+
+    setBulkConfirming(true);
+    const results = await Promise.allSettled(
+      appointmentsToConfirm.map((appointment) =>
+        updateAppointment(appointment.id, { status: "confirmed" }),
+      ),
+    );
+    const confirmedCount = results.filter((result) => result.status === "fulfilled").length;
+    const failedCount = results.length - confirmedCount;
+
+    try {
+      await loadAppointments();
+      if (confirmedCount > 0) clearSelection();
+      setBulkConfirmDialogOpen(false);
+
+      if (failedCount === 0) {
+        toast.success(
+          `${confirmedCount} ${confirmedCount === 1 ? "agendamento confirmado" : "agendamentos confirmados"}.`,
+        );
+      } else if (confirmedCount > 0) {
+        toast.warning(
+          `${confirmedCount} confirmado(s), mas ${failedCount} nao puderam ser confirmados.`,
+        );
+      } else {
+        const firstFailure = results.find(
+          (result): result is PromiseRejectedResult => result.status === "rejected",
+        );
+        toast.error(getApiMessage(firstFailure?.reason));
+      }
+    } finally {
+      setBulkConfirming(false);
+    }
+  }
+
   async function handleCancel(appointment: Appointment) {
     try {
       await cancelAppointment(appointment.id);
@@ -787,7 +901,7 @@ export function BookingsPage() {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
-        <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border p-4 xl:flex-row xl:items-center xl:justify-between">
           <h3 className="text-base font-medium text-foreground">
             {statusFilter === "active"
               ? "Agendamentos Ativos"
@@ -805,8 +919,19 @@ export function BookingsPage() {
                             : "Nao compareceu"
                   }`}
           </h3>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="relative">
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center xl:justify-end">
+            {selectedRows.length > 0 && (
+              <Button
+                size="sm"
+                className="gap-2"
+                disabled={appointmentsToConfirm.length === 0}
+                onClick={() => setBulkConfirmDialogOpen(true)}
+              >
+                <CheckCircle2 size={14} />
+                Confirmar selecionados ({appointmentsToConfirm.length})
+              </Button>
+            )}
+            <div className="relative min-w-0 sm:flex-1 xl:flex-none">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                 size={14}
@@ -815,7 +940,32 @@ export function BookingsPage() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Buscar..."
-                className="h-9 w-full bg-secondary pl-9 text-sm sm:w-56"
+                className="h-9 w-full bg-secondary pl-9 text-sm xl:w-56"
+              />
+            </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <Input
+                type="date"
+                value={dateFrom}
+                max={dateTo || undefined}
+                onChange={(event) => {
+                  setDateFrom(event.target.value);
+                  setPage(1);
+                }}
+                aria-label="Data inicial"
+                className="h-9 min-w-[135px] flex-1 sm:w-[145px] sm:flex-none"
+              />
+              <span className="text-xs text-muted-foreground">até</span>
+              <Input
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(event) => {
+                  setDateTo(event.target.value);
+                  setPage(1);
+                }}
+                aria-label="Data final"
+                className="h-9 min-w-[135px] flex-1 sm:w-[145px] sm:flex-none"
               />
             </div>
             <DropdownMenu>
@@ -829,7 +979,16 @@ export function BookingsPage() {
                 <DropdownMenuRadioGroup
                   value={statusFilter}
                   onValueChange={(value) => {
-                    setStatusFilter(value as StatusFilter);
+                    const nextStatus = value as StatusFilter;
+                    setStatusFilter(nextStatus);
+                    if (nextStatus === "all") {
+                      setDateFrom("");
+                      setDateTo("");
+                    } else if (!dateFrom && !dateTo) {
+                      const today = dateToDateString(new Date());
+                      setDateFrom(today);
+                      setDateTo(today);
+                    }
                     setPage(1);
                   }}
                 >
@@ -1081,14 +1240,28 @@ export function BookingsPage() {
                                 <CheckCircle2 size={14} />
                                 Confirmar
                               </DropdownMenuItem>
+                              {can("managePayments") && ["scheduled", "confirmed", "in_service"].includes(appointment.status) && (
+                                <DropdownMenuItem
+                                  disabled={startingAttendanceId === appointment.id}
+                                  onClick={() => void startAttendanceWithTab(appointment)}
+                                >
+                                  {startingAttendanceId === appointment.id ? (
+                                    <Loader2 size={14} className="animate-spin" />
+                                  ) : (
+                                    <ReceiptText size={14} />
+                                  )}
+                                  {appointment.status === "in_service" ? "Ver comanda" : "Iniciar atendimento"}
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
                                 disabled={appointment.status === "completed"}
-                                onClick={() =>
-                                  changeStatus(appointment, "completed")
+                                onClick={() => user?.role === "admin"
+                                  ? openCompletionDialog(appointment)
+                                  : void changeStatus(appointment, "completed")
                                 }
                               >
                                 <CheckCircle2 size={14} />
-                                Finalizar
+                                Finalizar atendimento
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 disabled={appointment.status === "no_show"}
@@ -1351,6 +1524,37 @@ export function BookingsPage() {
               ) : (
                 "Confirmar transferencia"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(completionAppointment)} onOpenChange={(open) => { if (!open && !completing) setCompletionAppointment(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Finalizar atendimento</DialogTitle>
+            <DialogDescription>
+              Informe o horario real em que o atendimento terminou. A comanda e o pagamento continuam separados.
+            </DialogDescription>
+          </DialogHeader>
+          {completionAppointment && (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-secondary/30 p-3 text-sm">
+                <p><span className="font-medium">Cliente:</span> {completionAppointment.client?.name ?? "Cliente"}</p>
+                <p><span className="font-medium">Inicio:</span> {formatDateTime(completionAppointment.startAt).time}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="completion-time">Horario de termino</Label>
+                <Input id="completion-time" type="time" value={completionTime} onChange={(event) => setCompletionTime(event.target.value)} />
+                <p className="text-xs text-muted-foreground">O horario deve ser posterior ao inicio e nao pode estar no futuro.</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={completing} onClick={() => setCompletionAppointment(null)}>Cancelar</Button>
+            <Button type="button" disabled={completing || !completionTime} onClick={() => void handleCompleteAppointment()}>
+              {completing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirmar finalizacao
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1693,6 +1897,38 @@ export function BookingsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={bulkConfirmDialogOpen}
+        onOpenChange={(open) => !bulkConfirming && setBulkConfirmDialogOpen(open)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar agendamentos selecionados?</DialogTitle>
+            <DialogDescription>
+              {appointmentsToConfirm.length === 1
+                ? "1 agendamento sera confirmado."
+                : `${appointmentsToConfirm.length} agendamentos serao confirmados.`}
+              {selectedAppointments.length > appointmentsToConfirm.length
+                ? ` ${selectedAppointments.length - appointmentsToConfirm.length} item(ns) que nao estao com status Agendado serao ignorados.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={bulkConfirming}
+              onClick={() => setBulkConfirmDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button disabled={bulkConfirming} onClick={() => void handleBulkConfirm()}>
+              {bulkConfirming && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {bulkConfirming ? "Confirmando..." : "Confirmar agendamentos"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

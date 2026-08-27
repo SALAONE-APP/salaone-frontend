@@ -19,11 +19,16 @@ export function useTableSelection<TId extends RowId>(rowIds: TId[]) {
     );
   }
 
+  function clearSelection() {
+    setSelectedRows([]);
+  }
+
   return {
     selectedRows,
     selectedCount: selectedRows.length,
     allSelected: selectedRows.length === rowIds.length && rowIds.length > 0,
     toggleRow,
     toggleAll,
+    clearSelection,
   };
 }

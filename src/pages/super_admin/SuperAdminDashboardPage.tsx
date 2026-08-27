@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useAuth } from "../../hooks/useAuth";
 
 import {
   listSuperAdminSalons,
@@ -36,9 +46,96 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+const subscriptionDueLookaheadDays = 7;
+
+interface SubscriptionDueReminder {
+  id: string;
+  salonName: string;
+  planName: string;
+  dueAt: string;
+  daysUntil: number;
+  isTrial: boolean;
+}
+
+function startOfLocalDay(value = new Date()) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+function buildSubscriptionDueReminders(salons: SuperAdminSalon[]): SubscriptionDueReminder[] {
+  const today = startOfLocalDay();
+
+  return salons.flatMap((salon) => {
+    const subscription = salon.platformSubscription;
+    if (!subscription || !["active", "trialing"].includes(subscription.status)) return [];
+
+    const isTrial = subscription.status === "trialing";
+    const dueAt = isTrial
+      ? subscription.trial_ends_at ?? subscription.next_billing_date
+      : subscription.next_billing_date;
+    if (!dueAt) return [];
+
+    const dueDate = new Date(dueAt);
+    if (Number.isNaN(dueDate.getTime())) return [];
+    const daysUntil = Math.round((startOfLocalDay(dueDate).getTime() - today.getTime()) / 86400000);
+    if (daysUntil < 0 || daysUntil > subscriptionDueLookaheadDays) return [];
+
+    return [{
+      id: subscription.id,
+      salonName: salon.name,
+      planName: subscription.platform_plans?.name ?? subscription.selected_plan ?? "Sem plano",
+      dueAt,
+      daysUntil,
+      isTrial,
+    }];
+  }).sort((a, b) => a.daysUntil - b.daysUntil || a.salonName.localeCompare(b.salonName, "pt-BR"));
+}
+
+function SubscriptionDueReminderDialog({
+  open,
+  onOpenChange,
+  reminders,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  reminders: SubscriptionDueReminder[];
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Vencimentos de planos</DialogTitle>
+          <DialogDescription>
+            Planos de saloes com vencimento hoje ou nos proximos {subscriptionDueLookaheadDays} dias.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="max-h-[55vh] space-y-2 overflow-y-auto">
+          {reminders.map((reminder) => (
+            <div key={reminder.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-foreground">{reminder.salonName}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {reminder.planName} · {reminder.isTrial ? "Fim do periodo gratis" : "Proxima cobranca"} · {new Date(reminder.dueAt).toLocaleDateString("pt-BR")}
+                </p>
+              </div>
+              <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-medium ${reminder.daysUntil === 0 ? "bg-destructive/10 text-destructive" : "bg-amber-500/10 text-amber-600"}`}>
+                {reminder.daysUntil === 0 ? "Hoje" : `Em ${reminder.daysUntil} dia${reminder.daysUntil > 1 ? "s" : ""}`}
+              </span>
+            </div>
+          ))}
+        </div>
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)}>Entendi</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function SuperAdminDashboardPage() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [salons, setSalons] = useState<SuperAdminSalon[]>([]);
+  const [dueReminderOpen, setDueReminderOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,6 +150,24 @@ export function SuperAdminDashboardPage() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  const subscriptionDueReminders = useMemo(() => buildSubscriptionDueReminders(salons), [salons]);
+
+  useEffect(() => {
+    if (loading || !user?.id || subscriptionDueReminders.length === 0) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const signature = subscriptionDueReminders.map((item) => `${item.id}:${item.dueAt}`).join("|");
+    const storageKey = `superadmin:subscription-due:${user.id}:${today}:${signature}`;
+    if (sessionStorage.getItem(storageKey) !== "dismissed") setDueReminderOpen(true);
+  }, [loading, subscriptionDueReminders, user?.id]);
+
+  function handleDueReminderOpenChange(open: boolean) {
+    setDueReminderOpen(open);
+    if (open || !user?.id) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const signature = subscriptionDueReminders.map((item) => `${item.id}:${item.dueAt}`).join("|");
+    sessionStorage.setItem(`superadmin:subscription-due:${user.id}:${today}:${signature}`, "dismissed");
+  }
 
   // O backend atual ainda nao expoe /super-admin/dashboard. Os indicadores
   // disponiveis sao calculados a partir da listagem global de saloes.
@@ -133,6 +248,11 @@ export function SuperAdminDashboardPage() {
 
   return (
     <div className="space-y-6">
+      <SubscriptionDueReminderDialog
+        open={dueReminderOpen}
+        onOpenChange={handleDueReminderOpenChange}
+        reminders={subscriptionDueReminders}
+      />
       <section className="rounded-xl border border-primary/20 bg-primary/10 p-6">
         <h2 className="text-xl font-semibold text-foreground">Visao Geral da Plataforma</h2>
         <p className="mt-1 text-sm text-muted-foreground">Acompanhe os principais indicadores globais do sistema.</p>

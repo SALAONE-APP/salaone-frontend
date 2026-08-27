@@ -23,6 +23,7 @@ export interface SuperAdminPlatformSubscription {
   amount?: number | null;
   start_date?: string | null;
   next_billing_date?: string | null;
+  trial_ends_at?: string | null;
   canceled_at?: string | null;
   created_at: string;
   platform_plans?: {
@@ -31,6 +32,7 @@ export interface SuperAdminPlatformSubscription {
     price: number;
     interval: string;
     interval_count: number;
+    trial_period_days?: number | null;
   } | null;
 }
 
@@ -165,6 +167,26 @@ interface BackendSalon {
   blocked_reason?: string | null;
   blocked_at?: string | null;
   deactivated_at?: string | null;
+  metrics?: Partial<SuperAdminSalon["metrics"]>;
+  salon_subscriptions?: {
+    id: string;
+    status: string;
+    start_date?: string | null;
+    payment_method?: string | null;
+    amount?: number | null;
+    next_billing_date?: string | null;
+    trial_ends_at?: string | null;
+    canceled_at?: string | null;
+    created_at: string;
+    platform_plans?: {
+      id: string;
+      name: string;
+      price: number;
+      interval: string;
+      interval_count: number;
+      trial_period_days?: number | null;
+    } | null;
+  } | null;
 }
 
 interface BackendSalonUser {
@@ -195,13 +217,55 @@ function mapBackendSalon(salon: BackendSalon): SuperAdminSalon {
     blockedReason: salon.blocked_reason ?? null,
     blockedAt: salon.blocked_at ?? null,
     deactivatedAt: salon.deactivated_at ?? null,
+    platformSubscription: salon.salon_subscriptions ? {
+      id: salon.salon_subscriptions.id,
+      status: salon.salon_subscriptions.status,
+      selected_plan: salon.salon_subscriptions.platform_plans?.name ?? "",
+      start_date: salon.salon_subscriptions.start_date ?? null,
+      payment_method: salon.salon_subscriptions.payment_method ?? null,
+      amount: salon.salon_subscriptions.amount ?? salon.salon_subscriptions.platform_plans?.price ?? null,
+      next_billing_date: salon.salon_subscriptions.next_billing_date ?? null,
+      trial_ends_at: salon.salon_subscriptions.trial_ends_at ?? null,
+      canceled_at: salon.salon_subscriptions.canceled_at ?? null,
+      created_at: salon.salon_subscriptions.created_at,
+      platform_plans: salon.salon_subscriptions.platform_plans ?? null,
+    } : null,
     metrics: {
-      appointmentsCount: 0,
-      servicesCount: 0,
-      productsCount: 0,
-      clientsCount: 0,
-      employeesCount: 0,
+      appointmentsCount: Number(salon.metrics?.appointmentsCount ?? 0),
+      servicesCount: Number(salon.metrics?.servicesCount ?? 0),
+      productsCount: Number(salon.metrics?.productsCount ?? 0),
+      clientsCount: Number(salon.metrics?.clientsCount ?? 0),
+      employeesCount: Number(salon.metrics?.employeesCount ?? 0),
     },
+  };
+}
+
+async function getSalonMetrics(
+  salonId: string,
+  fallback: SuperAdminSalon["metrics"],
+): Promise<SuperAdminSalon["metrics"]> {
+  const config = { headers: { "x-salon-id": salonId } };
+  const results = await Promise.allSettled([
+    api.get<{ total?: number; items?: unknown[] }>("/appointments", { ...config, params: { page: 1, limit: 1 } }),
+    api.get<{ total?: number; items?: unknown[]; services?: unknown[] }>("/services", config),
+    api.get<unknown[]>("/products", config),
+    api.get<{ clients?: unknown[] }>("/clients", config),
+    api.get<{ employees?: unknown[] }>("/employees", config),
+  ]);
+
+  const data = results.map((result) => result.status === "fulfilled" ? result.value.data : null);
+  const appointments = data[0] as { total?: number; items?: unknown[] } | null;
+  const services = data[1] as { total?: number; items?: unknown[]; services?: unknown[] } | null;
+  const products = data[2] as unknown[] | null;
+  const clients = data[3] as { clients?: unknown[] } | null;
+  const employees = data[4] as { employees?: unknown[] } | null;
+
+  return {
+    appointmentsCount: appointments ? Number(appointments.total ?? appointments.items?.length ?? 0) : fallback.appointmentsCount,
+    servicesCount: services ? Number(services.total ?? services.items?.length ?? services.services?.length ?? 0) : fallback.servicesCount,
+    productsCount: products ? products.length : fallback.productsCount,
+    clientsCount: clients ? (clients.clients?.length ?? 0) : fallback.clientsCount,
+    employeesCount: employees ? (employees.employees?.length ?? 0) : fallback.employeesCount,
   };
 }
 
@@ -251,7 +315,15 @@ export async function listSuperAdminSalons(
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const start = (page - 1) * limit;
 
-  return { items: items.slice(start, start + limit), total, page, limit, totalPages };
+  const paginatedItems = items.slice(start, start + limit);
+  const itemsWithMetrics = await Promise.all(
+    paginatedItems.map(async (salon) => ({
+      ...salon,
+      metrics: await getSalonMetrics(salon.id, salon.metrics),
+    })),
+  );
+
+  return { items: itemsWithMetrics, total, page, limit, totalPages };
 }
 
 export async function getSuperAdminSalonById(

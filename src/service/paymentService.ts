@@ -52,6 +52,11 @@ export interface PaymentRecord {
     id: string;
     code: string;
     status: string;
+    total?: number;
+    payments?: Array<{
+      method: PaymentMethod;
+      amount: number;
+    }>;
     items: Array<{
       id: string;
       type: "service" | "product" | "consumption";
@@ -59,12 +64,16 @@ export interface PaymentRecord {
       unitPrice: number;
       quantity: number;
       total: number;
+      original?: boolean;
+      paid?: boolean;
+      paymentMethods?: PaymentMethod[];
     }>;
   } | null;
   amount: number;
   method: PaymentMethod;
   status: PaymentStatus;
   statusRaw?: string | null;
+  adjustmentNote?: string | null;
   paidAt?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -74,6 +83,8 @@ export interface ListPaymentsParams {
   userId?: string;
   status?: PaymentStatus;
   method?: PaymentMethod;
+  dateFrom?: string;
+  dateTo?: string;
   page?: number;
   limit?: number;
 }
@@ -160,10 +171,20 @@ export async function listAllPayments(params: ListPaymentsParams = {}): Promise<
 
 export async function updatePayment(
   payment: Pick<PaymentRecord, "id" | "appointmentId">,
-  data: { status?: PaymentStatus; method?: PaymentMethod; paidAt?: string; noShow?: boolean },
+  data: { status?: PaymentStatus; method?: PaymentMethod; amount?: number; discountAmount?: number | null; adjustmentNote?: string | null; paidAt?: string; noShow?: boolean },
 ) {
   const response = await api.patch<PaymentRecord>(`/payments/${payment.id}`, data);
 
+  return response.data;
+}
+
+export interface SplitPaymentPart {
+  method: Exclude<PaymentMethod, "local" | "subscription">;
+  amount: number;
+}
+
+export async function splitPayment(paymentId: string, parts: SplitPaymentPart[], totalAmount: number, discountAmount: number, adjustmentNote?: string | null, paidAt?: string) {
+  const response = await api.post<PaymentRecord[]>(`/payments/${paymentId}/split`, { parts, totalAmount, discountAmount, adjustmentNote, paidAt });
   return response.data;
 }
 

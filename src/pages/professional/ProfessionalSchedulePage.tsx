@@ -30,6 +30,7 @@ import {
   type AppointmentStatus,
 } from "@/service/appointmentService";
 import { useMyProfessional } from "@/hooks/useMyProfessional";
+import { useVisiblePolling } from "@/hooks/useVisiblePolling";
 import { usePermissions } from "@/hooks/usePermissions";
 
 /* ─── helpers ─── */
@@ -144,11 +145,11 @@ export function ProfessionalSchedulePage() {
   const selectedDateStr = dateToDateString(selectedDate);
   const todayStr = dateToDateString(new Date());
 
-  const loadSchedule = useCallback(async (dateStr: string, professionalId: string) => {
-    setLoadingSchedule(true);
+  const loadSchedule = useCallback(async (dateStr: string, professionalId: string, showLoading = true) => {
+    if (showLoading) setLoadingSchedule(true);
     try {
       const result = await listAppointments({
-        professionalId,
+        professionalId: canManage ? undefined : professionalId,
         dateFrom: dateStr,
         dateTo: dateStr,
         allAppointments: true,
@@ -158,15 +159,21 @@ export function ProfessionalSchedulePage() {
     } catch (err) {
       toast.error(getApiMessage(err));
     } finally {
-      setLoadingSchedule(false);
+      if (showLoading) setLoadingSchedule(false);
     }
-  }, []);
+  }, [canManage]);
 
   useEffect(() => {
     if (professional?.id) {
       void loadSchedule(selectedDateStr, professional.id);
     }
   }, [loadSchedule, selectedDateStr, professional]);
+
+  const refreshSchedule = useCallback(() => {
+    if (professional?.id) void loadSchedule(selectedDateStr, professional.id, false);
+  }, [loadSchedule, professional?.id, selectedDateStr]);
+
+  useVisiblePolling(refreshSchedule, Boolean(professional?.id));
 
   async function changeStatus(appointment: Appointment, status: AppointmentStatus) {
     try {
@@ -359,6 +366,11 @@ export function ProfessionalSchedulePage() {
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Cliente
                 </th>
+                {canManage && (
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Profissional
+                  </th>
+                )}
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Servico
                 </th>
@@ -374,14 +386,14 @@ export function ProfessionalSchedulePage() {
             <tbody>
               {loadingSchedule ? (
                 <tr>
-                  <td colSpan={canManage ? 6 : 5} className="p-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={canManage ? 7 : 5} className="p-8 text-center text-sm text-muted-foreground">
                     <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
                     Carregando agenda...
                   </td>
                 </tr>
               ) : appointments.length === 0 ? (
                 <tr>
-                  <td colSpan={canManage ? 6 : 5} className="p-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={canManage ? 7 : 5} className="p-8 text-center text-sm text-muted-foreground">
                     Nenhum atendimento para este dia.
                   </td>
                 </tr>
@@ -407,6 +419,12 @@ export function ProfessionalSchedulePage() {
                           <span className="text-muted-foreground">{formatTime(appt.endAt)}</span>
                         </div>
                       </td>
+
+                      {canManage && (
+                        <td className="px-4 py-3 text-sm text-foreground">
+                          {appt.professional?.displayName || "Profissional"}
+                        </td>
+                      )}
 
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -473,7 +491,7 @@ export function ProfessionalSchedulePage() {
                                 onClick={() => changeStatus(appt, "completed")}
                               >
                                 <CheckCircle2 size={14} />
-                                Finalizar
+                                Finalizar atendimento
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 disabled={appt.status === "no_show"}

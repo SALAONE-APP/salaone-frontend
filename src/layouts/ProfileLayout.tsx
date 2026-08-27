@@ -5,11 +5,15 @@ import type { ComponentType } from "react";
 interface SidebarMobileContextValue {
   open: boolean;
   setOpen: (v: boolean) => void;
+  collapsed: boolean;
+  setCollapsed: (v: boolean) => void;
 }
 
 const SidebarMobileContext = createContext<SidebarMobileContextValue>({
   open: false,
   setOpen: () => {},
+  collapsed: false,
+  setCollapsed: () => {},
 });
 
 export function useSidebarMobile() {
@@ -22,9 +26,10 @@ interface ProfileLayoutProps {
 
 export function ProfileLayout({ Sidebar }: ProfileLayoutProps) {
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <SidebarMobileContext.Provider value={{ open, setOpen }}>
+    <SidebarMobileContext.Provider value={{ open, setOpen, collapsed, setCollapsed }}>
       <div className="flex min-h-screen bg-background">
         <Sidebar />
 
@@ -36,7 +41,11 @@ export function ProfileLayout({ Sidebar }: ProfileLayoutProps) {
           />
         )}
 
-        <main className="min-w-0 flex-1 md:ml-64">
+        <main
+          className={`min-w-0 flex-1 transition-[margin] duration-300 ${
+            collapsed ? "md:ml-16" : "md:ml-64"
+          }`}
+        >
           <Outlet />
         </main>
       </div>

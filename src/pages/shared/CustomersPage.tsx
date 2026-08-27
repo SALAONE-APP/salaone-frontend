@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   Calendar,
+  CalendarX,
   Cake,
   Download,
   Edit,
@@ -69,7 +70,7 @@ import {
   type Subscription,
 } from "@/service/subscriptionService";
 import type { Plan } from "@/service/planService";
-import type { BookingPaymentMethod } from "@/service/settingsService";
+import { getClientBookingBlockPeriod, updateClientBookingBlockPeriod, type BookingPaymentMethod } from "@/service/settingsService";
 import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
 import { downloadClientImportTemplate, downloadCsvReport, downloadPdfReport, type ReportColumn } from "@/utils/reportExport";
 import { hasWhatsAppPhone, openWhatsApp } from "@/utils/whatsapp";
@@ -165,6 +166,8 @@ function formatDate(value?: string | null) {
     year: "numeric",
   }).format(date);
 }
+
+
 
 function getDaysSinceLastVisit(customer: UserProfile) {
   if (!customer.lastVisit) return null;
@@ -403,6 +406,9 @@ export function CustomersPage() {
   const [customerToResetPassword, setCustomerToResetPassword] = useState<UserProfile | null>(null);
   const [newClientPassword, setNewClientPassword] = useState("");
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [clientBlockStart, setClientBlockStart] = useState("");
+  const [clientBlockEnd, setClientBlockEnd] = useState("");
+  const [savingClientBlock, setSavingClientBlock] = useState(false);
   const [subscriptionMap, setSubscriptionMap] = useState<Map<string, Subscription>>(new Map());
   const [subDialogCustomer, setSubDialogCustomer] = useState<UserProfile | null>(null);
   const [availablePlans] = useState<Plan[]>([]);
@@ -423,6 +429,16 @@ export function CustomersPage() {
   useEffect(() => {
     getSalonProfile().then(setSalonProfile).catch(() => setSalonProfile(null));
   }, []);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    getClientBookingBlockPeriod()
+      .then((period) => {
+        setClientBlockStart(period.startDate ?? "");
+        setClientBlockEnd(period.endDate ?? "");
+      })
+      .catch((err) => toast.error(getApiMessage(err)));
+  }, [isAdmin]);
 
   function sendBirthdayWhatsApp(customer: UserProfile) {
     if (!hasWhatsAppPhone(customer.phone)) {
@@ -787,6 +803,40 @@ export function CustomersPage() {
     }
   }
 
+  async function saveClientBookingBlock() {
+    if (!clientBlockStart || !clientBlockEnd) {
+      toast.error("Informe as datas inicial e final do bloqueio.");
+      return;
+    }
+    if (clientBlockStart > clientBlockEnd) {
+      toast.error("A data final deve ser igual ou posterior a data inicial.");
+      return;
+    }
+    setSavingClientBlock(true);
+    try {
+      await updateClientBookingBlockPeriod({ startDate: clientBlockStart, endDate: clientBlockEnd });
+      toast.success("Periodo de autoagendamento bloqueado para os clientes.");
+    } catch (err) {
+      toast.error(getApiMessage(err));
+    } finally {
+      setSavingClientBlock(false);
+    }
+  }
+
+  async function clearClientBookingBlock() {
+    setSavingClientBlock(true);
+    try {
+      await updateClientBookingBlockPeriod({ startDate: null, endDate: null });
+      setClientBlockStart("");
+      setClientBlockEnd("");
+      toast.success("Autoagendamento liberado para todos os periodos.");
+    } catch (err) {
+      toast.error(getApiMessage(err));
+    } finally {
+      setSavingClientBlock(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
@@ -818,6 +868,41 @@ export function CustomersPage() {
           </h3>
         </div>
       </div>
+
+      {isAdmin && (
+        <div className="rounded-xl border border-amber-500/30 bg-card p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <CalendarX size={18} className="text-amber-600" />
+                <h3 className="text-base font-medium text-foreground">Bloqueio de agendamentos do cliente</h3>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Clientes nao poderao escolher datas dentro deste periodo. Agendamentos criados pela equipe continuam liberados.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="space-y-1.5">
+                <Label htmlFor="client-booking-block-start">Data inicial</Label>
+                <Input id="client-booking-block-start" type="date" value={clientBlockStart} onChange={(event) => setClientBlockStart(event.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="client-booking-block-end">Data final</Label>
+                <Input id="client-booking-block-end" type="date" value={clientBlockEnd} onChange={(event) => setClientBlockEnd(event.target.value)} />
+              </div>
+              <Button disabled={savingClientBlock} onClick={() => void saveClientBookingBlock()}>
+                {savingClientBlock && <Loader2 size={14} className="mr-2 animate-spin" />}
+                Bloquear periodo
+              </Button>
+              {(clientBlockStart || clientBlockEnd) && (
+                <Button variant="outline" disabled={savingClientBlock} onClick={() => void clearClientBookingBlock()}>
+                  Liberar periodo
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">

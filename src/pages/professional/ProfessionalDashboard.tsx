@@ -7,6 +7,8 @@ import { StatCard } from "@/components/StatCard";
 import { Badge } from "@/components/ui/badge";
 import { listAppointments, type Appointment } from "@/service/appointmentService";
 import { useMyProfessional } from "@/hooks/useMyProfessional";
+import { useVisiblePolling } from "@/hooks/useVisiblePolling";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "../../hooks/useAuth";
 
 function dateToDateString(date: Date): string {
@@ -84,34 +86,42 @@ const shortcuts = [
 
 export function ProfessionalDashboard() {
   const { user } = useAuth();
+  const { can } = usePermissions();
+  const canManageAppointments = can("manageAgendamentos");
   const { professional, loading: professionalLoading } = useMyProfessional();
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
   const [weekAppointments, setWeekAppointments] = useState<Appointment[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
 
-  const loadData = useCallback(async (professionalId: string) => {
+  const loadData = useCallback(async (professionalId: string, showLoading = true) => {
     const today = dateToDateString(new Date());
     const week = getWeekRange();
-    setDataLoading(true);
+    if (showLoading) setDataLoading(true);
     try {
       const [todayResult, weekResult] = await Promise.all([
-        listAppointments({ professionalId, dateFrom: today, dateTo: today, allAppointments: true, limit: 100 }),
-        listAppointments({ professionalId, dateFrom: week.start, dateTo: week.end, allAppointments: true, limit: 100 }),
+        listAppointments({ professionalId: canManageAppointments ? undefined : professionalId, dateFrom: today, dateTo: today, allAppointments: true, limit: 100 }),
+        listAppointments({ professionalId: canManageAppointments ? undefined : professionalId, dateFrom: week.start, dateTo: week.end, allAppointments: true, limit: 100 }),
       ]);
       setTodayAppointments(todayResult.items);
       setWeekAppointments(weekResult.items);
     } catch {
       toast.error("Erro ao carregar dados da agenda.");
     } finally {
-      setDataLoading(false);
+      if (showLoading) setDataLoading(false);
     }
-  }, []);
+  }, [canManageAppointments]);
 
   useEffect(() => {
     if (professional?.id) {
       void loadData(professional.id);
     }
   }, [professional, loadData]);
+
+  const refreshData = useCallback(() => {
+    if (professional?.id) void loadData(professional.id, false);
+  }, [professional?.id, loadData]);
+
+  useVisiblePolling(refreshData, Boolean(professional?.id));
 
   const stats = useMemo(() => {
     const activeToday = todayAppointments.filter(

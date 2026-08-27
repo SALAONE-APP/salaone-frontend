@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BanknoteArrowDown, CheckCircle, CreditCard, Download, Loader2, Search } from "lucide-react";
+import { BanknoteArrowDown, BanknoteArrowUp, CheckCircle, Download, Loader2, Search, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -27,12 +27,11 @@ import {
 } from "@/service/cashClosingService";
 import {
   createCashOut,
-  createManualSubscriptionPayment,
   type CashOutCategory,
   type PaymentMethod,
 } from "@/service/paymentService";
-import { listSubscriptions, type Subscription } from "@/service/subscriptionService";
 import { downloadPdfReport, type ReportColumn } from "@/utils/reportExport";
+import { WalkInProductSaleDialog } from "@/components/WalkInProductSaleDialog";
 
 type OpenCashSession = {
   openedAt: string;
@@ -172,6 +171,7 @@ function getCashPaymentDescription(payment: CashClosingPayment) {
     const description = getValidCashOutDescription(payment);
     return description ? `Saida: ${label} - ${description}` : `Saida: ${label}`;
   }
+  if (payment.type === "cash_in") return payment.description || "Entrada de caixa";
   if (payment.type === "subscription") return payment.subscriptionPlanName || "Assinatura";
   if (payment.type === "service_tab") return payment.description || "PAGAMENTO DE COMANDA";
   if (payment.type === "product_order") return payment.description || "Pedido de produtos";
@@ -226,11 +226,13 @@ function closingMatchesSearch(closing: CashClosing, search: string) {
 
 function getCashPaymentClientLabel(payment: CashClosingPayment) {
   if (payment.type === "cash_out") return "Saida de caixa";
+  if (payment.type === "cash_in") return "Entrada de caixa";
   return payment.clientName || "Cliente nao informado";
 }
 
 function getCashPaymentTypeLabel(payment: CashClosingPayment) {
   if (payment.type === "cash_out") return "Saida";
+  if (payment.type === "cash_in") return "Entrada";
   if (payment.type === "subscription") return "Assinatura";
   if (payment.type === "service_tab") return "Comanda";
   if (payment.type === "product_order") return "Pedido de produto";
@@ -245,6 +247,7 @@ function getCashPaymentCategoryLabel(payment: CashClosingPayment) {
 
 function getCashPaymentDetailLabel(payment: CashClosingPayment) {
   if (payment.type === "cash_out") return getValidCashOutDescription(payment) || "-";
+  if (payment.type === "cash_in") return payment.description || "Saldo inicial do caixa";
   if (payment.type === "subscription") return payment.subscriptionPlanName || "Assinatura";
   if (payment.type === "service_tab") return payment.description || "PAGAMENTO DE COMANDA";
   if (payment.type === "product_order") return payment.description || "Pedido de produtos";
@@ -338,6 +341,7 @@ async function downloadCashClosingsPdf(closings: CashClosing[], selectedPeriodLa
     { header: "Tipo", getValue: ({ payment }) => payment ? getCashPaymentTypeLabel(payment) : "Fechamento", align: "center" },
     { header: "Categoria", getValue: ({ payment }) => payment ? getCashPaymentCategoryLabel(payment) : "-", align: "center" },
     { header: "Descricao", getValue: ({ closing, payment }) => payment ? getCashPaymentReportDescription(payment) : `Fechamento #${closing.id.slice(0, 8)}` },
+    { header: "Observacao", getValue: ({ payment }) => payment?.adjustmentNote || "-" },
     { header: "Forma", getValue: ({ closing, payment }) => payment ? methodLabels[payment.method] || payment.method : getClosingMethodsLabel(closing), align: "center" },
     { header: "Status", getValue: ({ payment }) => payment?.status || "fechado", align: "center" },
     { header: "Valor", getValue: ({ closing, payment }) => formatCurrency(payment?.amount ?? closing.totalAmount), align: "right" },
@@ -382,6 +386,7 @@ function downloadCashClosingsCsv(closings: CashClosing[]) {
     "Tipo",
     "Categoria",
     "Descricao",
+    "Observacao",
     "Valor",
     "Metodo",
     "Status",
@@ -403,6 +408,7 @@ function downloadCashClosingsCsv(closings: CashClosing[]) {
       payment ? getCashPaymentTypeLabel(payment) : "Fechamento",
       payment ? getCashPaymentCategoryLabel(payment) : "-",
       payment ? getCashPaymentReportDescription(payment) : `Fechamento #${closing.id.slice(0, 8)}`,
+      payment?.adjustmentNote || "",
       String(payment?.amount ?? closing.totalAmount).replace(".", ","),
       payment ? methodLabels[payment.method] || payment.method : getClosingMethodsLabel(closing),
       payment?.status || "fechado",
@@ -455,18 +461,10 @@ export function CashClosingPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [openCashPage, setOpenCashPage] = useState(1);
-  const [manualPaymentOpen, setManualPaymentOpen] = useState(false);
-  const [subscriptionSearch, setSubscriptionSearch] = useState("");
-  const [subscriptionOptions, setSubscriptionOptions] = useState<Subscription[]>([]);
-  const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
-  const [selectedSubscriptionId, setSelectedSubscriptionId] = useState("");
-  const [selectedSubscriptionLabel, setSelectedSubscriptionLabel] = useState("");
-  const [manualPaymentAmount, setManualPaymentAmount] = useState("");
-  const [manualPaymentMethod, setManualPaymentMethod] =
-    useState<Exclude<PaymentMethod, "subscription">>("dinheiro");
-  const [manualPaidAt, setManualPaidAt] = useState(() => toDateTimeLocalValue(new Date()));
-  const [savingManualPayment, setSavingManualPayment] = useState(false);
+  const [openingCashOpen, setOpeningCashOpen] = useState(false);
+  const [openingBalance, setOpeningBalance] = useState("");
   const [cashOutOpen, setCashOutOpen] = useState(false);
+  const [walkInSaleOpen, setWalkInSaleOpen] = useState(false);
   const [cashOutCategory, setCashOutCategory] = useState<CashOutCategory>("products");
   const [cashOutAmount, setCashOutAmount] = useState("");
   const [cashOutMethod, setCashOutMethod] = useState<Exclude<PaymentMethod, "subscription">>("dinheiro");
@@ -536,34 +534,6 @@ export function CashClosingPage() {
     };
   }, []);
 
-  const loadSubscriptionOptions = useCallback(async () => {
-    setLoadingSubscriptions(true);
-    try {
-      const result = await listSubscriptions({
-        search: subscriptionSearch.trim() || undefined,
-        searchType: "name",
-        page: 1,
-        limit: 50,
-      });
-      setSubscriptionOptions(result.items);
-    } catch (err) {
-      setSubscriptionOptions([]);
-      toast.error(getApiMessage(err));
-    } finally {
-      setLoadingSubscriptions(false);
-    }
-  }, [subscriptionSearch]);
-
-  useEffect(() => {
-    if (!manualPaymentOpen) return;
-
-    const timeout = window.setTimeout(() => {
-      void loadSubscriptionOptions();
-    }, 250);
-
-    return () => window.clearTimeout(timeout);
-  }, [manualPaymentOpen, subscriptionSearch, loadSubscriptionOptions]);
-
   useEffect(() => {
     setPage(1);
   }, [reportStartDate, reportEndDate, search]);
@@ -595,9 +565,14 @@ export function CashClosingPage() {
   const cashIsOpen = Boolean(openCashSession);
 
   async function handleOpenCash() {
+    const amount = Number(String(openingBalance || "0").replace(",", "."));
+    if (!Number.isFinite(amount) || amount < 0) {
+      toast.error("Informe um saldo inicial valido.");
+      return;
+    }
     setClosingCash(true);
     try {
-      const preview = await openCashRegister();
+      const preview = await openCashRegister(amount);
       setCashPreview(preview);
       setOpenCashSession(preview.openedAt ? {
         openedAt: preview.openedAt,
@@ -605,6 +580,8 @@ export function CashClosingPage() {
         openedByName: preview.openedByName || user?.name || "Usuario nao identificado",
       } : null);
       toast.success("Caixa aberto com sucesso.");
+      setOpeningCashOpen(false);
+      setOpeningBalance("");
     } catch (err) {
       toast.error(getApiMessage(err));
     } finally {
@@ -628,7 +605,7 @@ export function CashClosingPage() {
 
   async function handleCashAction() {
     if (!cashIsOpen) {
-      await handleOpenCash();
+      setOpeningCashOpen(true);
       return;
     }
 
@@ -672,67 +649,6 @@ export function CashClosingPage() {
       toast.error(getApiMessage(err));
     } finally {
       setExportingCsv(false);
-    }
-  }
-
-  function handleSelectSubscription(subscriptionId: string) {
-    setSelectedSubscriptionId(subscriptionId);
-    const selected = subscriptionOptions.find((subscription) => subscription.id === subscriptionId);
-    if (selected) {
-      if (selected.hasPagarmeSubscription) {
-        toast.error("Esta assinatura possui recorrencia no Pagar.me. Cancele ou altere a recorrencia antes de registrar pagamento presencial.");
-        setSelectedSubscriptionId("");
-        setSelectedSubscriptionLabel("");
-        setManualPaymentAmount("");
-        return;
-      }
-
-      setSelectedSubscriptionLabel(
-        `${selected.user?.name || "Cliente"} - ${selected.plan?.name || "Plano"}`
-      );
-      setSubscriptionSearch(selected.user?.name || "");
-      setManualPaymentAmount(String(selected.amount || selected.plan?.price || ""));
-    }
-  }
-
-  async function handleRegisterManualSubscriptionPayment() {
-    if (!cashIsOpen) {
-      toast.error("Abra o caixa antes de registrar pagamentos.");
-      return;
-    }
-
-    if (!selectedSubscriptionId) {
-      toast.error("Selecione uma assinatura.");
-      return;
-    }
-
-    const amount = Number(String(manualPaymentAmount).replace(",", "."));
-    if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error("Informe um valor valido.");
-      return;
-    }
-
-    setSavingManualPayment(true);
-    try {
-      await createManualSubscriptionPayment({
-        subscriptionId: selectedSubscriptionId,
-        amount,
-        method: manualPaymentMethod,
-        paidAt: manualPaidAt ? new Date(manualPaidAt).toISOString() : undefined,
-      });
-      toast.success("Pagamento de assinatura registrado.");
-      setManualPaymentOpen(false);
-      setSelectedSubscriptionId("");
-      setSelectedSubscriptionLabel("");
-      setManualPaymentAmount("");
-      setSubscriptionSearch("");
-      setManualPaymentMethod("dinheiro");
-      setManualPaidAt(toDateTimeLocalValue(new Date()));
-      await loadCashClosings();
-    } catch (err) {
-      toast.error(getApiMessage(err));
-    } finally {
-      setSavingManualPayment(false);
     }
   }
 
@@ -822,6 +738,7 @@ export function CashClosingPage() {
             ) : null}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+            {/* Assinatura removida do fluxo de fechamento de caixa.
             <Button
               variant="outline"
               onClick={() => setManualPaymentOpen(true)}
@@ -830,6 +747,15 @@ export function CashClosingPage() {
             >
               <CreditCard size={14} />
               Registrar assinatura
+            </Button> */}
+            <Button
+              variant="outline"
+              onClick={() => setWalkInSaleOpen(true)}
+              disabled={!cashIsOpen || loading}
+              className="gap-2"
+            >
+              <ShoppingBag size={14} />
+              Venda avulsa
             </Button>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="space-y-1">
@@ -988,6 +914,11 @@ export function CashClosingPage() {
                           <p className="text-xs text-muted-foreground">
                             {getCashPaymentClientLabel(payment)}
                           </p>
+                          {payment.adjustmentNote ? (
+                            <p className="mt-1 max-w-md text-xs text-amber-700 dark:text-amber-300" title={payment.adjustmentNote}>
+                              Observacao: {payment.adjustmentNote}
+                            </p>
+                          ) : null}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm text-muted-foreground">
                           {methodLabels[payment.method] || payment.method}
@@ -1171,6 +1102,40 @@ export function CashClosingPage() {
         </div>
       </div>
 
+      <Dialog open={openingCashOpen} onOpenChange={setOpeningCashOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Entrada de caixa</DialogTitle>
+            <DialogDescription>
+              Informe o saldo positivo usado para iniciar o caixa, como um investimento pessoal.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="opening-balance">Saldo inicial</Label>
+            <Input
+              id="opening-balance"
+              type="number"
+              min="0"
+              step="0.01"
+              value={openingBalance}
+              onChange={(event) => setOpeningBalance(event.target.value)}
+              placeholder="0,00"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpeningCashOpen(false)} disabled={closingCash}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={handleOpenCash} disabled={closingCash} className="gap-2">
+              {closingCash ? <Loader2 className="h-4 w-4 animate-spin" /> : <BanknoteArrowUp size={14} />}
+              Abrir com entrada
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* O registro manual de assinatura nao pertence mais a esta tela.
       <Dialog open={manualPaymentOpen} onOpenChange={setManualPaymentOpen}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
@@ -1313,7 +1278,9 @@ export function CashClosingPage() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
+
+      <WalkInProductSaleDialog open={walkInSaleOpen} onOpenChange={setWalkInSaleOpen} onSuccess={loadCashClosings} />
 
       <Dialog open={cashOutOpen} onOpenChange={setCashOutOpen}>
         <DialogContent className="sm:max-w-xl">

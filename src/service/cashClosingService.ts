@@ -15,8 +15,9 @@ export interface CashClosingPayment {
   appointmentStartAt?: string | null;
   subscriptionPlanName?: string | null;
   description?: string | null;
+  adjustmentNote?: string | null;
   cashOutCategory?: "products" | "employees" | "refunds" | "other" | string | null;
-  type: "appointment" | "subscription" | "product_order" | "service_tab" | "extra" | "cash_out";
+  type: "appointment" | "subscription" | "product_order" | "service_tab" | "extra" | "cash_in" | "cash_out";
 }
 
 export interface CashClosingSummary {
@@ -32,8 +33,8 @@ export interface CashClosingSummary {
   openedByName?: string | null;
 }
 
-export async function openCashRegister() {
-  const response = await api.post<CashClosingSummary>("/cashClosings/open");
+export async function openCashRegister(openingBalance: number) {
+  const response = await api.post<CashClosingSummary>("/cashClosings/open", { openingBalance });
   return response.data;
 }
 
