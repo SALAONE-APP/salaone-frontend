@@ -174,6 +174,7 @@ export function ProfessionalBookingsPage() {
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
+  const [dateFilter, setDateFilter] = useState(() => dateToDateString(new Date()));
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -198,6 +199,8 @@ export function ProfessionalBookingsPage() {
           professionalId: canManage ? undefined : professionalId,
           allAppointments: true,
           status: statusFilter === "all" ? undefined : statusFilter,
+          dateFrom: dateFilter,
+          dateTo: dateFilter,
           page,
           limit,
         });
@@ -212,7 +215,7 @@ export function ProfessionalBookingsPage() {
         if (showLoading) setLoading(false);
       }
     },
-    [canManage, page, statusFilter],
+    [canManage, dateFilter, page, statusFilter],
   );
 
   useEffect(() => {
@@ -454,11 +457,9 @@ export function ProfessionalBookingsPage() {
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
           <h3 className="text-base font-medium text-foreground">
-            {statusFilter === "active"
-              ? "Meus Agendamentos Ativos"
-              : statusFilter === "all"
-                ? "Todos Meus Agendamentos"
-                : `Agendamentos — ${statusLabels[statusFilter as AppointmentStatus] ?? statusFilter}`}
+            {dateFilter === dateToDateString(new Date())
+              ? "Agendamentos de hoje"
+              : "Agendamentos da data selecionada"}
           </h3>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative">
@@ -469,6 +470,31 @@ export function ProfessionalBookingsPage() {
                 placeholder="Buscar..."
                 className="h-9 w-full bg-secondary pl-9 text-sm sm:w-56"
               />
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={dateFilter}
+                onChange={(event) => {
+                  setDateFilter(event.target.value || dateToDateString(new Date()));
+                  setPage(1);
+                }}
+                aria-label="Filtrar agendamentos por data"
+                className="h-9 w-full bg-secondary text-sm sm:w-40"
+              />
+              {dateFilter !== dateToDateString(new Date()) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setDateFilter(dateToDateString(new Date()));
+                    setPage(1);
+                  }}
+                >
+                  Hoje
+                </Button>
+              )}
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
