@@ -1,8 +1,11 @@
 import api from "./api";
 
 const PAGARME_PUBLIC_KEY = import.meta.env.VITE_PAGARME_PUBLIC_KEY as string;
+const DEFAULT_PAGARME_BASE_URL = import.meta.env.MODE === "production"
+  ? "https://api.pagar.me/core/v5"
+  : "https://sdx-api.pagar.me/core/v5";
 const PAGARME_BASE_URL = String(
-  import.meta.env.VITE_PAGARME_BASE_URL || "https://api.pagar.me/core/v5",
+  import.meta.env.VITE_PAGARME_BASE_URL || DEFAULT_PAGARME_BASE_URL,
 ).replace(/\/+$/, "");
 
 function onlyNumbers(value: unknown): string {

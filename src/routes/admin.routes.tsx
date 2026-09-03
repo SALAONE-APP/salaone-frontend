@@ -15,6 +15,8 @@ import { ClientRecordsPage } from "../pages/shared/ClientRecordsPage";
 import { HelpCenterPage } from "../pages/shared/HelpCenterPage";
 import { OverviewPage } from "../pages/shared/OverviewPage";
 import { PaymentsPage } from "../pages/shared/PaymentsPage";
+import { RelationshipDashboardPage } from "../pages/shared/RelationshipDashboardPage";
+import { RelationshipKanbanPage } from "../pages/shared/RelationshipKanbanPage";
 import { ReviewsPage } from "../pages/shared/ReviewsPage";
 import { SchedulesPage } from "../pages/shared/SchedulesPage";
 import { ServicesPage } from "../pages/shared/ServicesPage";
@@ -151,6 +153,18 @@ export const adminRoutes: AppRoute[] = [
     title: "Promocoes",
     breadcrumbs: ["Marketing", "Promocoes"],
     Component: PromotionsPage,
+  },
+  {
+    path: "/relationship-kanban",
+    title: "Kanban",
+    breadcrumbs: ["Relacionamento", "Kanban"],
+    Component: RelationshipKanbanPage,
+  },
+  {
+    path: "/relationship-dashboard",
+    title: "Dashboard",
+    breadcrumbs: ["Relacionamento", "Dashboard"],
+    Component: RelationshipDashboardPage,
   },
   {
     path: "/reviews",

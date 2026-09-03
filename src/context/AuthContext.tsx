@@ -15,6 +15,7 @@ export interface User {
   cpf?: string | null;
   birthDate?: string | null;
   birth_date?: string | null;
+  salonUserId?: string | null;
 }
 
 export interface AuthContextData {

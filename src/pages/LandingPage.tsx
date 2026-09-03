@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import salaOneLogo from "../assets/image/logo-icone-salaone.jpeg";
 import api from "../service/api";
+import { createPagarmeCardToken } from "../service/pagarmeService";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,8 +61,8 @@ interface RegisterResult {
 
 async function apiFetchPlans(): Promise<Plan[]> {
   const { data } = await api.get<{ items: Plan[] } | Plan[]>("/public/platform-plans");
-  if (Array.isArray(data)) return data as Plan[];
-  if (Array.isArray((data as any)?.items)) return (data as any).items as Plan[];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.items)) return data.items;
   return [];
 }
 
@@ -83,44 +84,6 @@ async function apiRegister(form: RegForm, planId: string): Promise<RegisterResul
   localStorage.setItem("user", JSON.stringify(data.user));
   localStorage.setItem("salon", JSON.stringify(data.salon));
   return data;
-}
-
-async function apiTokenizeCard(card: CardForm): Promise<string> {
-  const appId = import.meta.env.VITE_PAGARME_PUBLIC_KEY;
-  const baseUrl = import.meta.env.VITE_PAGARME_BASE_URL;
-  const digits = card.number.replace(/\s/g, "");
-  const month = Number(card.expMonth);
-  const year = Number(card.expYear);
-  const currentYear = new Date().getFullYear();
-
-  if (digits.length < 13) throw new Error("Número do cartão inválido.");
-  if (!card.holderName.trim()) throw new Error("Informe o nome do titular.");
-  if (month < 1 || month > 12) throw new Error("Mês de validade inválido.");
-  if (year < currentYear) throw new Error("Cartão vencido. Verifique a validade.");
-  if (card.cvv.length < 3) throw new Error("CVV inválido.");
-
-  const res = await fetch(`${baseUrl}/tokens?appId=${appId}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      type: "card",
-      card: {
-        number: digits,
-        holder_name: card.holderName,
-        holder_document: card.document.replace(/\D/g, ""),
-        exp_month: month,
-        exp_year: year,
-        cvv: card.cvv,
-        billing_address: { line_1: "Não informado", zip_code: "00000000", city: "Não informado", state: "SP", country: "BR" },
-      },
-    }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as any)?.message ?? "Erro ao processar cartão. Verifique os dados.");
-  }
-  const json = await res.json();
-  return json.id as string;
 }
 
 async function apiSubscribe(
@@ -273,10 +236,11 @@ function RegisterModal({ plan, onClose, onRegistered }: {
       setSubmitting(true);
       const result = await apiRegister(form, plan.id);
       onRegistered(result);
-    } catch (err: any) {
-      const apiErrors = err?.response?.data;
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: string[] | { message?: string } } };
+      const apiErrors = error.response?.data;
       if (Array.isArray(apiErrors) && apiErrors.length > 0) setFormError(apiErrors[0]);
-      else if (err?.response?.data?.message) setFormError(err.response.data.message);
+      else if (apiErrors && !Array.isArray(apiErrors) && apiErrors.message) setFormError(apiErrors.message);
       else setFormError("Não foi possível concluir o cadastro. Tente novamente.");
     } finally {
       setSubmitting(false);
@@ -419,7 +383,7 @@ function SubscriptionPaymentModal({ plan, customerName, customerEmail, onClose, 
 
     try {
       setLoading(true);
-      const cardToken = await apiTokenizeCard(card);
+      const cardToken = await createPagarmeCardToken({ ...card, installments: 1 });
       await apiSubscribe(plan.id, cardToken, plan.price, {
         name: customerName,
         email: customerEmail,
@@ -427,8 +391,9 @@ function SubscriptionPaymentModal({ plan, customerName, customerEmail, onClose, 
         phone: card.phone.replace(/\D/g, ""),
       });
       setSuccess(true);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Não foi possível processar o pagamento. Verifique os dados e tente novamente.");
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string; error?: string } }; message?: string };
+      setError(error.response?.data?.message || error.response?.data?.error || error.message || "Não foi possível processar o pagamento. Verifique os dados e tente novamente.");
     } finally {
       setLoading(false);
     }

@@ -4,10 +4,12 @@ import { toast } from "sonner";
 
 import {
   getPlatformPlans,
+  syncPlatformPlanIds,
   createPlatformPlan,
   updatePlatformPlan,
   deletePlatformPlan,
   type PlatformPlan,
+  type PlatformPlanSyncConflict,
 } from "@/service/superAdminService";
 
 function fmtCurrency(value?: number | null) {
@@ -72,16 +74,29 @@ export function SuperAdminPlansPage() {
   const [editForm, setEditForm] = useState<PlanForm>({ ...EMPTY_FORM });
   const [savingPlanId, setSavingPlanId] = useState<string | null>(null);
   const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncConflicts, setSyncConflicts] = useState<Record<string, PlatformPlanSyncConflict>>({});
 
-  const loadPlans = useCallback(async () => {
+  const loadPlans = useCallback(async (syncRemote = false) => {
+    if (syncRemote) {
+      try {
+        const result = await syncPlatformPlanIds();
+        setPlans(result.items);
+        setSyncConflicts(Object.fromEntries(result.conflicts.map((conflict) => [conflict.localPlanId, conflict])));
+        return result;
+      } catch {
+        // A indisponibilidade do Pagar.me nao deve impedir a listagem dos planos locais.
+      }
+    }
     const data = await getPlatformPlans();
     setPlans(data);
+    return null;
   }, []);
 
   useEffect(() => {
     void (async () => {
       setLoading(true);
-      try { await loadPlans(); } catch { toast.error("Nao foi possivel carregar os planos."); } finally { setLoading(false); }
+      try { await loadPlans(true); } catch { toast.error("Nao foi possivel carregar os planos."); } finally { setLoading(false); }
     })();
   }, [loadPlans]);
 
@@ -104,13 +119,32 @@ export function SuperAdminPlansPage() {
         isPublic: form.isPublic, isRecommended: form.isRecommended,
         sortOrder: Number(form.sortOrder || 0), syncPagarme: form.syncPagarme,
       });
-      const msg = result?.pagarmeSkipped
-        ? "Plano salvo no banco. PAGARME_SECRET_KEY nao configurada."
-        : form.syncPagarme ? "Plano criado no Pagar.me e salvo." : "Plano salvo (sem Pagar.me).";
+      const pagarmePlanId = result.pagarmePlanId || result.pagarme_plan_id;
+      const msg = form.syncPagarme && pagarmePlanId
+        ? "Plano criado no Pagar.me e salvo."
+        : "Plano salvo (sem Pagar.me).";
       toast.success(msg);
       setForm({ ...EMPTY_FORM });
       await loadPlans();
     } catch { toast.error("Nao foi possivel criar o plano."); } finally { setCreating(false); }
+  };
+
+  const handleSyncPlanIds = async () => {
+    setSyncing(true);
+    try {
+      const result = await loadPlans(true);
+      if (!result) {
+        toast.error("Nao foi possivel consultar os planos no Pagar.me.");
+      } else if (result.conflicts.length > 0) {
+        toast.warning(`${result.conflicts.length} plano(s) possuem valor ou periodicidade divergente no Pagar.me.`);
+      } else if (result.linked.length > 0) {
+        toast.success(`${result.linked.length} ID(s) do Pagar.me vinculado(s).`);
+      } else {
+        toast.success("IDs do Pagar.me ja estao sincronizados.");
+      }
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const openEditPlan = (plan: PlatformPlan) => {
@@ -197,9 +231,16 @@ export function SuperAdminPlansPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-base font-semibold text-foreground">Planos da Plataforma</h3>
-        <p className="text-sm text-muted-foreground">Crie os planos recorrentes no Pagar.me e publique na landing page.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold text-foreground">Planos da Plataforma</h3>
+          <p className="text-sm text-muted-foreground">Crie os planos recorrentes no Pagar.me e publique na landing page.</p>
+        </div>
+        <button type="button" onClick={() => void handleSyncPlanIds()} disabled={loading || syncing}
+          className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-secondary disabled:opacity-50">
+          {syncing && <Loader2 size={15} className="animate-spin" />}
+          Sincronizar IDs
+        </button>
       </div>
 
       {/* Formulario */}
@@ -291,7 +332,8 @@ export function SuperAdminPlansPage() {
                 const isPublic = Boolean(plan.isPublic ?? plan.is_public);
                 const isActive = plan.active !== false;
                 const isBusy = savingPlanId === plan.id || deletingPlanId === plan.id;
-                const pid = plan.pagarmePlanId || plan.pagarme_plan_id;
+                const conflict = syncConflicts[plan.id];
+                const pid = plan.pagarmePlanId || plan.pagarme_plan_id || conflict?.remotePlanId;
                 return (
                   <tr key={plan.id} className="border-b border-border last:border-0 hover:bg-secondary/30">
                     <td className="px-5 py-3">
@@ -300,7 +342,10 @@ export function SuperAdminPlansPage() {
                     </td>
                     <td className="px-5 py-3 text-muted-foreground">{fmtInterval(plan.interval, plan.intervalCount ?? plan.interval_count)}</td>
                     <td className="px-5 py-3 font-medium text-foreground">{fmtCurrency(plan.price)}</td>
-                    <td className="px-5 py-3"><span className="font-mono text-xs text-muted-foreground">{pid || "-"}</span></td>
+                    <td className="px-5 py-3">
+                      <span className={`block font-mono text-xs ${conflict ? "text-amber-600" : "text-muted-foreground"}`} title={conflict?.reason}>{pid || "-"}</span>
+                      {conflict && <small className="text-amber-600">Configuracao divergente</small>}
+                    </td>
                     <td className="px-5 py-3">
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${isPublic ? "bg-emerald-500/10 text-emerald-600" : "bg-secondary text-muted-foreground"}`}>
                         {isPublic ? "Publicado" : "Oculto"}

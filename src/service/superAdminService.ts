@@ -458,6 +458,24 @@ export async function getPlatformPlans(): Promise<PlatformPlan[]> {
   return [];
 }
 
+export interface PlatformPlanSyncConflict {
+  localPlanId: string;
+  localPlanName: string;
+  remotePlanId: string;
+  reason: string;
+}
+
+export interface PlatformPlanSyncResult {
+  items: PlatformPlan[];
+  linked: Array<{ localPlanId: string; remotePlanId: string }>;
+  conflicts: PlatformPlanSyncConflict[];
+}
+
+export async function syncPlatformPlanIds(): Promise<PlatformPlanSyncResult> {
+  const response = await api.post<PlatformPlanSyncResult>("/platform-plans/sync");
+  return response.data;
+}
+
 export async function createPlatformPlan(payload: {
   name: string;
   description?: string | null;
