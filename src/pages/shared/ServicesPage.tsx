@@ -80,6 +80,7 @@ type ServiceFilter = "all" | "active" | "inactive";
 
 interface ServiceFormState {
   name: string;
+  category: string;
   description: string;
   basePrice: string;
   durationMinutes: string;
@@ -93,6 +94,7 @@ interface ServiceFormState {
 
 const emptyForm: ServiceFormState = {
   name: "",
+  category: "",
   description: "",
   basePrice: "",
   durationMinutes: "30",
@@ -147,6 +149,7 @@ function getCommission(service: Service) {
 function serviceToForm(service: Service): ServiceFormState {
   return {
     name: service.name ?? "",
+    category: service.category ?? "",
     description: service.description ?? "",
     basePrice: String(service.basePrice ?? ""),
     durationMinutes: String(service.durationMinutes ?? 30),
@@ -198,7 +201,15 @@ export function ServicesPage() {
     });
   }, [filter, services]);
 
-
+  const distinctCategories = useMemo(() => {
+    return Array.from(
+      new Set(
+        services
+          .map((service) => service.category?.trim())
+          .filter((category): category is string => Boolean(category)),
+      ),
+    ).sort((a, b) => a.localeCompare(b));
+  }, [services]);
 
   const stats = useMemo(() => {
     const active = services.filter((service) => service.active).length;
@@ -329,6 +340,7 @@ export function ServicesPage() {
 
     const payload = {
       name: form.name.trim(),
+      category: form.category.trim() || null,
       description: form.description.trim() || null,
       basePrice: parseCurrencyInput(form.basePrice),
       durationMinutes: Number(form.durationMinutes),
@@ -687,6 +699,21 @@ export function ServicesPage() {
                   placeholder="Ex: Corte degradê"
                   required
                 />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="service-category">Categoria</Label>
+                <Input
+                  id="service-category"
+                  list="service-category-options"
+                  value={form.category}
+                  onChange={(event) => setField("category", event.target.value)}
+                  placeholder="Ex: Cílios, Mecha e Coloração"
+                />
+                <datalist id="service-category-options">
+                  {distinctCategories.map((category) => (
+                    <option key={category} value={category} />
+                  ))}
+                </datalist>
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="service-description">Descricao</Label>
