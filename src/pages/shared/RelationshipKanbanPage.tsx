@@ -14,9 +14,11 @@ import {
   UserCog,
   UserRound,
   Wallet,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { RelationshipAutomationDialog } from "@/components/RelationshipAutomationDialog";
 import { RelationshipCardDetailDialog } from "@/components/RelationshipCardDetailDialog";
 import { RelationshipCreateCardDialog } from "@/components/RelationshipCreateCardDialog";
 import { RelationshipPipelineManagerDialog } from "@/components/RelationshipPipelineManagerDialog";
@@ -75,6 +77,7 @@ export function RelationshipKanbanPage() {
   const [pipelinesLoading, setPipelinesLoading] = useState(true);
   const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
   const [managerOpen, setManagerOpen] = useState(false);
+  const [automationOpen, setAutomationOpen] = useState(false);
 
   const [cards, setCards] = useState<RelationshipCard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -360,6 +363,9 @@ export function RelationshipKanbanPage() {
           <Button variant="ghost" size="icon" className="h-9 w-9" title="Gerenciar pipelines" onClick={() => setManagerOpen(true)}>
             <Settings2 size={16} />
           </Button>
+          <Button variant="ghost" size="icon" className="h-9 w-9" title="Automação pós-atendimento" onClick={() => setAutomationOpen(true)}>
+            <Zap size={16} />
+          </Button>
           <Button size="sm" className="gap-2" onClick={() => setCreateOpen(true)} disabled={!activePipelineId}>
             <Plus size={14} />
             Novo card
@@ -636,6 +642,11 @@ export function RelationshipKanbanPage() {
         activePipelineId={activePipelineId}
         cardsInActivePipeline={cards}
         onChanged={() => void loadPipelines()}
+      />
+      <RelationshipAutomationDialog
+        open={automationOpen}
+        onClose={() => setAutomationOpen(false)}
+        pipelines={pipelines}
       />
     </div>
   );

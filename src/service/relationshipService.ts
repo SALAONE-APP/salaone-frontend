@@ -65,6 +65,12 @@ export const PIPELINE_TEMPLATES: RelationshipPipelineTemplate[] = [
     stages: DEFAULT_STAGE_TEMPLATE,
   },
   {
+    id: "pos_atendimento_generico",
+    name: "Pós Atendimento",
+    description: "Fluxo genérico de pós-venda para qualquer serviço concluído, sem categoria mapeada.",
+    stages: DEFAULT_STAGE_TEMPLATE,
+  },
+  {
     id: "pos_mecha_coloracao",
     name: "Pós Mecha / Coloração",
     description: "Acompanhamento até o retorno de manutenção (retoque de raiz).",
@@ -287,6 +293,27 @@ export async function updateRelationshipPipeline(
 
 export async function deleteRelationshipPipeline(id: string) {
   await api.delete(`/relationship/pipelines/${id}`);
+}
+
+export interface PostServiceAutomationConfig {
+  enabled: boolean;
+  genericPipelineId: string | null;
+  categoryPipelines: Record<string, string>;
+}
+
+export async function getPostServiceAutomation() {
+  const response = await api.get<{ automation: PostServiceAutomationConfig }>(
+    "/relationship/automation/post-service",
+  );
+  return response.data.automation;
+}
+
+export async function savePostServiceAutomation(data: PostServiceAutomationConfig) {
+  const response = await api.put<{ automation: PostServiceAutomationConfig }>(
+    "/relationship/automation/post-service",
+    data,
+  );
+  return response.data.automation;
 }
 
 export interface RelationshipDashboardFunnelStage {
