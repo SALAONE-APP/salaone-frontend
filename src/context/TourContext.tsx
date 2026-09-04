@@ -131,7 +131,17 @@ export function RelationshipTourProvider({ children }: { children: ReactNode }) 
         if (!el) {
           console.warn(`[relationship-tour] selector not found for step "${step.id}": ${step.selector}`);
         } else {
-          el.scrollIntoView({ block: "center", behavior: "smooth" });
+          el.scrollIntoView({ block: "center", behavior: "instant" });
+          // Diálogos abrem com animação (~200ms, zoom-in/fade do Tailwind).
+          // waitForSelector resolve assim que o elemento entra no DOM, mas
+          // isso é ANTES da animação terminar - o reactour mede a posição
+          // pra desenhar o destaque assim que currentStep muda logo abaixo,
+          // e se medir durante a animação, o destaque fica desenhado na
+          // posição/tamanho errado (fixo depois, quando o diálogo já
+          // terminou de animar, sem nunca remedir). Esperar a animação
+          // assentar antes de trocar o passo evita isso.
+          await new Promise((resolve) => setTimeout(resolve, 260));
+          if (runId !== runIdRef.current) return;
         }
         setCurrentStep(targetIndex);
       } finally {
@@ -162,8 +172,19 @@ export function RelationshipTourProvider({ children }: { children: ReactNode }) 
           é no-op de propósito), e esse rect às vezes intercepta cliques nos
           próprios botões do painel do tour quando há um diálogo real aberto
           por baixo. Como não precisamos de clique na máscara, desligar
-          pointer-events nela resolve sem tocar em nada da biblioteca. */}
-      <style>{`.reactour__mask, .reactour__mask * { pointer-events: none !important; }`}</style>
+          pointer-events nela resolve sem tocar em nada da biblioteca.
+          O balão padrão do reactour (.reactour__popover) continua sendo
+          criado pela própria biblioteca mesmo com ContentComponent custom -
+          só que agora fica sem conteúdo nenhum, já que o TourStepPanel
+          renderiza tudo via portal direto no body. Sem isso, sobra uma
+          caixinha branca vazia flutuando na tela, sem função. Não dá pra
+          remover o nó do DOM (é interno da lib), mas visibility:hidden
+          apaga ela por completo sem quebrar o cálculo de posição interno
+          que a lib ainda faz em cima desse elemento. */}
+      <style>{`
+        .reactour__mask, .reactour__mask * { pointer-events: none !important; }
+        .reactour__popover { visibility: hidden !important; pointer-events: none !important; }
+      `}</style>
       <ReactourProvider
         steps={reactourSteps}
         currentStep={currentStep}
