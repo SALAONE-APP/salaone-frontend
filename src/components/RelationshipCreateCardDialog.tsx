@@ -8,15 +8,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { REASON_LABELS, createRelationshipCard, type RelationshipPipeline } from "@/service/relationshipService";
+import {
+  REASON_LABELS,
+  createRelationshipCard,
+  type RelationshipCard,
+  type RelationshipPipeline,
+} from "@/service/relationshipService";
 import { listUsers, type UserProfile } from "@/service/userService";
+import { useRelationshipTour } from "@/hooks/useRelationshipTour";
 
 interface Props {
   open: boolean;
   pipelines: RelationshipPipeline[];
   defaultPipelineId: string | null;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (card: RelationshipCard) => void;
 }
 
 function extractErrorMessage(error: unknown, fallback: string) {
@@ -25,6 +31,7 @@ function extractErrorMessage(error: unknown, fallback: string) {
 }
 
 export function RelationshipCreateCardDialog({ open, pipelines, defaultPipelineId, onClose, onCreated }: Props) {
+  const { isTourOpen } = useRelationshipTour();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [client, setClient] = useState<UserProfile | null>(null);
   const [primaryReason, setPrimaryReason] = useState("");
@@ -61,7 +68,7 @@ export function RelationshipCreateCardDialog({ open, pipelines, defaultPipelineI
     }
     setSubmitting(true);
     try {
-      await createRelationshipCard({
+      const card = await createRelationshipCard({
         clientId: client.id,
         pipelineId: pipelineId ?? undefined,
         primaryReason,
@@ -71,7 +78,7 @@ export function RelationshipCreateCardDialog({ open, pipelines, defaultPipelineI
         notes: notes.trim() || null,
       });
       toast.success("Card criado.");
-      onCreated();
+      onCreated(card);
       onClose();
     } catch (error) {
       toast.error(extractErrorMessage(error, "Não foi possível criar o card."));
@@ -83,7 +90,12 @@ export function RelationshipCreateCardDialog({ open, pipelines, defaultPipelineI
   return (
     <>
       <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-        <DialogContent className="flex max-h-[90vh] flex-col gap-4 overflow-y-auto sm:max-w-lg">
+        <DialogContent
+          className="flex max-h-[90vh] flex-col gap-4 overflow-y-auto sm:max-w-lg"
+          onInteractOutside={(event) => {
+            if (isTourOpen) event.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Novo card de relacionamento</DialogTitle>
           </DialogHeader>
@@ -101,7 +113,12 @@ export function RelationshipCreateCardDialog({ open, pipelines, defaultPipelineI
                 </Button>
               </div>
             ) : (
-              <Button variant="outline" className="mt-1.5 w-full" onClick={() => setPickerOpen(true)}>
+              <Button
+                variant="outline"
+                className="mt-1.5 w-full"
+                data-tour="create-dialog-cliente-btn"
+                onClick={() => setPickerOpen(true)}
+              >
                 Selecionar cliente
               </Button>
             )}
@@ -128,7 +145,7 @@ export function RelationshipCreateCardDialog({ open, pipelines, defaultPipelineI
           <div>
             <Label>Motivo principal</Label>
             <Select value={primaryReason} onValueChange={setPrimaryReason}>
-              <SelectTrigger className="mt-1.5">
+              <SelectTrigger className="mt-1.5" data-tour="create-dialog-motivo-select">
                 <SelectValue placeholder="Selecione o motivo" />
               </SelectTrigger>
               <SelectContent>
@@ -174,7 +191,12 @@ export function RelationshipCreateCardDialog({ open, pipelines, defaultPipelineI
             <Textarea className="mt-1.5 min-h-20" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
 
-          <Button onClick={handleSubmit} disabled={submitting} className="w-fit self-end">
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="w-fit self-end"
+            data-tour="create-dialog-submit-btn"
+          >
             {submitting ? "Criando..." : "Criar card"}
           </Button>
         </DialogContent>

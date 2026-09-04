@@ -161,9 +161,19 @@ function RelationshipFunnel({ stages }: { stages: RelationshipDashboardFunnelSta
   );
 }
 
-function Panel({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+function Panel({
+  title,
+  subtitle,
+  children,
+  dataTour,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+  dataTour?: string;
+}) {
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
+    <div className="rounded-xl border border-border bg-card p-5" data-tour={dataTour}>
       <h3 className="text-base font-medium text-foreground">{title}</h3>
       {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
       <div className="mt-4">{children}</div>
@@ -328,7 +338,11 @@ export function RelationshipDashboardPage() {
               </p>
             </Panel>
 
-            <Panel title="Motivos mais frequentes" subtitle="Por que os clientes entraram no relacionamento">
+            <Panel
+              title="Motivos mais frequentes"
+              subtitle="Por que os clientes entraram no relacionamento"
+              dataTour="dashboard-motivos-tendencia"
+            >
               {reasonsWithLabel.length === 0 ? (
                 <EmptyPanel message="Nenhum card criado no período." />
               ) : (
@@ -362,7 +376,11 @@ export function RelationshipDashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Panel title="Cards ativos por etapa" subtitle="Onde os casos em aberto estão parados agora, no funil do pipeline">
+            <Panel
+              title="Cards ativos por etapa"
+              subtitle="Onde os casos em aberto estão parados agora, no funil do pipeline"
+              dataTour="dashboard-funil"
+            >
               {dashboard.funnel.length === 0 ? (
                 <EmptyPanel message="Nenhum card ativo neste pipeline." />
               ) : (
@@ -370,7 +388,11 @@ export function RelationshipDashboardPage() {
               )}
             </Panel>
 
-            <Panel title="Precisa de atenção hoje" subtitle="Casos ativos que provavelmente estão parados na fila de alguém">
+            <Panel
+              title="Precisa de atenção hoje"
+              subtitle="Casos ativos que provavelmente estão parados na fila de alguém"
+              dataTour="dashboard-atencao"
+            >
               {(() => {
                 const items = [
                   {
