@@ -687,7 +687,7 @@ export function BookingsPage() {
     status: AppointmentStatus,
   ) {
     try {
-      await updateAppointment(appointment.id, { status });
+      const updated = await updateAppointment(appointment.id, { status });
       await loadAppointments();
       if (status === "confirmed") {
         toast.success("Agendamento confirmado.", {
@@ -704,15 +704,35 @@ export function BookingsPage() {
       } else {
         toast.success("Agendamento atualizado.");
       }
+      if (status === "completed" && updated?.relationshipCardCreated) {
+        toast.success("Pós-venda iniciado no CRM 🎉", {
+          action: {
+            label: "Conferir card",
+            onClick: () => navigate(
+              `/relationship-kanban?pipelineId=${updated.relationshipPipelineId}&cardId=${updated.relationshipCardId}`,
+            ),
+          },
+        });
+      }
     } catch (err) {
       toast.error(getApiMessage(err));
     }
   }
 
+  // Só por DIA, não por horário exato - um adiantamento (cliente chegou
+  // antes, serviço rolou e terminou mais cedo que o horário marcado, no
+  // mesmo dia) é legítimo e não deve ser bloqueado.
+  function appointmentDayNotArrived(appointment: Appointment) {
+    const saoPauloDate = (date: Date) => new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(date);
+    return saoPauloDate(new Date(appointment.startAt)) > saoPauloDate(new Date());
+  }
+
   function openCompletionDialog(appointment: Appointment) {
     const now = new Date();
-    if (new Date(appointment.startAt).getTime() > now.getTime()) {
-      toast.error("Este atendimento ainda não começou, não é possível finalizá-lo.");
+    if (appointmentDayNotArrived(appointment)) {
+      toast.error("O dia deste atendimento ainda não chegou, não é possível finalizá-lo.");
       return;
     }
     setCompletionAppointment(appointment);
@@ -738,8 +758,18 @@ export function BookingsPage() {
     }
     setCompleting(true);
     try {
-      await updateAppointment(completionAppointment.id, { status: "completed", completedAt: completedAt.toISOString() });
+      const updated = await updateAppointment(completionAppointment.id, { status: "completed", completedAt: completedAt.toISOString() });
       toast.success("Atendimento finalizado no horario informado.");
+      if (updated?.relationshipCardCreated) {
+        toast.success("Pós-venda iniciado no CRM 🎉", {
+          action: {
+            label: "Conferir card",
+            onClick: () => navigate(
+              `/relationship-kanban?pipelineId=${updated.relationshipPipelineId}&cardId=${updated.relationshipCardId}`,
+            ),
+          },
+        });
+      }
       setCompletionAppointment(null);
       await loadAppointments();
     } catch (err) {
@@ -1258,10 +1288,10 @@ export function BookingsPage() {
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuItem
-                                disabled={appointment.status === "completed" || new Date(appointment.startAt).getTime() > Date.now()}
+                                disabled={appointment.status === "completed" || appointmentDayNotArrived(appointment)}
                                 title={
-                                  new Date(appointment.startAt).getTime() > Date.now()
-                                    ? "Este atendimento ainda não começou"
+                                  appointmentDayNotArrived(appointment)
+                                    ? "O dia deste atendimento ainda não chegou"
                                     : undefined
                                 }
                                 onClick={() => user?.role === "admin"

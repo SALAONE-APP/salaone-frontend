@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowUpDown,
   Clock,
@@ -98,12 +98,22 @@ export function RelationshipKanbanPage() {
   const lastCreatedCardIdRef = useRef<string | null>(null);
   const hasAutoStartedRef = useRef(false);
   const cardsRef = useRef<RelationshipCard[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Atalho vindo do toast "Pós-venda iniciado no CRM" (ver BookingsPage.tsx)
+  // - só é consumido uma vez, no primeiro carregamento de pipelines.
+  const linkedPipelineIdRef = useRef(searchParams.get("pipelineId"));
+  const linkedCardIdRef = useRef(searchParams.get("cardId"));
 
   const loadPipelines = useCallback(async () => {
     try {
       const result = await listRelationshipPipelines();
       setPipelines(result);
       setActivePipelineId((current) => {
+        const linked = linkedPipelineIdRef.current;
+        if (linked && result.some((pipeline) => pipeline.id === linked)) {
+          linkedPipelineIdRef.current = null;
+          return linked;
+        }
         if (current && result.some((pipeline) => pipeline.id === current)) return current;
         return result.find((pipeline) => pipeline.isDefault)?.id ?? result[0]?.id ?? null;
       });
@@ -172,6 +182,18 @@ export function RelationshipKanbanPage() {
 
     return () => window.clearInterval(timer);
   }, [activePipelineId, load]);
+
+  // Consome o atalho de "cardId" da URL (vindo do toast de pós-atendimento)
+  // assim que o pipeline certo já está ativo - o diálogo de detalhe busca o
+  // card pelo id direto, não precisa esperar a lista carregar. Limpa os
+  // parâmetros da URL depois, pra um F5 não reabrir o mesmo card de novo.
+  useEffect(() => {
+    if (!linkedCardIdRef.current || !activePipelineId) return;
+    if (activePipelineId !== searchParams.get("pipelineId")) return;
+    setSelectedCardId(linkedCardIdRef.current);
+    linkedCardIdRef.current = null;
+    setSearchParams({}, { replace: true });
+  }, [activePipelineId, searchParams, setSearchParams]);
 
   const activePipeline = useMemo(
     () => pipelines.find((pipeline) => pipeline.id === activePipelineId) ?? null,
