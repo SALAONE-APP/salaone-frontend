@@ -73,6 +73,10 @@ export interface Appointment {
   commissionPercent?: number | null;
   createdAt?: string;
   updatedAt?: string;
+  // Só vem `true` na resposta do PATCH que finaliza o atendimento, quando a
+  // automação de pós-atendimento do CRM cria um card de verdade nesse
+  // momento (ver relationshipAutomationService.ts no backend).
+  relationshipCardCreated?: boolean;
 }
 
 export interface ListAppointmentsParams {
