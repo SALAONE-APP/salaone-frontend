@@ -1143,22 +1143,30 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
       schedule_line3: workingHoursForm.schedule_line3.trim(),
     };
 
-    if (
-      !trimmedAboutForm.about_title ||
-      !trimmedAboutForm.about_text1 ||
-      !trimmedAboutForm.about_text2 ||
-      !trimmedAboutForm.about_text3
-    ) {
-      toast.error('Preencha o titulo e os 3 paragrafos da secao Sobre Nos.');
+    // "Sobre Nos" e "Localizacao" sao conteudo do site publico, opcional -
+    // nao pode ser obrigatorio pra sempre (isso travava qualquer salvamento
+    // desta tela, incluindo horario de funcionamento, que nao tem nada a
+    // ver com essas secoes). So valida se a secao foi PARCIALMENTE
+    // preenchida, pra evitar salvar algo pela metade; totalmente em branco
+    // continua permitido (secao ainda nao configurada).
+    const aboutFields = [
+      trimmedAboutForm.about_title,
+      trimmedAboutForm.about_text1,
+      trimmedAboutForm.about_text2,
+      trimmedAboutForm.about_text3,
+    ];
+    if (aboutFields.some(Boolean) && !aboutFields.every(Boolean)) {
+      toast.error('Preencha o titulo e os 3 paragrafos da secao Sobre Nos, ou deixe todos em branco.');
       return;
     }
 
-    if (
-      !trimmedLocationForm.location_title ||
-      !trimmedLocationForm.location_address ||
-      !trimmedLocationForm.location_city
-    ) {
-      toast.error('Preencha titulo, endereco e cidade da secao Localizacao.');
+    const locationFields = [
+      trimmedLocationForm.location_title,
+      trimmedLocationForm.location_address,
+      trimmedLocationForm.location_city,
+    ];
+    if (locationFields.some(Boolean) && !locationFields.every(Boolean)) {
+      toast.error('Preencha titulo, endereco e cidade da secao Localizacao, ou deixe todos em branco.');
       return;
     }
 

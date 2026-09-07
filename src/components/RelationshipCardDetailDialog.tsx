@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
+import { useRelationshipTour } from "@/hooks/useRelationshipTour";
 import {
   CONTACT_TYPE_LABELS,
   EVENT_TYPE_LABELS,
@@ -68,6 +69,7 @@ function toDateTimeLocalInput(value: string | null) {
 
 export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onChanged }: Props) {
   const { user } = useAuth();
+  const { isTourOpen } = useRelationshipTour();
   const [card, setCard] = useState<RelationshipCard | null>(null);
   const [events, setEvents] = useState<RelationshipEvent[]>([]);
   const [loading, setLoading] = useState(false);
@@ -206,7 +208,12 @@ export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onCha
   return (
     <>
       <Dialog open={Boolean(cardId)} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="flex max-h-[90vh] flex-col gap-4 overflow-y-auto sm:max-w-2xl">
+        <DialogContent
+          className="flex max-h-[90vh] flex-col gap-4 overflow-y-auto sm:max-w-2xl"
+          onInteractOutside={(event) => {
+            if (isTourOpen) event.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {card ? (
@@ -305,7 +312,7 @@ export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onCha
                 <div>
                   <Label>Etapa</Label>
                   <Select value={stage} onValueChange={setStage}>
-                    <SelectTrigger className="mt-1.5">
+                    <SelectTrigger className="mt-1.5" data-tour="card-detail-etapa-select">
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
@@ -367,7 +374,7 @@ export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onCha
                 </Button>
               </div>
 
-              <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
+              <div className="flex flex-col gap-2 rounded-lg border border-border p-3" data-tour="card-detail-registrar-contato">
                 <Label>Registrar contato</Label>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <Select value={contactType} onValueChange={setContactType}>
@@ -400,7 +407,7 @@ export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onCha
                 </Button>
               </div>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2" data-tour="card-detail-historico">
                 <Label>Histórico</Label>
                 {events.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Nenhum evento registrado ainda.</p>

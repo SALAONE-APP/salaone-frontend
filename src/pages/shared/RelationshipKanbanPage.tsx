@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowUpDown,
   Clock,
   Filter,
+  HelpCircle,
   Loader2,
   MessageCircle,
   Plus,
@@ -22,6 +23,7 @@ import { RelationshipAutomationDialog } from "@/components/RelationshipAutomatio
 import { RelationshipCardDetailDialog } from "@/components/RelationshipCardDetailDialog";
 import { RelationshipCreateCardDialog } from "@/components/RelationshipCreateCardDialog";
 import { RelationshipPipelineManagerDialog } from "@/components/RelationshipPipelineManagerDialog";
+import { useRelationshipTour } from "@/hooks/useRelationshipTour";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -92,11 +94,26 @@ export function RelationshipKanbanPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [staffOptions, setStaffOptions] = useState<UserProfile[]>([]);
 
+  const { registerControls, unregisterControls, startTour, hasSeenTour } = useRelationshipTour();
+  const lastCreatedCardIdRef = useRef<string | null>(null);
+  const hasAutoStartedRef = useRef(false);
+  const cardsRef = useRef<RelationshipCard[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Atalho vindo do toast "Pós-venda iniciado no CRM" (ver BookingsPage.tsx)
+  // - só é consumido uma vez, no primeiro carregamento de pipelines.
+  const linkedPipelineIdRef = useRef(searchParams.get("pipelineId"));
+  const linkedCardIdRef = useRef(searchParams.get("cardId"));
+
   const loadPipelines = useCallback(async () => {
     try {
       const result = await listRelationshipPipelines();
       setPipelines(result);
       setActivePipelineId((current) => {
+        const linked = linkedPipelineIdRef.current;
+        if (linked && result.some((pipeline) => pipeline.id === linked)) {
+          linkedPipelineIdRef.current = null;
+          return linked;
+        }
         if (current && result.some((pipeline) => pipeline.id === current)) return current;
         return result.find((pipeline) => pipeline.isDefault)?.id ?? result[0]?.id ?? null;
       });
@@ -128,6 +145,34 @@ export function RelationshipKanbanPage() {
   }, [loadPipelines]);
 
   useEffect(() => {
+    cardsRef.current = cards;
+  }, [cards]);
+
+  useEffect(() => {
+    registerControls({
+      openCreateDialog: () => setCreateOpen(true),
+      closeCreateDialog: () => setCreateOpen(false),
+      openManagerDialog: () => setManagerOpen(true),
+      closeManagerDialog: () => setManagerOpen(false),
+      openAutomationDialog: () => setAutomationOpen(true),
+      closeAutomationDialog: () => setAutomationOpen(false),
+      // Prioriza o card recem-criado pelo proprio tour; se nao tiver (ex.:
+      // usuario pulou a criacao, ou o salao ja tinha cards antes), cai pro
+      // primeiro card visivel no board - so fica sem nada pra abrir se o
+      // salao estiver 100% vazio, caso em que o passo so avisa no console e
+      // segue (waitForSelector ja trata isso sem quebrar o tour).
+      openCardDetail: (cardId) =>
+        setSelectedCardId(cardId ?? lastCreatedCardIdRef.current ?? cardsRef.current[0]?.id ?? null),
+      closeCardDetail: () => setSelectedCardId(null),
+    });
+    if (!hasAutoStartedRef.current && !hasSeenTour) {
+      hasAutoStartedRef.current = true;
+      startTour();
+    }
+    return () => unregisterControls();
+  }, [registerControls, unregisterControls, startTour, hasSeenTour]);
+
+  useEffect(() => {
     if (!activePipelineId) return;
     void load(activePipelineId);
 
@@ -137,6 +182,18 @@ export function RelationshipKanbanPage() {
 
     return () => window.clearInterval(timer);
   }, [activePipelineId, load]);
+
+  // Consome o atalho de "cardId" da URL (vindo do toast de pós-atendimento)
+  // assim que o pipeline certo já está ativo - o diálogo de detalhe busca o
+  // card pelo id direto, não precisa esperar a lista carregar. Limpa os
+  // parâmetros da URL depois, pra um F5 não reabrir o mesmo card de novo.
+  useEffect(() => {
+    if (!linkedCardIdRef.current || !activePipelineId) return;
+    if (activePipelineId !== searchParams.get("pipelineId")) return;
+    setSelectedCardId(linkedCardIdRef.current);
+    linkedCardIdRef.current = null;
+    setSearchParams({}, { replace: true });
+  }, [activePipelineId, searchParams, setSearchParams]);
 
   const activePipeline = useMemo(
     () => pipelines.find((pipeline) => pipeline.id === activePipelineId) ?? null,
@@ -360,13 +417,36 @@ export function RelationshipKanbanPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 self-start">
-          <Button variant="ghost" size="icon" className="h-9 w-9" title="Gerenciar pipelines" onClick={() => setManagerOpen(true)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            title="Gerenciar pipelines"
+            data-tour="kanban-gerenciar-pipelines-btn"
+            onClick={() => setManagerOpen(true)}
+          >
             <Settings2 size={16} />
           </Button>
-          <Button variant="ghost" size="icon" className="h-9 w-9" title="Automação pós-atendimento" onClick={() => setAutomationOpen(true)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            title="Automação pós-atendimento"
+            data-tour="kanban-automacao-btn"
+            onClick={() => setAutomationOpen(true)}
+          >
             <Zap size={16} />
           </Button>
-          <Button size="sm" className="gap-2" onClick={() => setCreateOpen(true)} disabled={!activePipelineId}>
+          <Button variant="ghost" size="icon" className="h-9 w-9" title="Tour guiado" onClick={() => startTour()}>
+            <HelpCircle size={16} />
+          </Button>
+          <Button
+            size="sm"
+            className="gap-2"
+            data-tour="kanban-novo-card-btn"
+            onClick={() => setCreateOpen(true)}
+            disabled={!activePipelineId}
+          >
             <Plus size={14} />
             Novo card
           </Button>
@@ -497,8 +577,8 @@ export function RelationshipKanbanPage() {
               Nenhum card encontrado com os filtros atuais.
             </div>
           ) : (
-            <div className="flex gap-4 overflow-x-auto pb-2">
-              {columns.map((column) => (
+            <div className="flex gap-4 overflow-x-auto pb-2" data-tour="kanban-board">
+              {columns.map((column, columnIndex) => (
                 <div
                   key={column.key}
                   data-column-key={column.key}
@@ -514,7 +594,7 @@ export function RelationshipKanbanPage() {
                     </Badge>
                   </div>
 
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-2" data-tour={columnIndex === 0 ? "kanban-column-cards" : undefined}>
                     {column.cards.length === 0 ? (
                       <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
                         Nenhum card aqui
@@ -633,7 +713,10 @@ export function RelationshipKanbanPage() {
         pipelines={pipelines}
         defaultPipelineId={activePipelineId}
         onClose={() => setCreateOpen(false)}
-        onCreated={() => activePipelineId && void load(activePipelineId)}
+        onCreated={(card) => {
+          lastCreatedCardIdRef.current = card.id;
+          activePipelineId && void load(activePipelineId);
+        }}
       />
       <RelationshipPipelineManagerDialog
         open={managerOpen}
