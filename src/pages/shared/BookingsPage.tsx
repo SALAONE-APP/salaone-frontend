@@ -711,6 +711,10 @@ export function BookingsPage() {
 
   function openCompletionDialog(appointment: Appointment) {
     const now = new Date();
+    if (new Date(appointment.startAt).getTime() > now.getTime()) {
+      toast.error("Este atendimento ainda não começou, não é possível finalizá-lo.");
+      return;
+    }
     setCompletionAppointment(appointment);
     setCompletionTime(now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false }));
   }
@@ -1254,7 +1258,12 @@ export function BookingsPage() {
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuItem
-                                disabled={appointment.status === "completed"}
+                                disabled={appointment.status === "completed" || new Date(appointment.startAt).getTime() > Date.now()}
+                                title={
+                                  new Date(appointment.startAt).getTime() > Date.now()
+                                    ? "Este atendimento ainda não começou"
+                                    : undefined
+                                }
                                 onClick={() => user?.role === "admin"
                                   ? openCompletionDialog(appointment)
                                   : void changeStatus(appointment, "completed")

@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useRelationshipTour } from "@/hooks/useRelationshipTour";
 import {
   PIPELINE_TEMPLATES,
   createRelationshipPipeline,
@@ -74,6 +75,7 @@ export function RelationshipPipelineManagerDialog({
   cardsInActivePipeline,
   onChanged,
 }: Props) {
+  const { isTourOpen } = useRelationshipTour();
   const [mode, setMode] = useState<"list" | "template" | "edit">("list");
   const [editingPipeline, setEditingPipeline] = useState<RelationshipPipeline | null>(null);
   const [name, setName] = useState("");
@@ -231,7 +233,12 @@ export function RelationshipPipelineManagerDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-        <DialogContent className="flex max-h-[85vh] flex-col gap-4 overflow-y-auto sm:max-w-lg">
+        <DialogContent
+          className="flex max-h-[85vh] flex-col gap-4 overflow-y-auto sm:max-w-lg"
+          onInteractOutside={(event) => {
+            if (isTourOpen) event.preventDefault();
+          }}
+        >
           {mode === "list" ? (
             <>
               <DialogHeader>
@@ -241,7 +248,7 @@ export function RelationshipPipelineManagerDialog({
                 Cada pipeline é um fluxo independente de acompanhamento, com suas próprias etapas.
               </p>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2" data-tour="pipeline-manager-list">
                 {pipelines.map((pipeline) => (
                   <div
                     key={pipeline.id}
@@ -289,7 +296,12 @@ export function RelationshipPipelineManagerDialog({
                 ))}
               </div>
 
-              <Button variant="outline" className="w-fit gap-2" onClick={() => setMode("template")}>
+              <Button
+                variant="outline"
+                className="w-fit gap-2"
+                data-tour="pipeline-manager-novo-pipeline-btn"
+                onClick={() => setMode("template")}
+              >
                 <Plus size={14} />
                 Novo pipeline
               </Button>

@@ -13,6 +13,7 @@ import {
   type RelationshipPipeline,
 } from "@/service/relationshipService";
 import { listServices } from "@/service/serviceService";
+import { useRelationshipTour } from "@/hooks/useRelationshipTour";
 
 interface Props {
   open: boolean;
@@ -28,6 +29,7 @@ function extractErrorMessage(error: unknown, fallback: string) {
 const NO_MAPPING = "__none__";
 
 export function RelationshipAutomationDialog({ open, onClose, pipelines }: Props) {
+  const { isTourOpen } = useRelationshipTour();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [enabled, setEnabled] = useState(false);
@@ -97,7 +99,12 @@ export function RelationshipAutomationDialog({ open, onClose, pipelines }: Props
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="flex max-h-[85vh] flex-col gap-4 overflow-y-auto sm:max-w-lg">
+      <DialogContent
+        className="flex max-h-[85vh] flex-col gap-4 overflow-y-auto sm:max-w-lg"
+        onInteractOutside={(event) => {
+          if (isTourOpen) event.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Automação de pós-atendimento</DialogTitle>
         </DialogHeader>
@@ -115,7 +122,12 @@ export function RelationshipAutomationDialog({ open, onClose, pipelines }: Props
                 <p className="text-sm font-medium text-foreground">Ativar criação automática</p>
                 <p className="text-xs text-muted-foreground">Desligada por padrão.</p>
               </div>
-              <Switch checked={enabled} onCheckedChange={setEnabled} disabled={pipelines.length === 0} />
+              <Switch
+                checked={enabled}
+                onCheckedChange={setEnabled}
+                disabled={pipelines.length === 0}
+                data-tour="automation-switch"
+              />
             </div>
 
             {pipelines.length === 0 && (
@@ -130,7 +142,7 @@ export function RelationshipAutomationDialog({ open, onClose, pipelines }: Props
                 Usado quando o atendimento tem mais de um serviço, ou quando o serviço não tem categoria mapeada.
               </p>
               <Select value={genericPipelineId ?? undefined} onValueChange={setGenericPipelineId}>
-                <SelectTrigger>
+                <SelectTrigger data-tour="automation-pipeline-padrao-select">
                   <SelectValue placeholder="Selecione um pipeline" />
                 </SelectTrigger>
                 <SelectContent>
@@ -149,7 +161,7 @@ export function RelationshipAutomationDialog({ open, onClose, pipelines }: Props
             </div>
 
             {categories.length > 0 && (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2" data-tour="automation-categoria-mapeamento">
                 <Label>Categorias de serviço</Label>
                 {categories.map((category) => {
                   const isStale = categoryPipelines[category] && !pipelineById.has(categoryPipelines[category]);
