@@ -705,7 +705,14 @@ export function BookingsPage() {
         toast.success("Agendamento atualizado.");
       }
       if (status === "completed" && updated?.relationshipCardCreated) {
-        toast.success("Pós-venda iniciado no CRM 🎉");
+        toast.success("Pós-venda iniciado no CRM 🎉", {
+          action: {
+            label: "Conferir card",
+            onClick: () => navigate(
+              `/relationship-kanban?pipelineId=${updated.relationshipPipelineId}&cardId=${updated.relationshipCardId}`,
+            ),
+          },
+        });
       }
     } catch (err) {
       toast.error(getApiMessage(err));
@@ -754,7 +761,14 @@ export function BookingsPage() {
       const updated = await updateAppointment(completionAppointment.id, { status: "completed", completedAt: completedAt.toISOString() });
       toast.success("Atendimento finalizado no horario informado.");
       if (updated?.relationshipCardCreated) {
-        toast.success("Pós-venda iniciado no CRM 🎉");
+        toast.success("Pós-venda iniciado no CRM 🎉", {
+          action: {
+            label: "Conferir card",
+            onClick: () => navigate(
+              `/relationship-kanban?pipelineId=${updated.relationshipPipelineId}&cardId=${updated.relationshipCardId}`,
+            ),
+          },
+        });
       }
       setCompletionAppointment(null);
       await loadAppointments();
