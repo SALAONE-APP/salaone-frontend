@@ -13,6 +13,7 @@ export interface BlockedDate {
   recurrenceWeekdays?: number[];
   recurrenceMonthDay?: number | null;
   recurrenceEndDate?: string | null;
+  clientsOnly?: boolean;
   professional?: {
     id: string;
     displayName: string;
@@ -32,6 +33,7 @@ export interface BlockedDatePayload {
   recurrenceWeekdays?: number[];
   recurrenceMonthDay?: number | null;
   recurrenceEndDate?: string | null;
+  clientsOnly?: boolean;
 }
 
 export async function listBlockedDates(params: {

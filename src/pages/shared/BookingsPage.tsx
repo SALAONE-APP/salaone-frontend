@@ -488,12 +488,12 @@ export function BookingsPage() {
       professionalId: form.professionalId,
     })
       .then((items) => {
-        const block = items.find((b) => {
-          if (b.date.slice(0, 10) !== form.date) return false;
-          if (!b.professionalId && !form.professionalId) return true;
-          if (!b.professionalId) return true; // salão inteira
-          return b.professionalId === form.professionalId;
-        });
+        const relevantBlocks = items.filter(
+          (block) => !block.professionalId || block.professionalId === form.professionalId,
+        );
+        // Um bloqueio que também vale internamente deve prevalecer no aviso e
+        // na validação caso existam duas regras para a mesma data.
+        const block = relevantBlocks.find((item) => !item.clientsOnly) ?? relevantBlocks[0];
         setBlockedDateWarning(block ?? null);
       })
       .catch(() => setBlockedDateWarning(null));
@@ -1884,8 +1884,12 @@ export function BookingsPage() {
               ) : null}
 
               {blockedDateWarning && (
-                <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive md:col-span-2">
-                  <strong>Data bloqueada:</strong>{" "}
+                <div className={`rounded-md border p-3 text-sm md:col-span-2 ${
+                  blockedDateWarning.clientsOnly
+                    ? "border-blue-500/30 bg-blue-500/10 text-blue-700"
+                    : "border-destructive/40 bg-destructive/10 text-destructive"
+                }`}>
+                  <strong>{blockedDateWarning.clientsOnly ? "Bloqueada somente para clientes:" : "Data bloqueada:"}</strong>{" "}
                   {blockedDateWarning.startTime && blockedDateWarning.endTime
                     ? `${blockedDateWarning.professionalId ? "Profissional bloqueado" : "Salão bloqueada"} das ${blockedDateWarning.startTime} às ${blockedDateWarning.endTime}`
                     : blockedDateWarning.professionalId
@@ -1893,6 +1897,9 @@ export function BookingsPage() {
                       : "A salão está fechada neste dia"}
                   {blockedDateWarning.reason
                     ? ` — ${blockedDateWarning.reason}`
+                    : ""}
+                  {blockedDateWarning.clientsOnly
+                    ? " — A agenda interna continua liberada."
                     : ""}
                 </div>
               )}
@@ -1921,7 +1928,7 @@ export function BookingsPage() {
                 type="submit"
                 disabled={
                   saving ||
-                  (!!blockedDateWarning && !blockedDateWarning.startTime)
+                  (!!blockedDateWarning && !blockedDateWarning.clientsOnly && !blockedDateWarning.startTime)
                 }
               >
                 {saving ? (
