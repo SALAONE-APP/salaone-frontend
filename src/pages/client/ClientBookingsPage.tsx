@@ -313,6 +313,7 @@ export function ClientBookingsPage() {
   const [userDependents, setUserDependents] = useState<Dependent[]>([]);
   const [bookingForDependent, setBookingForDependent] = useState<Dependent | null>(null);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [professionalsLoading, setProfessionalsLoading] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
@@ -408,13 +409,11 @@ export function ClientBookingsPage() {
     async function load() {
       try {
         const salonId = getStoredSalonId();
-        const [b, s, availableProducts, profile] = await Promise.all([
-          listProfessionals({ page: 1, limit: 100, salonId }),
+        const [s, availableProducts, profile] = await Promise.all([
           listServices({ includeInactive: false, page: 1, limit: 100, salonId }),
           listProducts({ active: true }),
           getSalonProfile(salonId),
         ]);
-        setProfessionals(b.items);
         setServices(s.items.filter((sv) => sv.active));
         setProducts(availableProducts);
         setSalonProfile(profile);
@@ -440,6 +439,42 @@ export function ClientBookingsPage() {
     }
     void load();
   }, [bookingOpen, user?.id]);
+
+  useEffect(() => {
+    if (!bookingOpen) return;
+
+    let active = true;
+    setProfessionalsLoading(true);
+    listProfessionals({
+      page: 1,
+      limit: 100,
+      salonId: getStoredSalonId(),
+      availabilityDate: form.date || undefined,
+    })
+      .then((response) => {
+        if (!active) return;
+        setProfessionals(response.items);
+        setForm((current) => {
+          if (!current.professionalId) return current;
+          const remainsAvailable = response.items.some(
+            (professional) => professional.id === current.professionalId,
+          );
+          return remainsAvailable
+            ? current
+            : { ...current, professionalId: "", time: "" };
+        });
+      })
+      .catch((err) => {
+        if (active) toast.error(getApiMessage(err));
+      })
+      .finally(() => {
+        if (active) setProfessionalsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [bookingOpen, form.date]);
 
   const selectedServices = useMemo(() => services.filter((s) => form.serviceIds.includes(s.id)), [form.serviceIds, services]);
   const selectedProducts = useMemo(() => products
@@ -1200,10 +1235,10 @@ export function ClientBookingsPage() {
                 <Select
                   value={form.professionalId}
                   onValueChange={(v) => { setField("professionalId", v); setField("time", ""); }}
-                  disabled={hasLockedProfessional}
+                  disabled={hasLockedProfessional || professionalsLoading}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecionar profissional" />
+                    <SelectValue placeholder={professionalsLoading ? "Carregando profissionais..." : "Selecionar profissional"} />
                   </SelectTrigger>
                   <SelectContent>
                     {professionals.map((b) => (
@@ -1213,6 +1248,11 @@ export function ClientBookingsPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {!professionalsLoading && form.date && professionals.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Nenhum profissional disponivel para clientes nesta data.
+                  </p>
+                )}
                 {hasLockedProfessional ? (
                   <p className="flex items-center gap-1.5 text-xs text-amber-600">
                     <Lock size={11} />
