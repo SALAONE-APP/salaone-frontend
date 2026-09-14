@@ -64,6 +64,12 @@ export interface SubscribePlatformPayload {
   platformPlanId: string;
   amount: number;
   cardForm: CardFormData;
+  billingAddress: {
+    line1: string;
+    zipCode: string;
+    city: string;
+    state: string;
+  };
   customer?: {
     name?: string;
     email?: string;
@@ -122,12 +128,16 @@ export async function confirmClientPlanPixOrder(payload: {
 }
 
 export async function subscribeSalonPlatformPlan(payload: SubscribePlatformPayload) {
-  const cardToken = await createPagarmeCardToken(payload.cardForm);
+  const cardToken = await createPagarmeCardToken(
+    { ...payload.cardForm, billingAddress: payload.billingAddress },
+    { requireBillingAddress: true },
+  );
 
   const { data } = await api.post('/pagarme/subscriptions/salon-platform-subscriptions', {
     platformPlanId: payload.platformPlanId,
     amount: payload.amount,
     cardToken,
+    billingAddress: payload.billingAddress,
     customer: {
       name: payload.customer?.name ?? '',
       email: payload.customer?.email ?? '',

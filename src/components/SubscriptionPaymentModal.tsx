@@ -29,6 +29,10 @@ export function SubscriptionPaymentModal({ isOpen, plan, onClose, onSuccess }: S
     cvv: '',
     document: '',
     phone: '',
+    line1: '',
+    zipCode: '',
+    city: '',
+    state: '',
     installments: 1,
   });
 
@@ -48,6 +52,10 @@ export function SubscriptionPaymentModal({ isOpen, plan, onClose, onSuccess }: S
     if (!cardForm.cvv.trim()) return 'Informe o CVV.';
     if (!cardForm.document.replace(/\D/g, '')) return 'Informe o CPF do pagador.';
     if (!cardForm.phone.replace(/\D/g, '')) return 'Informe o telefone do pagador.';
+    if (!cardForm.line1.trim()) return 'Informe o endereco de cobranca.';
+    if (cardForm.zipCode.replace(/\D/g, '').length !== 8) return 'Informe um CEP valido.';
+    if (!cardForm.city.trim()) return 'Informe a cidade.';
+    if (!/^[a-z]{2}$/i.test(cardForm.state.trim())) return 'Informe a sigla do estado.';
     if (!acceptedTerms) return 'Você precisa aceitar os termos da assinatura.';
     return null;
   }
@@ -64,6 +72,12 @@ export function SubscriptionPaymentModal({ isOpen, plan, onClose, onSuccess }: S
         platformPlanId: plan.id,
         amount,
         cardForm: { ...cardForm, number: cardForm.number.replace(/\s/g, '') },
+        billingAddress: {
+          line1: cardForm.line1,
+          zipCode: cardForm.zipCode,
+          city: cardForm.city,
+          state: cardForm.state,
+        },
         customer: { name: user?.name, email: user?.email },
       });
       toast.success('Assinatura criada com sucesso!');
@@ -211,6 +225,57 @@ export function SubscriptionPaymentModal({ isOpen, plan, onClose, onSuccess }: S
                 className="w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-foreground">Endereco de cobranca</label>
+            <input
+              type="text"
+              placeholder="Numero, rua, bairro"
+              value={cardForm.line1}
+              onChange={(e) => update('line1', e.target.value)}
+              autoComplete="address-line1"
+              className="w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+
+          <div className="grid grid-cols-[1fr_1fr] gap-3">
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">CEP</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="00000-000"
+                value={cardForm.zipCode}
+                onChange={(e) => update('zipCode', e.target.value)}
+                autoComplete="postal-code"
+                className="w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">UF</label>
+              <input
+                type="text"
+                placeholder="MG"
+                maxLength={2}
+                value={cardForm.state}
+                onChange={(e) => update('state', e.target.value.replace(/[^a-z]/gi, '').toUpperCase())}
+                autoComplete="address-level1"
+                className="w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-foreground">Cidade</label>
+            <input
+              type="text"
+              placeholder="Sua cidade"
+              value={cardForm.city}
+              onChange={(e) => update('city', e.target.value)}
+              autoComplete="address-level2"
+              className="w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
           </div>
 
           <label className="flex cursor-pointer items-start gap-2 text-sm text-muted-foreground">
