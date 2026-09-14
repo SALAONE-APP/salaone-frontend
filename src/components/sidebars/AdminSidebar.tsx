@@ -20,11 +20,14 @@ import {
   Users,
   Zap,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { ProfileSidebar } from "../shared/ProfileSidebar";
 import type { SidebarSection } from "../shared/ProfileSidebar";
+import { subscriptionIncludesCrm } from "../CrmFeatureGate";
+import { getSalonPlatformSubscription } from "@/service/platformSubscriptionService";
 
-function buildSections(): SidebarSection[] {
+function buildSections(canUseCrm: boolean): SidebarSection[] {
   return [
     {
       items: [
@@ -76,7 +79,7 @@ function buildSections(): SidebarSection[] {
         },
       ],
     },
-    {
+    ...(canUseCrm ? [{
       items: [
         {
           icon: Star,
@@ -88,7 +91,7 @@ function buildSections(): SidebarSection[] {
           ],
         },
       ],
-    },
+    }] : []),
     {
       items: [
         {
@@ -107,5 +110,13 @@ function buildSections(): SidebarSection[] {
 }
 
 export function AdminSidebar() {
-  return <ProfileSidebar title="Painel da Salão" homeHref="/home" sections={buildSections()} />;
+  const [canUseCrm, setCanUseCrm] = useState(false);
+
+  useEffect(() => {
+    getSalonPlatformSubscription()
+      .then(({ subscription }) => setCanUseCrm(subscriptionIncludesCrm(subscription)))
+      .catch(() => setCanUseCrm(false));
+  }, []);
+
+  return <ProfileSidebar title="Painel da Salão" homeHref="/home" sections={buildSections(canUseCrm)} />;
 }
