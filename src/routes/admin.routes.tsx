@@ -18,6 +18,7 @@ import { PaymentsPage } from "../pages/shared/PaymentsPage";
 import { RelationshipDashboardPage } from "../pages/shared/RelationshipDashboardPage";
 import { RelationshipKanbanPage } from "../pages/shared/RelationshipKanbanPage";
 import { ReviewsPage } from "../pages/shared/ReviewsPage";
+import { CrmFeatureGate } from "../components/CrmFeatureGate";
 import { SchedulesPage } from "../pages/shared/SchedulesPage";
 import { ServicesPage } from "../pages/shared/ServicesPage";
 import { ServiceTabsPage } from "../pages/shared/ServiceTabsPage";
@@ -158,19 +159,19 @@ export const adminRoutes: AppRoute[] = [
     path: "/relationship-kanban",
     title: "Kanban",
     breadcrumbs: ["Relacionamento", "Kanban"],
-    Component: RelationshipKanbanPage,
+    Component: () => <CrmFeatureGate><RelationshipKanbanPage /></CrmFeatureGate>,
   },
   {
     path: "/relationship-dashboard",
     title: "Dashboard",
     breadcrumbs: ["Relacionamento", "Dashboard"],
-    Component: RelationshipDashboardPage,
+    Component: () => <CrmFeatureGate><RelationshipDashboardPage /></CrmFeatureGate>,
   },
   {
     path: "/reviews",
     title: "Avaliacoes",
     breadcrumbs: ["Relacionamento", "Avaliacoes"],
-    Component: ReviewsPage,
+    Component: () => <CrmFeatureGate><ReviewsPage /></CrmFeatureGate>,
   },
   {
     path: "/settings",
