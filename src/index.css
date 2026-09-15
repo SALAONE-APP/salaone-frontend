@@ -29,7 +29,7 @@
   h3 { @apply text-2xl font-semibold leading-snug; }
   h4 { @apply text-xl font-semibold leading-snug; }
   input, textarea, select { @apply rounded-lg; }
-  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='button']):not([type='submit']):not([type='reset']),
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='button']):not([type='submit']):not([type='reset']):not(.landing-lead-input),
   textarea,
   select {
     background-color: #fff !important;
@@ -48,6 +48,19 @@
 
 @layer components {
   .font-brand { font-family: 'Playfair Display', serif; }
+  .landing-lead-input {
+    background-color: #171717 !important;
+    color: #fff !important;
+    caret-color: #fff !important;
+    -webkit-text-fill-color: #fff;
+  }
+  .landing-lead-input:-webkit-autofill,
+  .landing-lead-input:-webkit-autofill:hover,
+  .landing-lead-input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #171717 inset !important;
+    -webkit-text-fill-color: #fff !important;
+    caret-color: #fff;
+  }
   .brand-gradient { background: linear-gradient(135deg, #7B2CBF 0%, #E91E63 100%); }
   .brand-gradient-text { background: linear-gradient(135deg, #7B2CBF 0%, #E91E63 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .shadow-card { box-shadow: 0 4px 18px rgb(26 26 26 / 0.07); }
