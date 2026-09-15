@@ -192,8 +192,6 @@ const cardStyles: Record<CardVariant, { wrapper: string; btn: string; badge: str
     price: "text-white",
   },
 };
-const variantOrder: CardVariant[] = ["basic", "premium", "master"];
-
 function monthlyEquivalentPrice(plan: Plan) {
   const price = Number(plan.price) || 0;
   const count = Math.max(1, Number(plan.intervalCount) || 1);
