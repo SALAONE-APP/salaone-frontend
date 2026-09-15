@@ -200,9 +200,20 @@ export function SuperAdminSubscriptionsPage() {
 
   const calendarEvents = useMemo<CalendarSubscriptionEvent[]>(() => rows.flatMap((row) => {
     const events: CalendarSubscriptionEvent[] = [];
-    // O inicio do ciclo ativo e a competencia que acabou de ser paga.
-    if (row.status === "active" && row.startedAt) {
-      events.push({ id: `${row.id}-paid-${row.startedAt}`, name: row.name, plan: row.plan, billingStatus: "paid", paymentMethod: row.paymentMethod, occursAt: row.startedAt, price: row.price });
+    // O ciclo que acabou de iniciar deve aparecer no calendario. O Pagar.me
+    // pode retornar uma assinatura nova como `pending` ou `future` antes de
+    // confirma-la como `active`; nesses casos ela e um recebivel pendente,
+    // nao deve desaparecer ate a proxima data de cobranca.
+    if (row.startedAt && ["active", "pending", "future"].includes(row.status)) {
+      events.push({
+        id: `${row.id}-cycle-${row.startedAt}`,
+        name: row.name,
+        plan: row.plan,
+        billingStatus: row.status === "active" ? "paid" : "pending",
+        paymentMethod: row.paymentMethod,
+        occursAt: row.startedAt,
+        price: row.price,
+      });
     }
     // A proxima cobranca nunca esta paga antecipadamente apenas porque a assinatura esta ativa.
     if (row.nextBillingAt) {

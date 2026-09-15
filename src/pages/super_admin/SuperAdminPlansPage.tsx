@@ -42,10 +42,16 @@ const EMPTY_FORM = {
   trialPeriodDays: "0", statementDescriptor: "SALAONE",
   paymentMethods: ["credit_card"] as string[], features: "",
   maxProfessionals: "", maxAdmins: "", maxReceptionists: "",
-  isPublic: true, isRecommended: false, sortOrder: "0", syncPagarme: true,
+  isPublic: true, isRecommended: false, includesCrm: false, sortOrder: "0", syncPagarme: true,
 };
 
 type PlanForm = typeof EMPTY_FORM;
+
+function planFeatures(form: PlanForm) {
+  const features = form.features.split("\n").map((feature) => feature.trim()).filter(Boolean);
+  const withoutCrm = features.filter((feature) => feature.toLowerCase() !== "crm");
+  return form.includesCrm ? [...withoutCrm, "crm"] : withoutCrm;
+}
 
 function togglePM(form: PlanForm, method: string): PlanForm {
   const exists = form.paymentMethods.includes(method);
@@ -112,7 +118,7 @@ export function SuperAdminPlansPage() {
         price: cents / 100, interval: form.interval, intervalCount: Number(form.intervalCount || 1),
         trialPeriodDays: Number(form.trialPeriodDays || 0), statementDescriptor: form.statementDescriptor.trim(),
         paymentMethods: form.paymentMethods,
-        features: form.features.split("\n").map((f) => f.trim()).filter(Boolean),
+        features: planFeatures(form),
         maxProfessionals: form.maxProfessionals ? Number(form.maxProfessionals) : null,
         maxAdmins: form.maxAdmins ? Number(form.maxAdmins) : null,
         maxReceptionists: form.maxReceptionists ? Number(form.maxReceptionists) : null,
@@ -159,7 +165,8 @@ export function SuperAdminPlansPage() {
       trialPeriodDays: String(plan.trialPeriodDays ?? plan.trial_period_days ?? 0),
       statementDescriptor: plan.statementDescriptor ?? "SALAONE",
       paymentMethods: pm,
-      features: Array.isArray(plan.features) ? plan.features.join("\n") : "",
+      features: Array.isArray(plan.features) ? plan.features.filter((feature) => String(feature).toLowerCase() !== "crm").join("\n") : "",
+      includesCrm: Array.isArray(plan.features) && plan.features.some((feature) => String(feature).toLowerCase() === "crm"),
       maxProfessionals: plan.maxProfessionals != null ? String(plan.maxProfessionals) : plan.max_professionals != null ? String(plan.max_professionals) : "",
       maxAdmins: plan.maxAdmins != null ? String(plan.maxAdmins) : plan.max_admins != null ? String(plan.max_admins) : "",
       maxReceptionists: plan.maxReceptionists != null ? String(plan.maxReceptionists) : plan.max_receptionists != null ? String(plan.max_receptionists) : "",
@@ -180,7 +187,7 @@ export function SuperAdminPlansPage() {
       await updatePlatformPlan(editingPlan.id, {
         name: editForm.name.trim(), description: editForm.description.trim() || null,
         price: cents / 100,
-        features: editForm.features.split("\n").map((f) => f.trim()).filter(Boolean),
+        features: planFeatures(editForm),
         isPublic: editForm.isPublic, isRecommended: editForm.isRecommended,
         sortOrder: Number(editForm.sortOrder || 0),
         maxProfessionals: editForm.maxProfessionals ? Number(editForm.maxProfessionals) : null,
@@ -293,7 +300,7 @@ export function SuperAdminPlansPage() {
           <p className="text-xs text-muted-foreground">Pix nao e suportado em recorrencia de assinatura no Pagar.me.</p>
         </div>
         <div className="flex flex-wrap gap-4">
-          {[{ key: "isPublic", label: "Exibir na landing page" }, { key: "isRecommended", label: "Marcar como recomendado" }, { key: "syncPagarme", label: "Sincronizar com Pagar.me" }].map((opt) => (
+          {[{ key: "includesCrm", label: "Incluir CRM de Relacionamento" }, { key: "isPublic", label: "Exibir na landing page" }, { key: "isRecommended", label: "Marcar como recomendado" }, { key: "syncPagarme", label: "Sincronizar com Pagar.me" }].map((opt) => (
             <label key={opt.key} className="flex items-center gap-2 text-sm text-foreground">
               <input type="checkbox" checked={Boolean(form[opt.key as keyof PlanForm])} onChange={(e) => setForm((p) => ({ ...p, [opt.key]: e.target.checked }))} className="rounded border-border accent-primary" />
               {opt.label}
@@ -433,7 +440,7 @@ export function SuperAdminPlansPage() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-4">
-                {[{ key: "isPublic", label: "Exibir na landing page" }, { key: "isRecommended", label: "Marcar como recomendado" }].map((opt) => (
+                {[{ key: "includesCrm", label: "Incluir CRM de Relacionamento" }, { key: "isPublic", label: "Exibir na landing page" }, { key: "isRecommended", label: "Marcar como recomendado" }].map((opt) => (
                   <label key={opt.key} className="flex items-center gap-2 text-sm text-foreground">
                     <input type="checkbox" checked={Boolean(editForm[opt.key as keyof PlanForm])} onChange={(e) => setEditForm((p) => ({ ...p, [opt.key]: e.target.checked }))} className="rounded border-border accent-primary" />
                     {opt.label}

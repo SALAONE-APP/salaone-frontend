@@ -23,6 +23,7 @@ interface Plan {
   intervalCount: number;
   features: string[];
   isRecommended?: boolean;
+  sortOrder?: number;
 }
 
 interface RegForm {
@@ -191,7 +192,33 @@ const cardStyles: Record<CardVariant, { wrapper: string; btn: string; badge: str
     price: "text-white",
   },
 };
-const variantOrder: CardVariant[] = ["basic", "premium", "master"];
+function monthlyEquivalentPrice(plan: Plan) {
+  const price = Number(plan.price) || 0;
+  const count = Math.max(1, Number(plan.intervalCount) || 1);
+
+  if (plan.interval === "year") return price / (count * 12);
+  if (plan.interval === "week") return (price * 52) / (count * 12);
+  return price / count;
+}
+
+function getBestPlanId(plans: Plan[]) {
+  // A configuracao explicita do Super Admin tem prioridade. Assim, marcar
+  // um plano como recomendado sempre controla o destaque da landing page.
+  const candidates = plans.filter((plan) => plan.isRecommended);
+  const plansToRank = candidates.length > 0 ? candidates : plans;
+
+  return plansToRank.reduce<Plan | null>((best, plan) => {
+    if (!best) return plan;
+
+    const priceDifference = monthlyEquivalentPrice(plan) - monthlyEquivalentPrice(best);
+    if (priceDifference !== 0) return priceDifference > 0 ? plan : best;
+
+    const featuresDifference = plan.features.length - best.features.length;
+    if (featuresDifference !== 0) return featuresDifference > 0 ? plan : best;
+
+    return Number(plan.sortOrder ?? 0) > Number(best.sortOrder ?? 0) ? plan : best;
+  }, null)?.id;
+}
 
 // ─── Register Modal ───────────────────────────────────────────────────────────
 
@@ -571,6 +598,7 @@ export function LandingPage() {
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [paymentCtx, setPaymentCtx] = useState<PaymentCtx | null>(null);
   const [leadModalOpen, setLeadModalOpen] = useState(false);
+  const bestPlanId = getBestPlanId(plans);
 
   useEffect(() => {
     apiFetchPlans()
@@ -825,14 +853,17 @@ export function LandingPage() {
                 <p className="col-span-3 text-center text-neutral-500 py-8">Nenhum plano disponível no momento.</p>
               ) : (
                 plans.map((plan, index) => {
-                  const variant = variantOrder[Math.min(index, 2)];
+                  const isBestPlan = plan.id === bestPlanId;
+                  // A cor de destaque e o selo precisam sempre apontar para o
+                  // mesmo plano, independentemente da ordem retornada pela API.
+                  const variant = isBestPlan ? "premium" : index === 0 ? "basic" : "master";
                   const styles = cardStyles[variant];
                   return (
                     <article key={plan.id} className={`relative flex flex-col border rounded-2xl p-6 transition-colors ${styles.wrapper}`}>
-                      {plan.isRecommended && (
+                      {isBestPlan && (
                         <div className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full mb-4 w-fit ${styles.badge}`}>
                           <Star size={11} />
-                          {variant === "master" ? "Mais completo" : "Mais popular"}
+                          Mais completo
                         </div>
                       )}
                       <div className="mb-4">
