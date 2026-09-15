@@ -196,10 +196,15 @@ export function SuperAdminPlansPage() {
         statementDescriptor: editForm.statementDescriptor.trim(),
         paymentMethods: editForm.paymentMethods,
       });
-      toast.success("Plano atualizado.");
+      toast.success(editingPlan.pagarmePlanId || editingPlan.pagarme_plan_id
+        ? "Plano atualizado e valor sincronizado com Pagar.me."
+        : "Plano atualizado apenas no banco.");
       setEditingPlan(null);
       await loadPlans();
-    } catch { toast.error("Nao foi possivel atualizar o plano."); } finally { setSavingPlanId(null); }
+    } catch (error: unknown) {
+      const failure = error as { response?: { data?: { message?: string } } };
+      toast.error(failure.response?.data?.message || "Nao foi possivel atualizar o plano no Pagar.me.");
+    } finally { setSavingPlanId(null); }
   };
 
   const handleTogglePublic = async (plan: PlatformPlan) => {
