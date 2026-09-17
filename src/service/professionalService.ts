@@ -43,10 +43,11 @@ function normalizeProfessional(employee: BackendEmployee): Professional {
 }
 
 export async function listProfessionals(
-  _params: { q?: string; page?: number; limit?: number; salonId?: string } = {},
+  params: { q?: string; page?: number; limit?: number; salonId?: string; availabilityDate?: string } = {},
 ): Promise<ListProfessionalsResponse> {
-  void _params;
-  const response = await api.get<{ employees: BackendEmployee[] }>("/employees");
+  const response = await api.get<{ employees: BackendEmployee[] }>("/employees", {
+    params: { availabilityDate: params.availabilityDate },
+  });
   const items = response.data.employees
     .filter((employee) => employee.is_professional !== false)
     .map(normalizeProfessional);

@@ -141,6 +141,7 @@ interface BlockedDateFormState {
   reason: string;
   blockType: "all" | "professional";
   professionalId: string;
+  audience: "everyone" | "clients";
   allDay: boolean;
   startTime: string;
   endTime: string;
@@ -156,6 +157,7 @@ const emptyBlockedDateForm: BlockedDateFormState = {
   reason: "",
   blockType: "all",
   professionalId: "",
+  audience: "everyone",
   allDay: true,
   startTime: "09:00",
   endTime: "18:00",
@@ -172,6 +174,7 @@ function blockedDateToForm(item: BlockedDate): BlockedDateFormState {
     reason: item.reason ?? "",
     blockType: item.professionalId ? "professional" : "all",
     professionalId: item.professionalId ?? "",
+    audience: item.clientsOnly ? "clients" : "everyone",
     allDay: !item.startTime || !item.endTime,
     startTime: item.startTime ?? "09:00",
     endTime: item.endTime ?? "18:00",
@@ -188,6 +191,7 @@ function buildPayload(form: BlockedDateFormState): BlockedDatePayload {
     date: form.date,
     reason: form.reason.trim() || null,
     professionalId: form.blockType === "professional" ? form.professionalId : null,
+    clientsOnly: form.audience === "clients",
     startTime: form.allDay ? null : form.startTime,
     endTime: form.allDay ? null : form.endTime,
     recurrenceType: form.recurrenceType,
@@ -385,6 +389,7 @@ export function SchedulesPage() {
         item.professional?.displayName ?? "Todos",
         item.startTime && item.endTime ? `${item.startTime} ${item.endTime}` : "Dia inteiro",
         recurrenceLabel(item),
+        item.clientsOnly ? "Somente clientes" : "Clientes e equipe",
       ];
       return values.some((value) => normalizeText(value).includes(term));
     });
@@ -764,6 +769,7 @@ export function SchedulesPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Funcionario</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Horario</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Repeticao</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Aplicacao</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
                 <th className="w-10 px-4 py-3" />
               </tr>
@@ -771,7 +777,7 @@ export function SchedulesPage() {
             <tbody>
               {loadingBlockedDates ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     <span className="inline-flex items-center gap-2">
                       <Loader2 size={16} className="animate-spin" />
                       Carregando datas bloqueadas...
@@ -780,7 +786,7 @@ export function SchedulesPage() {
                 </tr>
               ) : filteredBlockedDates.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-muted-foreground">
                     Nenhuma data bloqueada encontrada.
                   </td>
                 </tr>
@@ -807,6 +813,15 @@ export function SchedulesPage() {
                           <div className="text-xs text-muted-foreground">
                             Ate {formatDate(item.recurrenceEndDate)}
                           </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-foreground">
+                        {item.clientsOnly ? (
+                          <Badge variant="outline" className="border-blue-500/20 bg-blue-500/10 text-blue-600">
+                            Somente clientes
+                          </Badge>
+                        ) : (
+                          "Clientes e equipe"
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -907,6 +922,27 @@ export function SchedulesPage() {
                 </Select>
               </div>
             )}
+
+            <div className="space-y-2">
+              <Label>Aplicar bloqueio para</Label>
+              <Select
+                value={form.audience}
+                onValueChange={(value: BlockedDateFormState["audience"]) =>
+                  setForm((current) => ({ ...current, audience: value }))
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="everyone">Clientes e equipe interna</SelectItem>
+                  <SelectItem value="clients">Somente clientes (liberado internamente)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Em "Somente clientes", administradores e funcionarios ainda podem criar agendamentos no periodo.
+              </p>
+            </div>
 
             <div className="rounded-lg border border-border bg-secondary/30 p-4">
               <div className="grid gap-4 sm:grid-cols-2">

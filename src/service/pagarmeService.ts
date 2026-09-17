@@ -1,8 +1,11 @@
 import api from "./api";
 
 const PAGARME_PUBLIC_KEY = import.meta.env.VITE_PAGARME_PUBLIC_KEY as string;
+// A Pagar.me usa o mesmo host para chaves de teste (`pk_test_*`) e de produção.
+// O ambiente é definido pelo tipo da chave, não por um endpoint `sdx-api` separado.
+const DEFAULT_PAGARME_BASE_URL = "https://api.pagar.me/core/v5";
 const PAGARME_BASE_URL = String(
-  import.meta.env.VITE_PAGARME_BASE_URL || "https://api.pagar.me/core/v5",
+  import.meta.env.VITE_PAGARME_BASE_URL || DEFAULT_PAGARME_BASE_URL,
 ).replace(/\/+$/, "");
 
 function onlyNumbers(value: unknown): string {
@@ -18,6 +21,12 @@ export interface CardFormData {
   document: string;
   phone: string;
   installments: number;
+  billingAddress?: {
+    line1: string;
+    zipCode: string;
+    city: string;
+    state: string;
+  };
 }
 
 export interface PagarmeOrderPayload {
@@ -54,7 +63,10 @@ export interface PagarmeOrderResult {
   failureReason?: string;
 }
 
-export async function createPagarmeCardToken(card: CardFormData): Promise<string> {
+export async function createPagarmeCardToken(
+  card: CardFormData,
+  options: { requireBillingAddress?: boolean } = {},
+): Promise<string> {
   if (!PAGARME_PUBLIC_KEY) {
     throw new Error("VITE_PAGARME_PUBLIC_KEY nao foi definida no .env do frontend.");
   }
@@ -62,19 +74,51 @@ export async function createPagarmeCardToken(card: CardFormData): Promise<string
   const number = onlyNumbers(card.number);
   const cvv = onlyNumbers(card.cvv);
   const expMonth = Number(card.expMonth);
-  const expYear = Number(String(card.expYear).length === 2 ? `20${card.expYear}` : card.expYear);
+  // A API de tokenização preserva o ano informado pelo portador. Em especial,
+  // enviar 2030 quando o campo recebeu "30" gera um token que falha na
+  // verificação do cartão ao criar a assinatura.
+  const expYear = Number(card.expYear);
+  const validationYear = String(card.expYear).length === 2 ? 2000 + expYear : expYear;
+  const billingAddress = card.billingAddress;
 
   if (!number || number.length < 13) throw new Error("Numero do cartao invalido.");
   if (!card.holderName?.trim()) throw new Error("Nome impresso no cartao e obrigatorio.");
   if (!expMonth || expMonth < 1 || expMonth > 12) throw new Error("Mes de validade invalido.");
-  if (!expYear || expYear < new Date().getFullYear()) throw new Error("Ano de validade invalido.");
+  const now = new Date();
+  if (
+    !validationYear ||
+    validationYear < now.getFullYear() ||
+    (validationYear === now.getFullYear() && expMonth < now.getMonth() + 1)
+  ) throw new Error("Ano de validade invalido.");
   if (!cvv || cvv.length < 3) throw new Error("CVV invalido.");
+  if (options.requireBillingAddress && (
+    !billingAddress?.line1?.trim() ||
+    billingAddress.zipCode.replace(/\D/g, "").length !== 8 ||
+    !billingAddress.city?.trim() ||
+    !/^[a-z]{2}$/i.test(billingAddress.state?.trim() || "")
+  )) throw new Error("Informe o endereco de cobranca completo.");
+
+  const address = billingAddress
+    ? {
+        line_1: billingAddress.line1.trim(),
+        zip_code: billingAddress.zipCode.replace(/\D/g, ""),
+        city: billingAddress.city.trim(),
+        state: billingAddress.state.trim().toUpperCase(),
+        country: "BR",
+      }
+    : {
+        line_1: "50, Rua Goias, Teste",
+        zip_code: "36036646",
+        city: "Juiz de Fora",
+        state: "MG",
+        country: "BR",
+      };
 
   const response = await fetch(
     `${PAGARME_BASE_URL}/tokens?appId=${encodeURIComponent(PAGARME_PUBLIC_KEY)}`,
     {
       method: "POST",
-      headers: { accept: "application/json", "content-type": "application/json" },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({
         type: "card",
         card: {
@@ -84,13 +128,7 @@ export async function createPagarmeCardToken(card: CardFormData): Promise<string
           exp_month: expMonth,
           exp_year: expYear,
           cvv,
-          billing_address: {
-            line_1: "50, Rua Goias, Teste",
-            zip_code: "36036646",
-            city: "Juiz de Fora",
-            state: "MG",
-            country: "BR",
-          },
+          billing_address: address,
         },
       }),
     },

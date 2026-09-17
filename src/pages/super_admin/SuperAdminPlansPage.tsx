@@ -4,10 +4,12 @@ import { toast } from "sonner";
 
 import {
   getPlatformPlans,
+  syncPlatformPlanIds,
   createPlatformPlan,
   updatePlatformPlan,
   deletePlatformPlan,
   type PlatformPlan,
+  type PlatformPlanSyncConflict,
 } from "@/service/superAdminService";
 
 function fmtCurrency(value?: number | null) {
@@ -40,10 +42,16 @@ const EMPTY_FORM = {
   trialPeriodDays: "0", statementDescriptor: "SALAONE",
   paymentMethods: ["credit_card"] as string[], features: "",
   maxProfessionals: "", maxAdmins: "", maxReceptionists: "",
-  isPublic: true, isRecommended: false, sortOrder: "0", syncPagarme: true,
+  isPublic: true, isRecommended: false, includesCrm: false, sortOrder: "0", syncPagarme: true,
 };
 
 type PlanForm = typeof EMPTY_FORM;
+
+function planFeatures(form: PlanForm) {
+  const features = form.features.split("\n").map((feature) => feature.trim()).filter(Boolean);
+  const withoutCrm = features.filter((feature) => feature.toLowerCase() !== "crm");
+  return form.includesCrm ? [...withoutCrm, "crm"] : withoutCrm;
+}
 
 function togglePM(form: PlanForm, method: string): PlanForm {
   const exists = form.paymentMethods.includes(method);
@@ -72,16 +80,29 @@ export function SuperAdminPlansPage() {
   const [editForm, setEditForm] = useState<PlanForm>({ ...EMPTY_FORM });
   const [savingPlanId, setSavingPlanId] = useState<string | null>(null);
   const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncConflicts, setSyncConflicts] = useState<Record<string, PlatformPlanSyncConflict>>({});
 
-  const loadPlans = useCallback(async () => {
+  const loadPlans = useCallback(async (syncRemote = false) => {
+    if (syncRemote) {
+      try {
+        const result = await syncPlatformPlanIds();
+        setPlans(result.items);
+        setSyncConflicts(Object.fromEntries(result.conflicts.map((conflict) => [conflict.localPlanId, conflict])));
+        return result;
+      } catch {
+        // A indisponibilidade do Pagar.me nao deve impedir a listagem dos planos locais.
+      }
+    }
     const data = await getPlatformPlans();
     setPlans(data);
+    return null;
   }, []);
 
   useEffect(() => {
     void (async () => {
       setLoading(true);
-      try { await loadPlans(); } catch { toast.error("Nao foi possivel carregar os planos."); } finally { setLoading(false); }
+      try { await loadPlans(true); } catch { toast.error("Nao foi possivel carregar os planos."); } finally { setLoading(false); }
     })();
   }, [loadPlans]);
 
@@ -97,20 +118,39 @@ export function SuperAdminPlansPage() {
         price: cents / 100, interval: form.interval, intervalCount: Number(form.intervalCount || 1),
         trialPeriodDays: Number(form.trialPeriodDays || 0), statementDescriptor: form.statementDescriptor.trim(),
         paymentMethods: form.paymentMethods,
-        features: form.features.split("\n").map((f) => f.trim()).filter(Boolean),
+        features: planFeatures(form),
         maxProfessionals: form.maxProfessionals ? Number(form.maxProfessionals) : null,
         maxAdmins: form.maxAdmins ? Number(form.maxAdmins) : null,
         maxReceptionists: form.maxReceptionists ? Number(form.maxReceptionists) : null,
         isPublic: form.isPublic, isRecommended: form.isRecommended,
         sortOrder: Number(form.sortOrder || 0), syncPagarme: form.syncPagarme,
       });
-      const msg = result?.pagarmeSkipped
-        ? "Plano salvo no banco. PAGARME_SECRET_KEY nao configurada."
-        : form.syncPagarme ? "Plano criado no Pagar.me e salvo." : "Plano salvo (sem Pagar.me).";
+      const pagarmePlanId = result.pagarmePlanId || result.pagarme_plan_id;
+      const msg = form.syncPagarme && pagarmePlanId
+        ? "Plano criado no Pagar.me e salvo."
+        : "Plano salvo (sem Pagar.me).";
       toast.success(msg);
       setForm({ ...EMPTY_FORM });
       await loadPlans();
     } catch { toast.error("Nao foi possivel criar o plano."); } finally { setCreating(false); }
+  };
+
+  const handleSyncPlanIds = async () => {
+    setSyncing(true);
+    try {
+      const result = await loadPlans(true);
+      if (!result) {
+        toast.error("Nao foi possivel consultar os planos no Pagar.me.");
+      } else if (result.conflicts.length > 0) {
+        toast.warning(`${result.conflicts.length} plano(s) possuem valor ou periodicidade divergente no Pagar.me.`);
+      } else if (result.linked.length > 0) {
+        toast.success(`${result.linked.length} ID(s) do Pagar.me vinculado(s).`);
+      } else {
+        toast.success("IDs do Pagar.me ja estao sincronizados.");
+      }
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const openEditPlan = (plan: PlatformPlan) => {
@@ -125,7 +165,8 @@ export function SuperAdminPlansPage() {
       trialPeriodDays: String(plan.trialPeriodDays ?? plan.trial_period_days ?? 0),
       statementDescriptor: plan.statementDescriptor ?? "SALAONE",
       paymentMethods: pm,
-      features: Array.isArray(plan.features) ? plan.features.join("\n") : "",
+      features: Array.isArray(plan.features) ? plan.features.filter((feature) => String(feature).toLowerCase() !== "crm").join("\n") : "",
+      includesCrm: Array.isArray(plan.features) && plan.features.some((feature) => String(feature).toLowerCase() === "crm"),
       maxProfessionals: plan.maxProfessionals != null ? String(plan.maxProfessionals) : plan.max_professionals != null ? String(plan.max_professionals) : "",
       maxAdmins: plan.maxAdmins != null ? String(plan.maxAdmins) : plan.max_admins != null ? String(plan.max_admins) : "",
       maxReceptionists: plan.maxReceptionists != null ? String(plan.maxReceptionists) : plan.max_receptionists != null ? String(plan.max_receptionists) : "",
@@ -146,7 +187,7 @@ export function SuperAdminPlansPage() {
       await updatePlatformPlan(editingPlan.id, {
         name: editForm.name.trim(), description: editForm.description.trim() || null,
         price: cents / 100,
-        features: editForm.features.split("\n").map((f) => f.trim()).filter(Boolean),
+        features: planFeatures(editForm),
         isPublic: editForm.isPublic, isRecommended: editForm.isRecommended,
         sortOrder: Number(editForm.sortOrder || 0),
         maxProfessionals: editForm.maxProfessionals ? Number(editForm.maxProfessionals) : null,
@@ -155,10 +196,15 @@ export function SuperAdminPlansPage() {
         statementDescriptor: editForm.statementDescriptor.trim(),
         paymentMethods: editForm.paymentMethods,
       });
-      toast.success("Plano atualizado.");
+      toast.success(editingPlan.pagarmePlanId || editingPlan.pagarme_plan_id
+        ? "Plano atualizado e valor sincronizado com Pagar.me."
+        : "Plano atualizado apenas no banco.");
       setEditingPlan(null);
       await loadPlans();
-    } catch { toast.error("Nao foi possivel atualizar o plano."); } finally { setSavingPlanId(null); }
+    } catch (error: unknown) {
+      const failure = error as { response?: { data?: { message?: string } } };
+      toast.error(failure.response?.data?.message || "Nao foi possivel atualizar o plano no Pagar.me.");
+    } finally { setSavingPlanId(null); }
   };
 
   const handleTogglePublic = async (plan: PlatformPlan) => {
@@ -197,9 +243,16 @@ export function SuperAdminPlansPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-base font-semibold text-foreground">Planos da Plataforma</h3>
-        <p className="text-sm text-muted-foreground">Crie os planos recorrentes no Pagar.me e publique na landing page.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold text-foreground">Planos da Plataforma</h3>
+          <p className="text-sm text-muted-foreground">Crie os planos recorrentes no Pagar.me e publique na landing page.</p>
+        </div>
+        <button type="button" onClick={() => void handleSyncPlanIds()} disabled={loading || syncing}
+          className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-secondary disabled:opacity-50">
+          {syncing && <Loader2 size={15} className="animate-spin" />}
+          Sincronizar IDs
+        </button>
       </div>
 
       {/* Formulario */}
@@ -252,7 +305,7 @@ export function SuperAdminPlansPage() {
           <p className="text-xs text-muted-foreground">Pix nao e suportado em recorrencia de assinatura no Pagar.me.</p>
         </div>
         <div className="flex flex-wrap gap-4">
-          {[{ key: "isPublic", label: "Exibir na landing page" }, { key: "isRecommended", label: "Marcar como recomendado" }, { key: "syncPagarme", label: "Sincronizar com Pagar.me" }].map((opt) => (
+          {[{ key: "includesCrm", label: "Incluir CRM de Relacionamento" }, { key: "isPublic", label: "Exibir na landing page" }, { key: "isRecommended", label: "Marcar como recomendado" }, { key: "syncPagarme", label: "Sincronizar com Pagar.me" }].map((opt) => (
             <label key={opt.key} className="flex items-center gap-2 text-sm text-foreground">
               <input type="checkbox" checked={Boolean(form[opt.key as keyof PlanForm])} onChange={(e) => setForm((p) => ({ ...p, [opt.key]: e.target.checked }))} className="rounded border-border accent-primary" />
               {opt.label}
@@ -291,7 +344,8 @@ export function SuperAdminPlansPage() {
                 const isPublic = Boolean(plan.isPublic ?? plan.is_public);
                 const isActive = plan.active !== false;
                 const isBusy = savingPlanId === plan.id || deletingPlanId === plan.id;
-                const pid = plan.pagarmePlanId || plan.pagarme_plan_id;
+                const conflict = syncConflicts[plan.id];
+                const pid = plan.pagarmePlanId || plan.pagarme_plan_id || conflict?.remotePlanId;
                 return (
                   <tr key={plan.id} className="border-b border-border last:border-0 hover:bg-secondary/30">
                     <td className="px-5 py-3">
@@ -300,7 +354,10 @@ export function SuperAdminPlansPage() {
                     </td>
                     <td className="px-5 py-3 text-muted-foreground">{fmtInterval(plan.interval, plan.intervalCount ?? plan.interval_count)}</td>
                     <td className="px-5 py-3 font-medium text-foreground">{fmtCurrency(plan.price)}</td>
-                    <td className="px-5 py-3"><span className="font-mono text-xs text-muted-foreground">{pid || "-"}</span></td>
+                    <td className="px-5 py-3">
+                      <span className={`block font-mono text-xs ${conflict ? "text-amber-600" : "text-muted-foreground"}`} title={conflict?.reason}>{pid || "-"}</span>
+                      {conflict && <small className="text-amber-600">Configuracao divergente</small>}
+                    </td>
                     <td className="px-5 py-3">
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${isPublic ? "bg-emerald-500/10 text-emerald-600" : "bg-secondary text-muted-foreground"}`}>
                         {isPublic ? "Publicado" : "Oculto"}
@@ -388,7 +445,7 @@ export function SuperAdminPlansPage() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-4">
-                {[{ key: "isPublic", label: "Exibir na landing page" }, { key: "isRecommended", label: "Marcar como recomendado" }].map((opt) => (
+                {[{ key: "includesCrm", label: "Incluir CRM de Relacionamento" }, { key: "isPublic", label: "Exibir na landing page" }, { key: "isRecommended", label: "Marcar como recomendado" }].map((opt) => (
                   <label key={opt.key} className="flex items-center gap-2 text-sm text-foreground">
                     <input type="checkbox" checked={Boolean(editForm[opt.key as keyof PlanForm])} onChange={(e) => setEditForm((p) => ({ ...p, [opt.key]: e.target.checked }))} className="rounded border-border accent-primary" />
                     {opt.label}
