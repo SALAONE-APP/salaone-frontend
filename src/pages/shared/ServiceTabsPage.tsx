@@ -223,6 +223,25 @@ export function ServiceTabsPage() {
     }
   }
 
+  async function handleGoToPayments(tab: ServiceTab) {
+    setBusy(true);
+    try {
+      // Reabre de forma idempotente para sincronizar itens de produtos de
+      // comandas criadas antes da correção, sem criar uma segunda comanda.
+      await openServiceTab(tab.appointmentId);
+      const paymentsPath = user?.role === "professional" ? "/financial-payments" : "/payments";
+      const params = new URLSearchParams({
+        serviceTabId: tab.id,
+        date: dateKey(tab.appointment.startAt),
+      });
+      navigate(`${paymentsPath}?${params.toString()}`);
+    } catch (error) {
+      toast.error(message(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function renderTab(tab: ServiceTab, readOnly = false) {
     const fullTotal = tab.originalServices.reduce((sum, item) => sum + item.total, 0)
       + tab.items.reduce((sum, item) => sum + item.total, 0);
@@ -302,14 +321,7 @@ export function ServiceTabsPage() {
             </Button>
             {tab.pendingTotal > 0.005 && (
               <Button
-                onClick={() => {
-                  const paymentsPath = user?.role === "professional" ? "/financial-payments" : "/payments";
-                  const params = new URLSearchParams({
-                    serviceTabId: tab.id,
-                    date: dateKey(tab.appointment.startAt),
-                  });
-                  navigate(`${paymentsPath}?${params.toString()}`);
-                }}
+                onClick={() => void handleGoToPayments(tab)}
                 disabled={busy}
               >
                 <CreditCard className="mr-2 h-4 w-4" /> Ir para pagamentos
