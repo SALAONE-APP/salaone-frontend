@@ -641,6 +641,12 @@ export function RelationshipKanbanPage() {
                                   {reasonLabel(trigger.reason)}
                                 </Badge>
                               ))}
+                              {card.serviceName && (
+                                <Badge className="gap-1 text-[11px]">
+                                  <Scissors size={11} />
+                                  {card.serviceName}
+                                </Badge>
+                              )}
                             </div>
 
                             <div className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground">

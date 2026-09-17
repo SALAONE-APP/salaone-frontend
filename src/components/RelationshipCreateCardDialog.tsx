@@ -9,12 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  NEXT_ACTION_OPTIONS,
   REASON_LABELS,
   createRelationshipCard,
   type RelationshipCard,
   type RelationshipPipeline,
 } from "@/service/relationshipService";
 import { listUsers, type UserProfile } from "@/service/userService";
+import { listServices, type Service } from "@/service/serviceService";
 import { useRelationshipTour } from "@/hooks/useRelationshipTour";
 
 interface Props {
@@ -37,8 +39,11 @@ export function RelationshipCreateCardDialog({ open, pipelines, defaultPipelineI
   const [primaryReason, setPrimaryReason] = useState("");
   const [responsibleId, setResponsibleId] = useState("none");
   const [responsibleOptions, setResponsibleOptions] = useState<UserProfile[]>([]);
+  const [serviceId, setServiceId] = useState("none");
+  const [serviceOptions, setServiceOptions] = useState<Service[]>([]);
   const [pipelineId, setPipelineId] = useState<string | null>(null);
-  const [nextAction, setNextAction] = useState("");
+  const [nextActionOption, setNextActionOption] = useState("");
+  const [nextActionCustom, setNextActionCustom] = useState("");
   const [nextActionAt, setNextActionAt] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -48,13 +53,16 @@ export function RelationshipCreateCardDialog({ open, pipelines, defaultPipelineI
       setClient(null);
       setPrimaryReason("");
       setResponsibleId("none");
-      setNextAction("");
+      setServiceId("none");
+      setNextActionOption("");
+      setNextActionCustom("");
       setNextActionAt("");
       setNotes("");
       return;
     }
     setPipelineId(defaultPipelineId);
     listUsers({ excludeRole: "client", limit: 100 }).then((r) => setResponsibleOptions(r.items)).catch(() => null);
+    listServices({ includeInactive: false }).then((r) => setServiceOptions(r.items)).catch(() => null);
   }, [open, defaultPipelineId]);
 
   async function handleSubmit() {
@@ -66,6 +74,8 @@ export function RelationshipCreateCardDialog({ open, pipelines, defaultPipelineI
       toast.error("Selecione o motivo principal.");
       return;
     }
+    const resolvedNextAction =
+      nextActionOption === "outro" ? nextActionCustom.trim() : NEXT_ACTION_OPTIONS[nextActionOption] ?? "";
     setSubmitting(true);
     try {
       const card = await createRelationshipCard({
@@ -73,7 +83,8 @@ export function RelationshipCreateCardDialog({ open, pipelines, defaultPipelineI
         pipelineId: pipelineId ?? undefined,
         primaryReason,
         responsibleSalonUserId: responsibleId === "none" ? null : responsibleId,
-        nextAction: nextAction.trim() || null,
+        serviceId: serviceId === "none" ? null : serviceId,
+        nextAction: resolvedNextAction || null,
         nextActionAt: nextActionAt ? new Date(nextActionAt).toISOString() : null,
         notes: notes.trim() || null,
       });
@@ -159,6 +170,23 @@ export function RelationshipCreateCardDialog({ open, pipelines, defaultPipelineI
           </div>
 
           <div>
+            <Label>Serviço específico</Label>
+            <Select value={serviceId} onValueChange={setServiceId}>
+              <SelectTrigger className="mt-1.5">
+                <SelectValue placeholder="Selecione o serviço" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nenhum</SelectItem>
+                {serviceOptions.map((service) => (
+                  <SelectItem key={service.id} value={service.id}>
+                    {service.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
             <Label>Responsável</Label>
             <Select value={responsibleId} onValueChange={setResponsibleId}>
               <SelectTrigger className="mt-1.5">
@@ -178,13 +206,36 @@ export function RelationshipCreateCardDialog({ open, pipelines, defaultPipelineI
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <Label>Próxima ação</Label>
-              <Input className="mt-1.5" value={nextAction} onChange={(e) => setNextAction(e.target.value)} placeholder="Ex.: Enviar WhatsApp" />
+              <Select value={nextActionOption} onValueChange={setNextActionOption}>
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue placeholder="Selecione a ação" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(NEXT_ACTION_OPTIONS).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Data/hora da próxima ação</Label>
               <Input className="mt-1.5" type="datetime-local" value={nextActionAt} onChange={(e) => setNextActionAt(e.target.value)} />
             </div>
           </div>
+
+          {nextActionOption === "outro" && (
+            <div>
+              <Label>Descreva a ação</Label>
+              <Input
+                className="mt-1.5"
+                value={nextActionCustom}
+                onChange={(e) => setNextActionCustom(e.target.value)}
+                placeholder="Ex.: Enviar orçamento por e-mail"
+              />
+            </div>
+          )}
 
           <div>
             <Label>Observações</Label>
