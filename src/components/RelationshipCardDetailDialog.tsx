@@ -24,6 +24,7 @@ import { useRelationshipTour } from "@/hooks/useRelationshipTour";
 import {
   CONTACT_TYPE_LABELS,
   EVENT_TYPE_LABELS,
+  NEXT_ACTION_OPTIONS,
   REASON_LABELS,
   addRelationshipTrigger,
   createRelationshipEvent,
@@ -39,6 +40,7 @@ import {
   type RelationshipPipeline,
 } from "@/service/relationshipService";
 import { listUsers, type UserProfile } from "@/service/userService";
+import { listServices, type Service } from "@/service/serviceService";
 
 interface Props {
   cardId: string | null;
@@ -67,6 +69,16 @@ function toDateTimeLocalInput(value: string | null) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+// Cards antigos guardam texto livre em nextAction. Se o valor bater com um
+// dos rótulos predefinidos, pré-seleciona essa opção; senão cai em "outro"
+// preservando o texto original, pra não perder dado ao editar um card antigo.
+function resolveNextActionOption(nextAction: string | null): { option: string; custom: string } {
+  if (!nextAction) return { option: "", custom: "" };
+  const match = Object.entries(NEXT_ACTION_OPTIONS).find(([key, label]) => key !== "outro" && label === nextAction);
+  if (match) return { option: match[0], custom: "" };
+  return { option: "outro", custom: nextAction };
+}
+
 export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onChanged }: Props) {
   const { user } = useAuth();
   const { isTourOpen } = useRelationshipTour();
@@ -75,11 +87,14 @@ export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onCha
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [responsibleOptions, setResponsibleOptions] = useState<UserProfile[]>([]);
+  const [serviceOptions, setServiceOptions] = useState<Service[]>([]);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const [stage, setStage] = useState("");
   const [responsibleId, setResponsibleId] = useState("none");
-  const [nextAction, setNextAction] = useState("");
+  const [serviceId, setServiceId] = useState("none");
+  const [nextActionOption, setNextActionOption] = useState("");
+  const [nextActionCustom, setNextActionCustom] = useState("");
   const [nextActionAt, setNextActionAt] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -97,7 +112,10 @@ export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onCha
       setEvents(eventsData);
       setStage(cardData.stage);
       setResponsibleId(cardData.responsibleSalonUserId ?? "none");
-      setNextAction(cardData.nextAction ?? "");
+      setServiceId(cardData.serviceId ?? "none");
+      const resolved = resolveNextActionOption(cardData.nextAction);
+      setNextActionOption(resolved.option);
+      setNextActionCustom(resolved.custom);
       setNextActionAt(toDateTimeLocalInput(cardData.nextActionAt));
       setNotes(cardData.notes ?? "");
     } catch {
@@ -111,6 +129,7 @@ export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onCha
     if (cardId) {
       void load(cardId);
       listUsers({ excludeRole: "client", limit: 100 }).then((r) => setResponsibleOptions(r.items)).catch(() => null);
+      listServices({ includeInactive: false }).then((r) => setServiceOptions(r.items)).catch(() => null);
     } else {
       setCard(null);
       setEvents([]);
@@ -120,12 +139,15 @@ export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onCha
 
   async function handleSaveFields() {
     if (!card) return;
+    const resolvedNextAction =
+      nextActionOption === "outro" ? nextActionCustom.trim() : NEXT_ACTION_OPTIONS[nextActionOption] ?? "";
     setSaving(true);
     try {
       const updated = await updateRelationshipCard(card.id, {
         stage: stage || undefined,
         responsibleSalonUserId: responsibleId === "none" ? null : responsibleId,
-        nextAction: nextAction.trim() || null,
+        serviceId: serviceId === "none" ? null : serviceId,
+        nextAction: resolvedNextAction || null,
         nextActionAt: nextActionAt ? new Date(nextActionAt).toISOString() : null,
         notes: notes.trim() || null,
       });
@@ -291,6 +313,10 @@ export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onCha
                   <p className="truncate font-medium text-foreground">{card.stats.favoriteService ?? "-"}</p>
                 </div>
                 <div>
+                  <span className="text-muted-foreground">Serviço do card</span>
+                  <p className="truncate font-medium text-foreground">{card.serviceName ?? "-"}</p>
+                </div>
+                <div>
                   <span className="text-muted-foreground">Profissional preferido</span>
                   <p className="truncate font-medium text-foreground">{card.stats.favoriteProfessional ?? "-"}</p>
                 </div>
@@ -354,16 +380,54 @@ export function RelationshipCardDetailDialog({ cardId, pipelines, onClose, onCha
                     </SelectContent>
                   </Select>
                 </div>
+                <div>
+                  <Label>Serviço específico</Label>
+                  <Select value={serviceId} onValueChange={setServiceId}>
+                    <SelectTrigger className="mt-1.5">
+                      <SelectValue placeholder="Selecione o serviço" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      {serviceOptions.map((service) => (
+                        <SelectItem key={service.id} value={service.id}>
+                          {service.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <Label>Próxima ação</Label>
-                    <Input className="mt-1.5" value={nextAction} onChange={(e) => setNextAction(e.target.value)} placeholder="Ex.: Enviar WhatsApp" />
+                    <Select value={nextActionOption} onValueChange={setNextActionOption}>
+                      <SelectTrigger className="mt-1.5">
+                        <SelectValue placeholder="Selecione a ação" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(NEXT_ACTION_OPTIONS).map(([key, label]) => (
+                          <SelectItem key={key} value={key}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <Label>Data/hora da próxima ação</Label>
                     <Input className="mt-1.5" type="datetime-local" value={nextActionAt} onChange={(e) => setNextActionAt(e.target.value)} />
                   </div>
                 </div>
+                {nextActionOption === "outro" && (
+                  <div>
+                    <Label>Descreva a ação</Label>
+                    <Input
+                      className="mt-1.5"
+                      value={nextActionCustom}
+                      onChange={(e) => setNextActionCustom(e.target.value)}
+                      placeholder="Ex.: Enviar orçamento por e-mail"
+                    />
+                  </div>
+                )}
                 <div>
                   <Label>Observações</Label>
                   <Textarea className="mt-1.5 min-h-20" value={notes} onChange={(e) => setNotes(e.target.value)} />

@@ -127,6 +127,17 @@ export const CONTACT_TYPE_LABELS: Record<string, string> = {
   presencial: "Presencial",
 };
 
+// Opções fixas pra "Próxima ação" no lugar do input livre - mesmo vocabulário
+// de CONTACT_TYPE_LABELS (canal de contato), mais "outro" pra liberar texto
+// livre quando nenhuma opção padrão cobre o caso.
+export const NEXT_ACTION_OPTIONS: Record<string, string> = {
+  ligacao: "Ligar",
+  whatsapp: "Enviar WhatsApp",
+  email: "Enviar e-mail",
+  presencial: "Visita presencial",
+  outro: "Outro",
+};
+
 export const EVENT_TYPE_LABELS: Record<string, string> = {
   contact: "Contato registrado",
   stage_changed: "Mudou de estágio",
@@ -173,6 +184,8 @@ export interface RelationshipCard {
   clientPhone: string;
   responsibleSalonUserId: string | null;
   responsibleName: string | null;
+  serviceId: string | null;
+  serviceName: string | null;
   createdBy: string | null;
   createdByName: string | null;
   stage: string;
@@ -224,6 +237,7 @@ export async function updateRelationshipCard(
     stage?: string;
     sortOrder?: number;
     responsibleSalonUserId?: string | null;
+    serviceId?: string | null;
     nextAction?: string | null;
     nextActionAt?: string | null;
     notes?: string | null;
@@ -239,6 +253,7 @@ export async function createRelationshipCard(data: {
   primaryReason: string;
   stage?: string;
   responsibleSalonUserId?: string | null;
+  serviceId?: string | null;
   nextAction?: string | null;
   nextActionAt?: string | null;
   notes?: string | null;
