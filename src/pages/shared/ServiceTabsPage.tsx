@@ -301,7 +301,17 @@ export function ServiceTabsPage() {
               <Plus className="mr-2 h-4 w-4" /> Adicionar item
             </Button>
             {tab.pendingTotal > 0.005 && (
-              <Button onClick={() => navigate(user?.role === "professional" ? "/financial-payments" : "/payments")} disabled={busy}>
+              <Button
+                onClick={() => {
+                  const paymentsPath = user?.role === "professional" ? "/financial-payments" : "/payments";
+                  const params = new URLSearchParams({
+                    serviceTabId: tab.id,
+                    date: dateKey(tab.appointment.startAt),
+                  });
+                  navigate(`${paymentsPath}?${params.toString()}`);
+                }}
+                disabled={busy}
+              >
                 <CreditCard className="mr-2 h-4 w-4" /> Ir para pagamentos
               </Button>
             )}

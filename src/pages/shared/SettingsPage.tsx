@@ -2295,25 +2295,28 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         {/* Payments */}
         <TabsContent value="payments" className="space-y-6">
           <div className="bg-card rounded-xl border border-border p-6">
-            <h3 className="text-lg font-medium text-foreground mb-4">Métodos de Pagamento</h3>
+            <h3 className="text-lg font-medium text-foreground mb-4">Métodos de pagamento online</h3>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Estas opções aparecem somente no site para o cliente ao realizar um agendamento. Elas não limitam o registro de pagamentos presenciais na aba Pagamentos.
+            </p>
             <div className="space-y-4">
               {[
                 {
                   id: 'cartao' as const,
                   name: 'Cartao',
-                  description: 'Credito e debito usam a mesma forma de pagamento no agendamento.',
+                  description: 'Permitir pagamento online com cartão de crédito ou débito no agendamento.',
                   icon: CreditCard,
                 },
                 {
                   id: 'pix' as const,
                   name: 'PIX',
-                  description: 'Permitir pagamento via PIX no agendamento.',
+                  description: 'Permitir pagamento online via PIX no agendamento.',
                   icon: QrCode,
                 },
                 {
                   id: 'local' as const,
                   name: 'Dinheiro/Pagamento Local',
-                  description: 'Permitir pagamento presencial na salão.',
+                  description: 'Exibir no agendamento online a opção de pagar presencialmente no salão.',
                   icon: Banknote,
                 },
               ].map((method) => {

@@ -15,6 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useSearchParams } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,14 @@ type TypeFilter = "all" | PaymentType;
 type SplitMethod = "pix" | "debito" | "credito" | "dinheiro";
 type SplitPart = { method: SplitMethod; amount: string };
 const MAX_ADJUSTMENT_NOTE_LENGTH = 200;
+// Os meios abaixo são exclusivos do recebimento presencial no painel.
+// Eles não dependem dos meios habilitados para o checkout online.
+const IN_PERSON_PAYMENT_METHODS: Array<{ value: SplitMethod; label: string }> = [
+  { value: "dinheiro", label: "Dinheiro" },
+  { value: "pix", label: "PIX" },
+  { value: "credito", label: "Cartão Crédito" },
+  { value: "debito", label: "Cartão Débito" },
+];
 
 function editablePaymentMethod(method: PaymentMethod): SplitMethod {
   return ["pix", "debito", "credito", "dinheiro"].includes(method)
@@ -246,13 +255,16 @@ function downloadCsv(payments: PaymentWithType[]) {
 }
 
 export function PaymentsPage() {
+  const [searchParams] = useSearchParams();
+  const serviceTabId = searchParams.get("serviceTabId");
+  const requestedDate = searchParams.get("date");
   const [payments, setPayments] = useState<PaymentWithType[]>([]);
   const [total, setTotal] = useState(0);
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
-  const [dateFilter, setDateFilter] = useState(() => localDateKey(new Date()));
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>(() => serviceTabId ? "service_tab" : "all");
+  const [dateFilter, setDateFilter] = useState(() => requestedDate || localDateKey(new Date()));
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -268,6 +280,12 @@ export function PaymentsPage() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>("dinheiro");
 
   const limit = 20;
+
+  useEffect(() => {
+    setTypeFilter(serviceTabId ? "service_tab" : "all");
+    setDateFilter(requestedDate || localDateKey(new Date()));
+    setPage(1);
+  }, [requestedDate, serviceTabId]);
 
   const loadPayments = useCallback(async () => {
     setLoading(true);
@@ -307,6 +325,7 @@ export function PaymentsPage() {
       if (dateFilter && paymentDateKey(payment) !== dateFilter) return false;
       if (statusFilter === "confirmed" && payment.status !== "paid" && payment.status !== "approved") return false;
       if (typeFilter !== "all" && payment.paymentType !== typeFilter) return false;
+      if (serviceTabId && payment.serviceTab?.id !== serviceTabId) return false;
       if (!term) return true;
 
       const haystack = normalizeText(
@@ -326,7 +345,7 @@ export function PaymentsPage() {
 
       return haystack.includes(term);
     });
-  }, [dateFilter, payments, search, statusFilter, typeFilter]);
+  }, [dateFilter, payments, search, serviceTabId, statusFilter, typeFilter]);
 
   const { selectedRows, toggleRow, toggleAll } = useTableSelection(
     filteredPayments.map((payment) => payment.id),
@@ -858,7 +877,7 @@ export function PaymentsPage() {
       <Dialog open={Boolean(localPaymentDialog)} onOpenChange={(open) => { if (!open) setLocalPaymentDialog(null); }}>
         <DialogContent className="w-[calc(100vw-2rem)] max-w-lg overflow-hidden sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Confirmar pagamento</DialogTitle>
+            <DialogTitle>Confirmar pagamento presencial</DialogTitle>
             <DialogDescription>
               Ajuste o valor, aplique desconto ou acrescimo e confirme a forma de pagamento de{" "}
               <span className="font-medium text-foreground">
@@ -906,14 +925,7 @@ export function PaymentsPage() {
             </div>
           )}
           {splitParts.length === 1 ? <div className="grid grid-cols-2 gap-3 py-2">
-            {(
-              [
-                { value: "dinheiro", label: "Dinheiro" },
-                { value: "pix", label: "PIX" },
-                { value: "credito", label: "Cartão Crédito" },
-                { value: "debito", label: "Cartão Débito" },
-              ] as { value: PaymentMethod; label: string }[]
-            ).map(({ value, label }) => (
+            {IN_PERSON_PAYMENT_METHODS.map(({ value, label }) => (
               <button
                 key={value}
                 type="button"
