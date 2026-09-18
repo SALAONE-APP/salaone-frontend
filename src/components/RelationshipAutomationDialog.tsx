@@ -12,7 +12,7 @@ import {
   type PostServiceAutomationConfig,
   type RelationshipPipeline,
 } from "@/service/relationshipService";
-import { listServices } from "@/service/serviceService";
+import { listServices, type Service } from "@/service/serviceService";
 import { useRelationshipTour } from "@/hooks/useRelationshipTour";
 
 interface Props {
@@ -34,8 +34,8 @@ export function RelationshipAutomationDialog({ open, onClose, pipelines }: Props
   const [saving, setSaving] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [genericPipelineId, setGenericPipelineId] = useState<string | null>(null);
-  const [categoryPipelines, setCategoryPipelines] = useState<Record<string, string>>({});
-  const [categories, setCategories] = useState<string[]>([]);
+  const [servicePipelines, setServicePipelines] = useState<Record<string, string>>({});
+  const [services, setServices] = useState<Service[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -44,15 +44,9 @@ export function RelationshipAutomationDialog({ open, onClose, pipelines }: Props
       .then(([automation, servicesResponse]) => {
         setEnabled(automation.enabled);
         setGenericPipelineId(automation.genericPipelineId);
-        setCategoryPipelines(automation.categoryPipelines);
-        const distinct = Array.from(
-          new Set(
-            servicesResponse.items
-              .map((service) => service.category?.trim())
-              .filter((category): category is string => Boolean(category)),
-          ),
-        ).sort((a, b) => a.localeCompare(b));
-        setCategories(distinct);
+        setServicePipelines(automation.servicePipelines);
+        const sorted = [...servicesResponse.items].sort((a, b) => a.name.localeCompare(b.name));
+        setServices(sorted);
       })
       .catch((error) => toast.error(extractErrorMessage(error, "Não foi possível carregar a automação.")))
       .finally(() => setLoading(false));
@@ -61,15 +55,15 @@ export function RelationshipAutomationDialog({ open, onClose, pipelines }: Props
   const pipelineById = useMemo(() => new Map(pipelines.map((pipeline) => [pipeline.id, pipeline])), [pipelines]);
 
   const staleGenericPipeline = genericPipelineId != null && !pipelineById.has(genericPipelineId);
-  const staleCategoryMappings = Object.entries(categoryPipelines).filter(([, pipelineId]) => !pipelineById.has(pipelineId));
+  const staleServiceMappings = Object.entries(servicePipelines).filter(([, pipelineId]) => !pipelineById.has(pipelineId));
 
-  function handleCategoryChange(category: string, value: string) {
-    setCategoryPipelines((prev) => {
+  function handleServiceChange(serviceId: string, value: string) {
+    setServicePipelines((prev) => {
       const next = { ...prev };
       if (value === NO_MAPPING) {
-        delete next[category];
+        delete next[serviceId];
       } else {
-        next[category] = value;
+        next[serviceId] = value;
       }
       return next;
     });
@@ -83,7 +77,7 @@ export function RelationshipAutomationDialog({ open, onClose, pipelines }: Props
     const config: PostServiceAutomationConfig = {
       enabled,
       genericPipelineId,
-      categoryPipelines,
+      servicePipelines,
     };
     setSaving(true);
     try {
@@ -139,7 +133,7 @@ export function RelationshipAutomationDialog({ open, onClose, pipelines }: Props
             <div>
               <Label>Pipeline padrão (fallback)</Label>
               <p className="mb-1.5 text-xs text-muted-foreground">
-                Usado quando o atendimento tem mais de um serviço, ou quando o serviço não tem categoria mapeada.
+                Usado quando nenhum serviço do atendimento tem um pipeline mapeado abaixo.
               </p>
               <Select value={genericPipelineId ?? undefined} onValueChange={setGenericPipelineId}>
                 <SelectTrigger data-tour="automation-pipeline-padrao-select">
@@ -160,18 +154,23 @@ export function RelationshipAutomationDialog({ open, onClose, pipelines }: Props
               )}
             </div>
 
-            {categories.length > 0 && (
+            {services.length > 0 && (
               <div className="flex flex-col gap-2" data-tour="automation-categoria-mapeamento">
-                <Label>Categorias de serviço</Label>
-                {categories.map((category) => {
-                  const isStale = categoryPipelines[category] && !pipelineById.has(categoryPipelines[category]);
+                <Label>Serviços</Label>
+                <p className="text-xs text-muted-foreground">
+                  Se o atendimento tiver mais de um serviço mapeado, vence o primeiro que foi adicionado ao
+                  agendamento.
+                </p>
+                {services.map((service) => {
+                  const mapped = servicePipelines[service.id];
+                  const isStale = Boolean(mapped) && !pipelineById.has(mapped);
                   return (
-                    <div key={category} className="flex items-center justify-between gap-3 rounded-lg border border-border p-2.5">
-                      <span className="text-sm text-foreground">{category}</span>
+                    <div key={service.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-2.5">
+                      <span className="text-sm text-foreground">{service.name}</span>
                       <div className="flex flex-col items-end">
                         <Select
-                          value={categoryPipelines[category] ?? NO_MAPPING}
-                          onValueChange={(value) => handleCategoryChange(category, value)}
+                          value={mapped ?? NO_MAPPING}
+                          onValueChange={(value) => handleServiceChange(service.id, value)}
                         >
                           <SelectTrigger className="h-8 w-56 text-xs">
                             <SelectValue placeholder="Sem mapeamento" />
@@ -195,7 +194,7 @@ export function RelationshipAutomationDialog({ open, onClose, pipelines }: Props
               </div>
             )}
 
-            {staleCategoryMappings.length > 0 && (
+            {staleServiceMappings.length > 0 && (
               <p className="text-xs text-destructive">
                 Alguns mapeamentos apontam para pipelines que não existem mais — ajuste antes de salvar.
               </p>

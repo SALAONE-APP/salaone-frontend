@@ -313,7 +313,7 @@ export async function deleteRelationshipPipeline(id: string) {
 export interface PostServiceAutomationConfig {
   enabled: boolean;
   genericPipelineId: string | null;
-  categoryPipelines: Record<string, string>;
+  servicePipelines: Record<string, string>;
 }
 
 export async function getPostServiceAutomation() {
