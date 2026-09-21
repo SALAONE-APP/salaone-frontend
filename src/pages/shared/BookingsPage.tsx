@@ -396,6 +396,13 @@ export function BookingsPage() {
     [form.serviceIds, services],
   );
 
+  const availableServicesForProfessional = useMemo(() => {
+    if (!form.professionalId) return [];
+    const professional = professionals.find((item) => item.id === form.professionalId);
+    const serviceIds = new Set(professional?.serviceIds ?? []);
+    return services.filter((service) => serviceIds.has(service.id));
+  }, [form.professionalId, professionals, services]);
+
   const selectedProducts = useMemo(
     () =>
       products
@@ -1664,8 +1671,14 @@ export function BookingsPage() {
                 <Select
                   value={form.professionalId}
                   onValueChange={(value) => {
-                    setField("professionalId", value);
-                    setField("time", "");
+                    const professional = professionals.find((item) => item.id === value);
+                    const serviceIds = new Set(professional?.serviceIds ?? []);
+                    setForm((current) => ({
+                      ...current,
+                      professionalId: value,
+                      serviceIds: current.serviceIds.filter((serviceId) => serviceIds.has(serviceId)),
+                      time: "",
+                    }));
                   }}
                 >
                   <SelectTrigger className="w-full">
@@ -1746,12 +1759,14 @@ export function BookingsPage() {
               <div className="space-y-3 md:col-span-2">
                 <Label>Servicos</Label>
                 <div className="grid max-h-56 gap-2 overflow-y-auto rounded-md border border-border p-3 md:grid-cols-2">
-                  {services.length === 0 ? (
+                  {availableServicesForProfessional.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      Nenhum servico ativo.
+                      {form.professionalId
+                        ? "Este profissional nao possui servicos habilitados."
+                        : "Selecione um profissional para ver os servicos disponiveis."}
                     </p>
                   ) : (
-                    services.map((service) => (
+                    availableServicesForProfessional.map((service) => (
                       <label
                         key={service.id}
                         className="flex items-start gap-3 rounded-md p-2 text-sm hover:bg-secondary/60"
