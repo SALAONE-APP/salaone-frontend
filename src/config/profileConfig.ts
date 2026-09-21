@@ -1,4 +1,4 @@
-export type UserRole = "client" | "professional" | "admin" | "super_admin" | "receptionist";
+export type UserRole = "client" | "professional" | "admin" | "super_admin" | "receptionist" | "sales_rep";
 
 export interface ProfileConfig {
   role: UserRole;
@@ -7,7 +7,7 @@ export interface ProfileConfig {
   defaultRoute: string;
 }
 
-const roles: UserRole[] = ["client", "professional", "admin", "super_admin", "receptionist"];
+const roles: UserRole[] = ["client", "professional", "admin", "super_admin", "receptionist", "sales_rep"];
 
 export function normalizeRole(role?: string | null): UserRole {
   const rawRole = String(role || "").trim().toLowerCase();
@@ -46,6 +46,12 @@ export const profileConfigs: Record<UserRole, ProfileConfig> = {
     label: "Recepcionista",
     panelTitle: "Recepcao",
     defaultRoute: "/home",
+  },
+  sales_rep: {
+    role: "sales_rep",
+    label: "Vendedor",
+    panelTitle: "CRM Comercial",
+    defaultRoute: "/crm-comercial",
   },
 };
 
