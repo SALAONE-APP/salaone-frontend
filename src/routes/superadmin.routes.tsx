@@ -7,6 +7,9 @@ import { SuperAdminReportsPage } from "../pages/super_admin/SuperAdminReportsPag
 import { SuperAdminAresChatPage } from "../pages/super_admin/SuperAdminAresChatPage";
 import { SuperAdminFeatureUpdatesPage } from "../pages/super_admin/SuperAdminFeatureUpdatesPage";
 import { SuperAdminLandingLeadsPage } from "../pages/super_admin/SuperAdminLandingLeadsPage";
+import { SalesCrmDashboardPage } from "../pages/sales_crm/SalesCrmDashboardPage";
+import { SalesCrmKanbanPage } from "../pages/sales_crm/SalesCrmKanbanPage";
+import { SalesCrmScriptsPage } from "../pages/sales_crm/SalesCrmScriptsPage";
 import type { AppRoute } from "./types";
 
 export const superAdminRoutes: AppRoute[] = [
@@ -63,5 +66,23 @@ export const superAdminRoutes: AppRoute[] = [
     title: "Relatorios",
     breadcrumbs: ["Super Admin", "Relatorios"],
     Component: SuperAdminReportsPage,
+  },
+  {
+    path: "/crm-comercial",
+    title: "Funil de Vendas",
+    breadcrumbs: ["CRM Comercial", "Funil de Vendas"],
+    Component: SalesCrmKanbanPage,
+  },
+  {
+    path: "/crm-comercial/dashboard",
+    title: "Dashboard Comercial",
+    breadcrumbs: ["CRM Comercial", "Dashboard"],
+    Component: SalesCrmDashboardPage,
+  },
+  {
+    path: "/crm-comercial/scripts",
+    title: "Scripts Comerciais",
+    breadcrumbs: ["CRM Comercial", "Scripts"],
+    Component: SalesCrmScriptsPage,
   },
 ];

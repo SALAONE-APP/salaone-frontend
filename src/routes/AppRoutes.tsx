@@ -12,6 +12,7 @@ import { ProfessionalLayout } from "../layouts/ProfessionalLayout";
 import { ClientLayout } from "../layouts/ClientLayout";
 import { ReceptionistLayout } from "../layouts/ReceptionistLayout";
 import { SuperAdminLayout } from "../layouts/SuperAdminLayout";
+import { SalesRepLayout } from "../layouts/SalesRepLayout";
 import { adminRoutes } from "./admin.routes";
 import { professionalRoutes } from "./professional.routes";
 import { clientRoutes } from "./client.routes";
@@ -20,6 +21,7 @@ import { PrivateRoute } from "./PrivateRoute";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { receptionistRoutes } from "./receptionist.routes";
 import { superAdminRoutes } from "./superadmin.routes";
+import { salesRepRoutes } from "./salesrep.routes";
 import type { AppRoute } from "./types";
 
 interface RouteGroup {
@@ -59,6 +61,12 @@ const routeGroups: Record<UserRole, RouteGroup> = {
     routes: receptionistRoutes,
     headerActionLabel: "Novo agendamento",
     headerActionHref: "/bookings",
+  },
+  sales_rep: {
+    Layout: SalesRepLayout,
+    routes: salesRepRoutes,
+    headerActionLabel: "Novo Lead",
+    headerActionHref: "/crm-comercial",
   },
 };
 
