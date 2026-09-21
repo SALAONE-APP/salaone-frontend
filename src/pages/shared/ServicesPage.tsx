@@ -492,7 +492,7 @@ export function ServicesPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Status
                   </th>
-                  {canManage ? <th className="w-10 px-4 py-3" /> : null}
+                  {canManage ? <th className="sticky right-0 z-10 w-12 bg-card px-4 py-3" /> : null}
                 </tr>
               </thead>
               <tbody>
@@ -594,10 +594,13 @@ export function ServicesPage() {
                           </Badge>
                         </td>
                         {canManage ? (
-                          <td className="px-4 py-3">
+                          <td className="sticky right-0 z-10 bg-card px-4 py-3">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <button className="p-1 text-muted-foreground transition-colors hover:text-foreground">
+                                <button
+                                  className="p-1 text-muted-foreground transition-colors hover:text-foreground"
+                                  aria-label={`Ações para ${service.name}`}
+                                >
                                   <MoreHorizontal size={16} />
                                 </button>
                               </DropdownMenuTrigger>
