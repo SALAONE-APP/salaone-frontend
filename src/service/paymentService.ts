@@ -82,6 +82,7 @@ export interface PaymentRecord {
 export interface ListPaymentsParams {
   userId?: string;
   status?: PaymentStatus;
+  confirmed?: boolean;
   method?: PaymentMethod;
   dateFrom?: string;
   dateTo?: string;

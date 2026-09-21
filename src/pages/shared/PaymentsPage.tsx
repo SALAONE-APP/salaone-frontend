@@ -294,6 +294,7 @@ export function PaymentsPage() {
     try {
       const result = await listAllPayments({
         status: statusFilter === "all" || statusFilter === "confirmed" ? undefined : statusFilter,
+        confirmed: statusFilter === "confirmed" ? true : undefined,
         dateFrom: dateFilter || undefined,
         dateTo: dateFilter || undefined,
         page,
