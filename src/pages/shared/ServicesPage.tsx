@@ -678,9 +678,9 @@ export function ServicesPage() {
       </Dialog>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <DialogHeader>
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+          <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+            <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
               <DialogTitle>
                 {editingService ? "Editar Serviço" : "Adicionar Serviço"}
               </DialogTitle>
@@ -689,7 +689,8 @@ export function ServicesPage() {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-6 pb-5 [-webkit-overflow-scrolling:touch]">
+              <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="service-name">Nome</Label>
                 <Input
@@ -845,9 +846,10 @@ export function ServicesPage() {
                 />
                 Serviço ativo
               </label>
+              </div>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="shrink-0 border-t border-border bg-background px-6 py-4">
               <Button
                 type="button"
                 variant="outline"
