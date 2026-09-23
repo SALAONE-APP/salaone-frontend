@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { FileAudio, FileText, Image as ImageIcon, Loader2, Paperclip, Pencil, Plus, Trash2, Video, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -24,15 +24,31 @@ import {
   SALES_CHANNELS,
   createSalesScript,
   deleteSalesScript,
+  deleteSalesScriptAttachment,
   listSalesScripts,
   salesChannelLabel,
   updateSalesScript,
+  uploadSalesScriptAttachment,
   type SalesScript,
+  type SalesScriptAttachment,
 } from "@/service/salesCrmService";
 
 function extractErrorMessage(error: unknown, fallback: string) {
   const value = (error as { response?: { data?: { message?: unknown } } })?.response?.data?.message;
   return typeof value === "string" ? value : fallback;
+}
+
+function attachmentIcon(type: SalesScriptAttachment["type"]) {
+  if (type === "image") return ImageIcon;
+  if (type === "video") return Video;
+  if (type === "audio") return FileAudio;
+  return FileText;
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 interface FormState {
@@ -42,9 +58,10 @@ interface FormState {
   channel: string;
   content: string;
   active: boolean;
+  attachments: SalesScriptAttachment[];
 }
 
-const EMPTY_FORM: FormState = { id: null, name: "", version: "", channel: "none", content: "", active: true };
+const EMPTY_FORM: FormState = { id: null, name: "", version: "", channel: "none", content: "", active: true, attachments: [] };
 
 export function SalesCrmScriptsPage() {
   const [scripts, setScripts] = useState<SalesScript[]>([]);
@@ -55,6 +72,9 @@ export function SalesCrmScriptsPage() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [deletingScript, setDeletingScript] = useState<SalesScript | null>(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -86,8 +106,42 @@ export function SalesCrmScriptsPage() {
       channel: script.channel ?? "none",
       content: script.content,
       active: script.active,
+      attachments: script.attachments ?? [],
     });
     setFormOpen(true);
+  }
+
+  async function handleAttachmentSelected(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !form.id) return;
+
+    setUploadingAttachment(true);
+    try {
+      const attachment = await uploadSalesScriptAttachment(form.id, file);
+      setForm((f) => ({ ...f, attachments: [...f.attachments, attachment] }));
+      toast.success("Arquivo anexado.");
+      void load();
+    } catch (error) {
+      toast.error(extractErrorMessage(error, "Não foi possível anexar o arquivo."));
+    } finally {
+      setUploadingAttachment(false);
+    }
+  }
+
+  async function handleRemoveAttachment(attachment: SalesScriptAttachment) {
+    if (!form.id) return;
+    setDeletingAttachmentId(attachment.id);
+    try {
+      await deleteSalesScriptAttachment(form.id, attachment.id);
+      setForm((f) => ({ ...f, attachments: f.attachments.filter((a) => a.id !== attachment.id) }));
+      toast.success("Anexo removido.");
+      void load();
+    } catch (error) {
+      toast.error(extractErrorMessage(error, "Não foi possível remover o anexo."));
+    } finally {
+      setDeletingAttachmentId(null);
+    }
   }
 
   async function handleSubmit() {
@@ -192,6 +246,12 @@ export function SalesCrmScriptsPage() {
                 </Badge>
               )}
               <p className="line-clamp-3 text-xs text-muted-foreground">{script.content}</p>
+              {script.attachments?.length > 0 && (
+                <span className="flex w-fit items-center gap-1 text-[11px] text-muted-foreground">
+                  <Paperclip size={11} />
+                  {script.attachments.length} anexo{script.attachments.length > 1 ? "s" : ""}
+                </span>
+              )}
               <div className="mt-2 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Switch checked={script.active} onCheckedChange={() => void handleToggleActive(script)} />
@@ -264,6 +324,63 @@ export function SalesCrmScriptsPage() {
               onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
               placeholder="Roteiro completo de abordagem..."
             />
+          </div>
+
+          <div>
+            <Label>Anexos</Label>
+            {!form.id ? (
+              <p className="mt-1.5 text-xs text-muted-foreground">Salve o script para poder anexar arquivos.</p>
+            ) : (
+              <div className="mt-1.5 space-y-2">
+                {form.attachments.map((attachment) => {
+                  const Icon = attachmentIcon(attachment.type);
+                  return (
+                    <div key={attachment.id} className="flex items-center gap-2 rounded-lg border border-border bg-secondary/30 px-3 py-2">
+                      <Icon size={16} className="shrink-0 text-muted-foreground" />
+                      <a
+                        href={attachment.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="min-w-0 flex-1 truncate text-xs text-foreground hover:underline"
+                        title={attachment.name}
+                      >
+                        {attachment.name}
+                      </a>
+                      <span className="shrink-0 text-[11px] text-muted-foreground">{formatBytes(attachment.bytes)}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0 text-destructive hover:bg-destructive/10"
+                        onClick={() => void handleRemoveAttachment(attachment)}
+                        disabled={deletingAttachmentId === attachment.id}
+                        title="Remover anexo"
+                      >
+                        {deletingAttachmentId === attachment.id ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+                      </Button>
+                    </div>
+                  );
+                })}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,video/*,audio/*,application/pdf"
+                  className="hidden"
+                  onChange={(e) => void handleAttachmentSelected(e)}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  disabled={uploadingAttachment}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {uploadingAttachment ? <Loader2 size={14} className="animate-spin" /> : <Paperclip size={14} />}
+                  {uploadingAttachment ? "Enviando..." : "Anexar arquivo"}
+                </Button>
+                <p className="text-[11px] text-muted-foreground">Imagem, vídeo, áudio ou PDF. Até 25MB.</p>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
