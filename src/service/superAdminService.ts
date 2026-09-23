@@ -396,6 +396,17 @@ export async function listSuperAdminUsers(params: {
   return response.data;
 }
 
+export async function createSuperAdminUser(data: {
+  name: string;
+  email: string;
+  password: string;
+  role: "admin" | "client" | "super_admin" | "sales_rep";
+  phone?: string;
+}): Promise<SuperAdminUser> {
+  const response = await api.post<SuperAdminUser>("/super-admin/users", data);
+  return response.data;
+}
+
 export async function updateSuperAdminUser(
   id: string,
   data: { email?: string; phone?: string | null; newPassword?: string }
