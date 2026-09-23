@@ -876,7 +876,7 @@ export function PaymentsPage() {
         </div>
       </div>
       <Dialog open={Boolean(localPaymentDialog)} onOpenChange={(open) => { if (!open) setLocalPaymentDialog(null); }}>
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-lg overflow-hidden sm:max-w-lg">
+        <DialogContent className="h-[80dvh] w-[calc(100vw-2rem)] max-w-lg overflow-y-auto sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Confirmar pagamento presencial</DialogTitle>
             <DialogDescription>
@@ -887,7 +887,8 @@ export function PaymentsPage() {
               .
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-lg border border-border bg-secondary/30 p-4">
+          <div className="space-y-4">
+            <div className="rounded-lg border border-border bg-secondary/30 p-4">
             <div className="mb-3 flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Valor original</span>
               <span className="font-medium">{formatCurrency(localPaymentDialog?.amount ?? 0)}</span>
@@ -983,7 +984,8 @@ export function PaymentsPage() {
               </div>
             </div>
           )}
-          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          </div>
+          <DialogFooter className="border-t border-border pt-4 flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
             <Button className="w-full sm:w-auto" variant="outline" onClick={() => setLocalPaymentDialog(null)}>
               Cancelar
             </Button>
