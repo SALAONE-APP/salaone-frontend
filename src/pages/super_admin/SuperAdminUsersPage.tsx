@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import {
   listSuperAdminUsers,
+  createSuperAdminUser,
   updateSuperAdminUser,
   resetSuperAdminUserPassword,
   type SuperAdminUser,
@@ -31,6 +32,10 @@ export function SuperAdminUsersPage() {
   const [resetPasswordModal, setResetPasswordModal] = useState({
     open: false, user: null as SuperAdminUser | null, newPassword: "", generatedPassword: "", isSubmitting: false,
   });
+
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({ name: "", email: "", phone: "", password: "", role: "sales_rep" });
+  const [creating, setCreating] = useState(false);
 
   const loadUsers = useCallback(async (overrides: { page?: number; q?: string; role?: string } = {}) => {
     const result = await listSuperAdminUsers({
@@ -82,6 +87,35 @@ export function SuperAdminUsersPage() {
     } catch { toast.error("Nao foi possivel atualizar o usuario."); } finally { setSavingUserId(null); }
   };
 
+  const openCreateModal = () => {
+    setCreateForm({ name: "", email: "", phone: "", password: "", role: "sales_rep" });
+    setCreateModalOpen(true);
+  };
+
+  const closeCreateModal = () => setCreateModalOpen(false);
+
+  const submitCreateUser = async (e: FormEvent) => {
+    e.preventDefault();
+    setCreating(true);
+    try {
+      await createSuperAdminUser({
+        name: createForm.name.trim(),
+        email: createForm.email.trim(),
+        password: createForm.password,
+        role: createForm.role as "admin" | "client" | "super_admin" | "sales_rep",
+        phone: createForm.phone.trim() || undefined,
+      });
+      toast.success(`Usuario ${createForm.name} criado.`);
+      closeCreateModal();
+      setUsersPage(1);
+      await loadUsers({ page: 1 });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Nao foi possivel criar o usuario.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const openResetPasswordModal = (user: SuperAdminUser) =>
     setResetPasswordModal({ open: true, user, newPassword: "", generatedPassword: "", isSubmitting: false });
 
@@ -104,9 +138,15 @@ export function SuperAdminUsersPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-base font-semibold text-foreground">Gestao de Usuarios</h3>
-        <p className="text-sm text-muted-foreground">Acesse todas as contas e atualize email, telefone ou senha.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-base font-semibold text-foreground">Gestao de Usuarios</h3>
+          <p className="text-sm text-muted-foreground">Acesse todas as contas e atualize email, telefone ou senha.</p>
+        </div>
+        <button type="button" onClick={openCreateModal}
+          className="h-9 shrink-0 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+          Novo usuario
+        </button>
       </div>
 
       <form onSubmit={handleSearch} className="flex flex-wrap gap-2">
@@ -122,6 +162,7 @@ export function SuperAdminUsersPage() {
           <option value="professional">Profissional</option>
           <option value="receptionist">Recepcionista</option>
           <option value="client">Cliente</option>
+          <option value="sales_rep">Vendedor</option>
         </select>
         <button type="submit" className="h-9 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">Buscar</button>
       </form>
@@ -187,6 +228,63 @@ export function SuperAdminUsersPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal Criar usuario */}
+      {createModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={closeCreateModal}>
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-foreground">Novo usuario</h3>
+              <button type="button" onClick={closeCreateModal} className="rounded border border-border px-3 py-1 text-sm text-muted-foreground hover:bg-secondary">Fechar</button>
+            </div>
+            <form onSubmit={submitCreateUser} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="col-span-full space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Nome</label>
+                  <input required type="text" value={createForm.name} onChange={(e) => setCreateForm((p) => ({ ...p, name: e.target.value }))}
+                    placeholder="Nome completo"
+                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Email</label>
+                  <input required type="email" value={createForm.email} onChange={(e) => setCreateForm((p) => ({ ...p, email: e.target.value }))}
+                    placeholder="usuario@exemplo.com"
+                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Telefone</label>
+                  <input type="text" value={createForm.phone} onChange={(e) => setCreateForm((p) => ({ ...p, phone: e.target.value }))}
+                    placeholder="Somente numeros"
+                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Papel</label>
+                  <select value={createForm.role} onChange={(e) => setCreateForm((p) => ({ ...p, role: e.target.value }))}
+                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40">
+                    <option value="sales_rep">Vendedor</option>
+                    <option value="admin">Admin</option>
+                    <option value="super_admin">Super Admin</option>
+                    <option value="client">Cliente</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Senha</label>
+                  <input required type="text" minLength={6} value={createForm.password} onChange={(e) => setCreateForm((p) => ({ ...p, password: e.target.value }))}
+                    placeholder="Minimo 6 caracteres"
+                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={closeCreateModal} className="rounded border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-secondary">Cancelar</button>
+                <button type="submit" disabled={creating}
+                  className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                  {creating ? "Criando..." : "Criar usuario"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal Editar usuario */}
       {selectedUser && (

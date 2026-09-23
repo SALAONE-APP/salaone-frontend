@@ -464,11 +464,11 @@ export function ServicesPage() {
           <div className="p-6 text-sm text-destructive">{error}</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full table-fixed">
+            <table className="w-full md:table-fixed">
               <thead>
                 <tr className="border-b border-border">
 
-                  <th className="w-[38%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground md:w-[38%]">
                     Serviço
                   </th>
                   {!isClient && (
@@ -542,12 +542,12 @@ export function ServicesPage() {
                                 <Scissors size={18} className="text-muted-foreground" />
                               )}
                             </div>
-                            <div className="min-w-0 flex-1">
+                            <div className="min-w-0 md:flex-1">
                               <p className="truncate text-sm font-medium text-foreground">
                                 {service.name}
                               </p>
                               {service.description ? (
-                                <p className="truncate text-xs text-muted-foreground" title={service.description}>
+                                <p className="max-w-72 truncate text-xs text-muted-foreground md:max-w-none" title={service.description}>
                                   {service.description}
                                 </p>
                               ) : null}
