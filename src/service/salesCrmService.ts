@@ -141,6 +141,18 @@ export interface SalesLeadActivity {
   createdAt: string;
 }
 
+export type SalesScriptAttachmentType = "image" | "video" | "audio" | "pdf";
+
+export interface SalesScriptAttachment {
+  id: string;
+  type: SalesScriptAttachmentType;
+  name: string;
+  url: string;
+  mimeType: string;
+  bytes: number;
+  createdAt: string;
+}
+
 export interface SalesScript {
   id: string;
   name: string;
@@ -151,6 +163,7 @@ export interface SalesScript {
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
+  attachments: SalesScriptAttachment[];
 }
 
 export interface SalesDashboardFunnelStage {
@@ -311,6 +324,21 @@ export async function updateSalesScript(id: string, input: UpdateSalesScriptInpu
 
 export async function deleteSalesScript(id: string) {
   await api.delete(`/sales-crm/scripts/${id}`);
+}
+
+export async function uploadSalesScriptAttachment(scriptId: string, file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await api.post<{ attachment: SalesScriptAttachment }>(
+    `/sales-crm/scripts/${scriptId}/attachments`,
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } },
+  );
+  return response.data.attachment;
+}
+
+export async function deleteSalesScriptAttachment(scriptId: string, attachmentId: string) {
+  await api.delete(`/sales-crm/scripts/${scriptId}/attachments/${attachmentId}`);
 }
 
 export async function getSalesDashboard(filters: { trendMonths?: number } = {}) {
