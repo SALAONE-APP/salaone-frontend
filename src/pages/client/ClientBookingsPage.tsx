@@ -1297,7 +1297,7 @@ export function ClientBookingsPage() {
                             disabled={isOutOfPlanForSubscriber}
                             onCheckedChange={(c) => toggleService(s.id, c === true)}
                           />
-                          <span className="min-w-0">
+                          <span className="min-w-0 flex-1">
                             <span className="flex flex-wrap items-center gap-2 font-medium text-foreground">
                               {s.name}
                               {isCovered && (
@@ -1312,7 +1312,9 @@ export function ClientBookingsPage() {
                               )}
                             </span>
                             {s.description ? (
-                              <span className="block text-xs text-muted-foreground">{s.description}</span>
+                              <span className="block truncate text-xs text-muted-foreground" title={s.description}>
+                                {s.description}
+                              </span>
                             ) : null}
                             <span className="block text-xs text-muted-foreground">
                               {getServicePrice(s) === 0 ? "Sem valor" : formatCurrency(getServicePrice(s))}
