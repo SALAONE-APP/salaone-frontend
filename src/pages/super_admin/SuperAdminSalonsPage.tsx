@@ -7,6 +7,7 @@ import {
   getSuperAdminSalonById,
   listSuperAdminSalonUsers,
   updateSuperAdminSalonStatus,
+  deleteSuperAdminSalon,
   resetSuperAdminUserPassword,
   type SalonStatus,
   type SuperAdminSalon,
@@ -92,6 +93,7 @@ export function SuperAdminSalonsPage() {
   const [selectedSalon, setSelectedSalon] = useState<SuperAdminSalonDetail | null>(null);
   const [selectedSalonUsers, setSelectedSalonUsers] = useState<SuperAdminSalonUser[]>([]);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [deleteModal, setDeleteModal] = useState({ open: false, salonId: "", salonName: "", slug: "", typedSlug: "", isSubmitting: false });
   const [statusReasonModal, setStatusReasonModal] = useState({
     open: false, salonId: "", salonName: "", nextStatus: "", reason: "",
   });
@@ -158,6 +160,21 @@ export function SuperAdminSalonsPage() {
         setSelectedSalon(details);
       }
     } catch { toast.error("Nao foi possivel atualizar o status."); }
+  };
+
+  const closeDeleteModal = () => setDeleteModal({ open: false, salonId: "", salonName: "", slug: "", typedSlug: "", isSubmitting: false });
+
+  const submitDeleteModal = async () => {
+    setDeleteModal((p) => ({ ...p, isSubmitting: true }));
+    try {
+      const result = await deleteSuperAdminSalon(deleteModal.salonId, deleteModal.typedSlug.trim());
+      toast.success(`Salão ${result.name} excluído (${result.deletedUsers} usuário(s) removido(s)).`);
+      closeDeleteModal();
+      await loadSalons();
+    } catch (err) {
+      setDeleteModal((p) => ({ ...p, isSubmitting: false }));
+      toast.error((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Não foi possível excluir o salão.");
+    }
   };
 
   const handleStatusUpdate = async (salonId: string, nextStatus: string) => {
@@ -295,6 +312,7 @@ export function SuperAdminSalonsPage() {
                       <button type="button" onClick={() => void handleStatusUpdate(shop.id, "active")} className="rounded bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-500/20">Ativar</button>
                       <button type="button" onClick={() => void handleStatusUpdate(shop.id, "inactive")} className="rounded bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-500/20">Inativar</button>
                       <button type="button" onClick={() => void handleStatusUpdate(shop.id, "blocked")} className="rounded bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/20">Bloquear</button>
+                      <button type="button" onClick={() => setDeleteModal({ open: true, salonId: shop.id, salonName: shop.name, slug: shop.slug, typedSlug: "", isSubmitting: false })} className="rounded border border-destructive/40 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10">Excluir</button>
                     </div>
                   </td>
                 </tr>
@@ -391,6 +409,28 @@ export function SuperAdminSalonsPage() {
                 )}
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Excluir salao */}
+      {deleteModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={closeDeleteModal}>
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-3 text-lg font-semibold text-destructive">Excluir salão permanentemente</h3>
+            <p className="mb-3 text-sm text-muted-foreground">
+              Isso apaga <strong className="text-foreground">{deleteModal.salonName}</strong> e todos os dados vinculados (agendamentos, clientes, serviços, produtos, funcionários e usuários que ficarem sem salão). Não pode ser desfeito.
+            </p>
+            <p className="mb-2 text-sm text-muted-foreground">Digite o slug <code className="rounded bg-secondary px-1 text-foreground">{deleteModal.slug}</code> para confirmar:</p>
+            <input type="text" value={deleteModal.typedSlug} onChange={(e) => setDeleteModal((p) => ({ ...p, typedSlug: e.target.value }))}
+              className="mb-4 h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-destructive/40" />
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={closeDeleteModal} className="rounded border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-secondary">Cancelar</button>
+              <button type="button" onClick={() => void submitDeleteModal()} disabled={deleteModal.isSubmitting || deleteModal.typedSlug.trim() !== deleteModal.slug}
+                className="rounded bg-destructive px-4 py-2 text-sm font-medium text-white hover:bg-destructive/90 disabled:opacity-40">
+                {deleteModal.isSubmitting ? "Excluindo..." : "Excluir definitivamente"}
+              </button>
+            </div>
           </div>
         </div>
       )}
