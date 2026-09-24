@@ -365,6 +365,14 @@ export async function updateSuperAdminSalonStatus(
   return response.data;
 }
 
+export async function deleteSuperAdminSalon(
+  id: string,
+  confirmSlug: string
+): Promise<{ id: string; name: string; slug: string; deletedUsers: number }> {
+  const response = await api.delete(`/super-admin/salons/${id}`, { data: { confirmSlug } });
+  return response.data;
+}
+
 export async function activatePixPlatformSubscription(
   salonId: string,
   payload: {
