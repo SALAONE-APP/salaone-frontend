@@ -176,6 +176,7 @@ function getCurrentSaoPauloMinutes(): number {
 interface FitSlotInfo {
   professionalId: string;
   professionalName: string;
+  serviceIds: string[];
   date: Date;
   startMinutes: number;
   durationMinutes: number;
@@ -218,6 +219,10 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
     () => services.filter((s) => serviceIds.includes(s.id)),
     [services, serviceIds],
   );
+  const availableServicesForProfessional = useMemo(() => {
+    const availableServiceIds = new Set(slotInfo.serviceIds);
+    return services.filter((service) => availableServiceIds.has(service.id));
+  }, [services, slotInfo.serviceIds]);
   const totalDuration = useMemo(
     () => selectedServices.reduce(
       (sum, s) => sum + Number(s.durationMinutes ?? 30) + Number(s.bufferMinutes ?? 0),
@@ -348,10 +353,10 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
             <div className="max-h-48 overflow-y-auto rounded-md border border-border p-3 space-y-1">
               {loading ? (
                 <p className="text-sm text-muted-foreground">Carregando servicos...</p>
-              ) : services.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhum servico ativo.</p>
+              ) : availableServicesForProfessional.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Este profissional nao possui servicos habilitados.</p>
               ) : (
-                services.map((service) => (
+                availableServicesForProfessional.map((service) => (
                   <label
                     key={service.id}
                     className="flex cursor-pointer items-start gap-3 rounded-md p-2 text-sm hover:bg-secondary/60"
@@ -593,6 +598,7 @@ export function FitAppointmentPage() {
     setFitSlot({
       professionalId,
       professionalName: professional?.displayName ?? "Profissional",
+      serviceIds: professional?.serviceIds ?? [],
       date,
       startMinutes: startMins,
       durationMinutes: durationMins,
