@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { APPOINTMENT_CLIENT_STATUS_CONFIG, getStableCalendarColor, CALENDAR_END_MINUTES } from '@/utils/adminCalendar';
 import type { CalendarAppointment, CalendarColor, FreeSlot } from '@/utils/adminCalendar';
 import type { Professional } from '@/service/professionalService';
@@ -89,6 +89,42 @@ export default function AdminAppointmentsCalendar({
   const [savingPause, setSavingPause] = useState(false);
   const [pauseStartTime, setPauseStartTime] = useState('');
   const [pauseEndTime, setPauseEndTime] = useState('');
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const touchDraggedRef = useRef(false);
+  const lastMobileTapRef = useRef<{ key: string; timestamp: number } | null>(null);
+
+  const isMobileCalendar = () => typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches;
+
+  const handleCalendarPointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.pointerType !== 'touch' || !isMobileCalendar()) return;
+    touchStartRef.current = { x: event.clientX, y: event.clientY };
+    touchDraggedRef.current = false;
+  };
+
+  const handleCalendarPointerMove = (event: React.PointerEvent<HTMLElement>) => {
+    const start = touchStartRef.current;
+    if (!start || event.pointerType !== 'touch') return;
+    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8) touchDraggedRef.current = true;
+  };
+
+  const shouldHandleCalendarClick = (key: string) => {
+    if (!isMobileCalendar()) return true;
+    if (touchDraggedRef.current) {
+      touchDraggedRef.current = false;
+      lastMobileTapRef.current = null;
+      return false;
+    }
+
+    const now = Date.now();
+    const lastTap = lastMobileTapRef.current;
+    if (lastTap?.key === key && now - lastTap.timestamp <= 500) {
+      lastMobileTapRef.current = null;
+      return true;
+    }
+
+    lastMobileTapRef.current = { key, timestamp: now };
+    return false;
+  };
   const statusLegend = [
     APPOINTMENT_CLIENT_STATUS_CONFIG.no_show,
     APPOINTMENT_CLIENT_STATUS_CONFIG.no_plan,
@@ -321,11 +357,19 @@ export default function AdminAppointmentsCalendar({
                         : CALENDAR_END_MINUTES - clickedMinutes;
                       const duration = Math.max(5, Math.min(maxAvail, 60));
 
+                      if (!shouldHandleCalendarClick(`column:${professional.id}:${clickedMinutes}`)) return;
                       onFreeFitBooking(professional.id, calDate, clickedMinutes, duration);
                     };
 
                     return (
-                      <div key={professional.id} className="calendar-appointments-column" style={{ cursor: 'pointer' }} onClick={handleColumnClick}>
+                      <div
+                        key={professional.id}
+                        className="calendar-appointments-column"
+                        style={{ cursor: 'pointer' }}
+                        onPointerDown={handleCalendarPointerDown}
+                        onPointerMove={handleCalendarPointerMove}
+                        onClick={handleColumnClick}
+                      >
                         {/* Full pause range, independent from the available fit slots inside it. */}
                         {pauseRanges.map((pause) => {
                           const pauseTop = ((pause.startMinutes - startMinutes) / minutesPerSlot) * slotHeight;
@@ -360,6 +404,7 @@ export default function AdminAppointmentsCalendar({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (isFreeFitPast || !calDate) return;
+                                if (!shouldHandleCalendarClick(`free-slot:${professional.id}:${freeSlot.startMinutes}`)) return;
                                 onFreeFitBooking(professional.id, calDate, freeSlot.startMinutes, freeSlot.durationMinutes, freeSlot.pauseAppointmentId);
                               }}
                             >
@@ -411,10 +456,14 @@ export default function AdminAppointmentsCalendar({
                               tabIndex={0}
                               onPointerDown={(e) => {
                                 e.stopPropagation();
+                                handleCalendarPointerDown(e);
+                                if (isMobileCalendar()) return;
                                 setAptModal({ appointment, professional, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
                               }}
+                              onPointerMove={handleCalendarPointerMove}
                               onClick={(e) => {
                                 e.stopPropagation();
+                                if (!shouldHandleCalendarClick(`appointment:${appointment.id}`)) return;
                                 setAptModal({ appointment, professional, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
                               }}
                               onKeyDown={(e) => {
@@ -487,10 +536,14 @@ export default function AdminAppointmentsCalendar({
                               tabIndex={0}
                               onPointerDown={(e) => {
                                 e.stopPropagation();
+                                handleCalendarPointerDown(e);
+                                if (isMobileCalendar()) return;
                                 setAptModal({ appointment, professional, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
                               }}
+                              onPointerMove={handleCalendarPointerMove}
                               onClick={(e) => {
                                 e.stopPropagation();
+                                if (!shouldHandleCalendarClick(`appointment:${appointment.id}`)) return;
                                 setAptModal({ appointment, professional, calDate, clientName, dependentName, isDependentAppointment, servicesNames });
                               }}
                               onKeyDown={(e) => {
