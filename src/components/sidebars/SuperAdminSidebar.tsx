@@ -5,13 +5,13 @@ import {
   CreditCard,
   FileText,
   Handshake,
-  KanbanSquare,
   LayoutDashboard,
   Megaphone,
   MessageSquareMore,
   Users,
 } from "lucide-react";
 
+import { salesCrmProductItems } from "./salesCrmMenu";
 import { ProfileSidebar } from "../shared/ProfileSidebar";
 import type { SidebarSection } from "../shared/ProfileSidebar";
 
@@ -30,11 +30,7 @@ const sections: SidebarSection[] = [
       {
         icon: Handshake,
         label: "CRM Comercial",
-        children: [
-          { icon: KanbanSquare, label: "Funil de Vendas", href: "/crm-comercial" },
-          { icon: BarChart3, label: "Dashboard", href: "/crm-comercial/dashboard" },
-          { icon: FileText, label: "Scripts", href: "/crm-comercial/scripts" },
-        ],
+        children: salesCrmProductItems,
       },
     ],
   },

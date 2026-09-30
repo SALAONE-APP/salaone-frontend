@@ -135,6 +135,9 @@ export function ProfileSidebar({ title, homeHref, sections }: ProfileSidebarProp
       section.items.forEach((item) => {
         if (item.children?.length && isItemActive(item)) {
           groups[item.label] = true;
+          item.children.forEach((child) => {
+            if (child.children?.length && isItemActive(child)) groups[child.label] = true;
+          });
         }
       });
 
@@ -274,7 +277,54 @@ export function ProfileSidebar({ title, homeHref, sections }: ProfileSidebarProp
                           <ul className="mt-0.5 space-y-0.5">
                             {item.children?.map((child) => (
                               <li key={`${child.href ?? child.label}-${child.label}`}>
-                                {child.href && (
+                                {child.children?.length ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleGroup(child)}
+                                      className={cn(
+                                        "ml-7 mr-2 flex w-[calc(100%-2.25rem)] items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors",
+                                        isItemActive(child)
+                                          ? "bg-sidebar-accent text-sidebar-foreground"
+                                          : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                                      )}
+                                    >
+                                      <child.icon size={16} className="flex-shrink-0" />
+                                      <span className="flex-1">{child.label}</span>
+                                      <ChevronRight
+                                        size={14}
+                                        className={cn(
+                                          "flex-shrink-0 transition-transform",
+                                          (openGroups[child.label] ?? isItemActive(child)) && "rotate-90"
+                                        )}
+                                      />
+                                    </button>
+                                    {(openGroups[child.label] ?? isItemActive(child)) && (
+                                      <ul className="mt-0.5 space-y-0.5">
+                                        {child.children.map((grandchild) => (
+                                          <li key={`${grandchild.href ?? grandchild.label}-${grandchild.label}`}>
+                                            {grandchild.href && (
+                                              <Link
+                                                to={grandchild.href}
+                                                onClick={closeMobile}
+                                                className={cn(
+                                                  "ml-12 mr-2 flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                                                  isItemActive(grandchild)
+                                                    ? "bg-primary text-primary-foreground"
+                                                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                                                )}
+                                              >
+                                                <grandchild.icon size={16} className="flex-shrink-0" />
+                                                <span>{grandchild.label}</span>
+                                              </Link>
+                                            )}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </>
+                                ) : (
+                                  child.href && (
                                   <Link
                                     to={child.href}
                                     onClick={closeMobile}
@@ -288,6 +338,7 @@ export function ProfileSidebar({ title, homeHref, sections }: ProfileSidebarProp
                                     <child.icon size={16} className="flex-shrink-0" />
                                     <span>{child.label}</span>
                                   </Link>
+                                  )
                                 )}
                               </li>
                             ))}
