@@ -104,6 +104,7 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
     try {
       const [leadData, activitiesData] = await Promise.all([getSalesLead(id), listSalesActivities(id)]);
       setLead(leadData);
+      listSalesScripts({ product: leadData.product, active: true }).then(setScriptOptions).catch(() => null);
       setActivities(activitiesData);
       setContactName(leadData.contactName);
       setSalonName(leadData.salonName ?? "");
@@ -128,7 +129,6 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
   useEffect(() => {
     if (leadId) {
       void load(leadId);
-      listSalesScripts({ active: true }).then(setScriptOptions).catch(() => null);
       if (isSuperAdmin) {
         Promise.all([
           listSuperAdminUsers({ role: "sales_rep", limit: 100 }),
@@ -245,7 +245,7 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
                   <Input className="mt-1.5" value={contactName} onChange={(e) => setContactName(e.target.value)} />
                 </div>
                 <div>
-                  <Label>Nome do salão</Label>
+                  <Label>Nome {lead?.product === "barberone" ? "da barbearia" : "do salão"}</Label>
                   <Input className="mt-1.5" value={salonName} onChange={(e) => setSalonName(e.target.value)} />
                 </div>
                 <div>
