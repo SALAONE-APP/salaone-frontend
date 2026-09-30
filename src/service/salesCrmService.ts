@@ -1,5 +1,23 @@
 import api from "./api";
 
+export const SALES_PRODUCTS = ["salaone", "barberone"] as const;
+export type SalesProduct = (typeof SALES_PRODUCTS)[number];
+
+export const SALES_PRODUCT_LABELS: Record<SalesProduct, string> = {
+  salaone: "SalaOne",
+  barberone: "BarberOne",
+};
+
+// Como o cliente-alvo de cada produto e chamado nos textos do CRM.
+export const SALES_PRODUCT_BUSINESS_LABELS: Record<SalesProduct, { singular: string; plural: string }> = {
+  salaone: { singular: "salão", plural: "salões" },
+  barberone: { singular: "barbearia", plural: "barbearias" },
+};
+
+export function isSalesProduct(value: string): value is SalesProduct {
+  return (SALES_PRODUCTS as readonly string[]).includes(value);
+}
+
 // Listas fechadas espelhando salesCrmSchemas.ts (backend) - validadas via Joi
 // contra string, não enum de banco, para poder evoluir sem migration.
 export const SALES_CHANNELS = ["instagram", "indicacao", "youtube", "google_meu_negocio", "outro"] as const;
@@ -102,6 +120,7 @@ export function salesActivityTypeLabel(activityType: string) {
 
 export interface SalesLead {
   id: string;
+  product: SalesProduct;
   contactName: string;
   salonName: string | null;
   phone: string;
@@ -155,6 +174,7 @@ export interface SalesScriptAttachment {
 
 export interface SalesScript {
   id: string;
+  product: SalesProduct;
   name: string;
   version: string;
   channel: string | null;
@@ -211,6 +231,7 @@ export interface PaginatedSalesLeads {
 }
 
 export interface ListSalesLeadsFilters {
+  product: SalesProduct;
   stage?: string;
   channel?: string;
   responsibleId?: string;
@@ -220,6 +241,7 @@ export interface ListSalesLeadsFilters {
 }
 
 export interface CreateSalesLeadInput {
+  product: SalesProduct;
   contactName: string;
   salonName?: string | null;
   phone: string;
@@ -258,6 +280,7 @@ export interface CreateSalesActivityInput {
 }
 
 export interface CreateSalesScriptInput {
+  product: SalesProduct;
   name: string;
   version: string;
   channel?: string | null;
@@ -273,7 +296,7 @@ export interface UpdateSalesScriptInput {
   active?: boolean;
 }
 
-export async function listSalesLeads(filters: ListSalesLeadsFilters = {}) {
+export async function listSalesLeads(filters: ListSalesLeadsFilters) {
   const response = await api.get<PaginatedSalesLeads>("/sales-crm/leads", { params: filters });
   return response.data;
 }
@@ -307,7 +330,7 @@ export async function createSalesActivity(leadId: string, input: CreateSalesActi
   return response.data.activity;
 }
 
-export async function listSalesScripts(filters: { active?: boolean; channel?: string } = {}) {
+export async function listSalesScripts(filters: { product: SalesProduct; active?: boolean; channel?: string }) {
   const response = await api.get<{ scripts: SalesScript[] }>("/sales-crm/scripts", { params: filters });
   return response.data.scripts;
 }
@@ -341,7 +364,7 @@ export async function deleteSalesScriptAttachment(scriptId: string, attachmentId
   await api.delete(`/sales-crm/scripts/${scriptId}/attachments/${attachmentId}`);
 }
 
-export async function getSalesDashboard(filters: { trendMonths?: number } = {}) {
+export async function getSalesDashboard(filters: { product: SalesProduct; trendMonths?: number }) {
   const response = await api.get<SalesDashboard>("/sales-crm/dashboard", { params: filters });
   return response.data;
 }

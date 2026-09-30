@@ -26,12 +26,14 @@ import {
   deleteSalesScript,
   deleteSalesScriptAttachment,
   listSalesScripts,
+  SALES_PRODUCT_LABELS,
   salesChannelLabel,
   updateSalesScript,
   uploadSalesScriptAttachment,
   type SalesScript,
   type SalesScriptAttachment,
 } from "@/service/salesCrmService";
+import { useSalesProduct } from "@/hooks/useSalesProduct";
 
 function extractErrorMessage(error: unknown, fallback: string) {
   const value = (error as { response?: { data?: { message?: unknown } } })?.response?.data?.message;
@@ -64,6 +66,7 @@ interface FormState {
 const EMPTY_FORM: FormState = { id: null, name: "", version: "", channel: "none", content: "", active: true, attachments: [] };
 
 export function SalesCrmScriptsPage() {
+  const product = useSalesProduct();
   const [scripts, setScripts] = useState<SalesScript[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,14 +83,14 @@ export function SalesCrmScriptsPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await listSalesScripts();
+      const result = await listSalesScripts({ product });
       setScripts(result);
     } catch {
       setError("Não foi possível carregar os scripts.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [product]);
 
   useEffect(() => {
     void load();
@@ -161,6 +164,7 @@ export function SalesCrmScriptsPage() {
     setSubmitting(true);
     try {
       const payload = {
+        product,
         name: form.name.trim(),
         version: form.version.trim(),
         channel: form.channel === "none" ? null : form.channel,
@@ -208,7 +212,7 @@ export function SalesCrmScriptsPage() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-semibold text-foreground">Scripts de Abordagem</h1>
+          <h1 className="text-xl font-semibold text-foreground">Scripts de Abordagem · {SALES_PRODUCT_LABELS[product]}</h1>
           <p className="text-sm text-muted-foreground">Roteiros de abordagem versionados, prontos para usar na prospecção.</p>
         </div>
         <Button size="sm" className="gap-2 self-start" onClick={openCreate}>

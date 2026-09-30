@@ -30,6 +30,8 @@ import {
   SALES_LEAD_STAGES,
   SALES_LOST_REASONS,
   listSalesLeads,
+  SALES_PRODUCT_BUSINESS_LABELS,
+  SALES_PRODUCT_LABELS,
   salesChannelLabel,
   salesLeadStageLabel,
   salesLostReasonLabel,
@@ -38,6 +40,7 @@ import {
   type UpdateSalesLeadInput,
 } from "@/service/salesCrmService";
 import { listSuperAdminUsers, type SuperAdminUser } from "@/service/superAdminService";
+import { useSalesProduct } from "@/hooks/useSalesProduct";
 
 function getInitials(name: string) {
   return name
@@ -61,6 +64,8 @@ interface PendingLostReasonDrag {
 }
 
 export function SalesCrmKanbanPage() {
+  const product = useSalesProduct();
+  const business = SALES_PRODUCT_BUSINESS_LABELS[product];
   const { user } = useAuth();
   const isSuperAdmin = user?.role === "super_admin";
 
@@ -86,14 +91,14 @@ export function SalesCrmKanbanPage() {
     if (!silent) setLoading(true);
     if (!silent) setError(null);
     try {
-      const result = await listSalesLeads({ limit: 200 });
+      const result = await listSalesLeads({ product, limit: 200 });
       setLeads(result.items);
     } catch {
       if (!silent) setError("Não foi possível carregar o funil de vendas.");
     } finally {
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [product]);
 
   useEffect(() => {
     void load();
@@ -306,9 +311,9 @@ export function SalesCrmKanbanPage() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-semibold text-foreground">Funil de Vendas</h1>
+          <h1 className="text-xl font-semibold text-foreground">Funil de Vendas · {SALES_PRODUCT_LABELS[product]}</h1>
           <p className="text-sm text-muted-foreground">
-            Acompanhe a prospecção de novos salões-clientes, do primeiro contato ao fechamento.
+            Acompanhe a prospecção de novos clientes do {SALES_PRODUCT_LABELS[product]} ({business.plural}), do primeiro contato ao fechamento.
           </p>
         </div>
         <Button size="sm" className="gap-2 self-start" onClick={() => setCreateOpen(true)}>
@@ -323,7 +328,7 @@ export function SalesCrmKanbanPage() {
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar contato, salão, telefone ou instagram..."
+            placeholder={`Buscar contato, ${business.singular}, telefone ou instagram...`}
             className="h-9 w-full bg-secondary pl-9 text-sm sm:w-72"
           />
         </div>
@@ -473,6 +478,7 @@ export function SalesCrmKanbanPage() {
 
       <SalesLeadDetailDialog leadId={selectedLeadId} onClose={() => setSelectedLeadId(null)} onChanged={() => void load()} />
       <SalesLeadCreateDialog
+        product={product}
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={() => void load()}

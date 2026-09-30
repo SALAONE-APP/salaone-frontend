@@ -15,10 +15,12 @@ import {
   salesChannelLabel,
   type SalesLead,
   type SalesScript,
+  type SalesProduct,
 } from "@/service/salesCrmService";
 import { listSuperAdminUsers, type SuperAdminUser } from "@/service/superAdminService";
 
 interface Props {
+  product: SalesProduct;
   open: boolean;
   onClose: () => void;
   onCreated: (lead: SalesLead) => void;
@@ -29,7 +31,7 @@ function extractErrorMessage(error: unknown, fallback: string) {
   return typeof value === "string" ? value : fallback;
 }
 
-export function SalesLeadCreateDialog({ open, onClose, onCreated }: Props) {
+export function SalesLeadCreateDialog({ product, open, onClose, onCreated }: Props) {
   const { user } = useAuth();
   const isSalesRep = user?.role === "sales_rep";
 
@@ -63,7 +65,7 @@ export function SalesLeadCreateDialog({ open, onClose, onCreated }: Props) {
 
     setResponsibleId(isSalesRep && user ? user.id : "");
 
-    listSalesScripts({ active: true })
+    listSalesScripts({ product, active: true })
       .then(setScriptOptions)
       .catch(() => null);
 
@@ -75,7 +77,7 @@ export function SalesLeadCreateDialog({ open, onClose, onCreated }: Props) {
         .then(([reps, admins]) => setResponsibleOptions([...reps.items, ...admins.items]))
         .catch(() => null);
     }
-  }, [open, isSalesRep, user]);
+  }, [open, isSalesRep, user, product]);
 
   async function handleSubmit() {
     if (!contactName.trim()) {
@@ -98,6 +100,7 @@ export function SalesLeadCreateDialog({ open, onClose, onCreated }: Props) {
     setSubmitting(true);
     try {
       const lead = await createSalesLead({
+        product,
         contactName: contactName.trim(),
         salonName: salonName.trim() || null,
         phone: phone.trim(),
@@ -131,7 +134,7 @@ export function SalesLeadCreateDialog({ open, onClose, onCreated }: Props) {
         </div>
 
         <div>
-          <Label>Nome do salão</Label>
+          <Label>Nome {product === "barberone" ? "da barbearia" : "do salão"}</Label>
           <Input className="mt-1.5" value={salonName} onChange={(e) => setSalonName(e.target.value)} placeholder="Opcional" />
         </div>
 

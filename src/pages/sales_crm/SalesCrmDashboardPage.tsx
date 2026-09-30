@@ -19,11 +19,13 @@ import { Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   getSalesDashboard,
+  SALES_PRODUCT_LABELS,
   salesChannelLabel,
   salesLeadStageLabel,
   salesLostReasonLabel,
   type SalesDashboard,
 } from "@/service/salesCrmService";
+import { useSalesProduct } from "@/hooks/useSalesProduct";
 
 const PALETTE = [
   "hsl(var(--primary))",
@@ -50,6 +52,7 @@ function Panel({ title, subtitle, children }: { title: string; subtitle?: string
 }
 
 export function SalesCrmDashboardPage() {
+  const product = useSalesProduct();
   const [months, setMonths] = useState(6);
   const [dashboard, setDashboard] = useState<SalesDashboard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,11 +61,11 @@ export function SalesCrmDashboardPage() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    getSalesDashboard({ trendMonths: months })
+    getSalesDashboard({ product, trendMonths: months })
       .then(setDashboard)
       .catch(() => setError("Não foi possível carregar o dashboard."))
       .finally(() => setLoading(false));
-  }, [months]);
+  }, [product, months]);
 
   const funnelWithLabel = useMemo(
     () => (dashboard?.funnel ?? []).map((item) => ({ ...item, label: salesLeadStageLabel(item.stage) })),
@@ -85,8 +88,8 @@ export function SalesCrmDashboardPage() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-semibold text-foreground">Dashboard Comercial</h1>
-          <p className="text-sm text-muted-foreground">Visão consolidada do funil de prospecção de salões.</p>
+          <h1 className="text-xl font-semibold text-foreground">Dashboard Comercial · {SALES_PRODUCT_LABELS[product]}</h1>
+          <p className="text-sm text-muted-foreground">Visão consolidada do funil de prospecção do {SALES_PRODUCT_LABELS[product]}.</p>
         </div>
         <Select value={String(months)} onValueChange={(v) => setMonths(Number(v))}>
           <SelectTrigger className="w-40 self-start">
