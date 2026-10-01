@@ -52,6 +52,10 @@ export interface AuthResponse {
   salon?: StoredSalon | null;
 }
 
+export interface AccessibleSalon extends StoredSalon {
+  role: string;
+}
+
 interface BackendAuthResponse {
   token: string;
   user: AuthResponse["user"];
@@ -141,6 +145,11 @@ export async function switchSalon(salonId: string | null): Promise<AuthResponse>
   const response = await api.post<AuthResponse>("/auth/switch-salon", { salonId });
   persistAuthResponse(response.data);
   return response.data;
+}
+
+export async function listAccessibleSalons(): Promise<AccessibleSalon[]> {
+  const response = await api.get<{ items: AccessibleSalon[] }>("/auth/salons");
+  return Array.isArray(response.data.items) ? response.data.items : [];
 }
 
 export async function register(_data: RegisterPayload) {

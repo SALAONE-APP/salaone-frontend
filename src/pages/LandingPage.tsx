@@ -11,6 +11,7 @@ import {
 import salaOneLogo from "../assets/image/logo-icone-salaone.jpeg";
 import api from "../service/api";
 import { createPagarmeCardToken } from "../service/pagarmeService";
+import { onlyDigits } from "@/utils/leadForm";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -219,6 +220,13 @@ function getBestPlanId(plans: Plan[]) {
 
     return Number(plan.sortOrder ?? 0) > Number(best.sortOrder ?? 0) ? plan : best;
   }, null)?.id;
+}
+
+function getVisiblePlanFeatures(features: string[]) {
+  // "crm" é uma flag interna usada na configuração do plano. Quando a
+  // descrição comercial de CRM já existe, não deve aparecer como um item
+  // duplicado no card da landing.
+  return features.filter((feature) => feature.trim().toLowerCase() !== "crm");
 }
 
 // ─── Register Modal ───────────────────────────────────────────────────────────
@@ -638,6 +646,16 @@ export function LandingPage() {
     setPaymentCtx({ plan, customerName: result.user.name, customerEmail: result.user.email });
   };
 
+  const openSalesWhatsApp = (plan: Plan) => {
+    const commercialPhone = onlyDigits(import.meta.env.VITE_LANDING_WHATSAPP_NUMBER || "");
+    if (!commercialPhone) {
+      setLeadModalOpen(true);
+      return;
+    }
+    const message = `Olá! Tenho interesse no plano ${plan.name} da SalaOne e gostaria de negociar uma proposta.`;
+    window.open(`https://wa.me/${commercialPhone}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+  };
+
   const onSubscriptionSuccess = () => { setPaymentCtx(null); navigate("/login"); };
 
   return (
@@ -882,6 +900,7 @@ export function LandingPage() {
               ) : (
                 visiblePlans.map((plan, index) => {
                   const isBestPlan = plan.id === bestPlanId;
+                  const isConsultationPlan = Number(plan.price) <= 0;
                   // A cor de destaque e o selo precisam sempre apontar para o
                   // mesmo plano, independentemente da ordem retornada pela API.
                   const variant = isBestPlan ? "premium" : index === 0 ? "basic" : "master";
@@ -898,22 +917,26 @@ export function LandingPage() {
                         <h3 className="text-xl font-bold text-white">{plan.name}</h3>
                         {plan.description && <p className="text-neutral-500 text-sm mt-1">{plan.description}</p>}
                       </div>
-                      <div className="flex items-end gap-1 mb-6">
-                        <span className="text-neutral-400 text-sm mb-1">R$</span>
-                        <span className={`text-4xl font-black leading-none ${styles.price}`}>{formatPrice(plan.price)}</span>
-                        <span className="text-neutral-500 text-sm mb-1">{getPeriodLabel(plan.interval, plan.intervalCount)}</span>
-                      </div>
-                      {plan.features.length > 0 && (
+                      {isConsultationPlan ? (
+                        <div className={`mb-6 text-3xl font-black leading-none ${styles.price}`}>Sob consulta</div>
+                      ) : (
+                        <div className="flex items-end gap-1 mb-6">
+                          <span className="text-neutral-400 text-sm mb-1">R$</span>
+                          <span className={`text-4xl font-black leading-none ${styles.price}`}>{formatPrice(plan.price)}</span>
+                          <span className="text-neutral-500 text-sm mb-1">{getPeriodLabel(plan.interval, plan.intervalCount)}</span>
+                        </div>
+                      )}
+                      {getVisiblePlanFeatures(plan.features).length > 0 && (
                         <ul className="space-y-2.5 mb-8 flex-1">
-                          {plan.features.map((feature) => (
+                          {getVisiblePlanFeatures(plan.features).map((feature) => (
                             <li key={feature} className="flex items-start gap-2 text-sm text-neutral-300">
                               <CheckCircle2 size={15} className="text-primary mt-0.5 shrink-0" /> {feature}
                             </li>
                           ))}
                         </ul>
                       )}
-                      <button onClick={() => setSelectedPlan(plan)} className={`w-full py-3 rounded-lg text-sm transition-all ${styles.btn}`}>
-                        TESTAR GRÁTIS
+                      <button onClick={() => isConsultationPlan ? openSalesWhatsApp(plan) : setSelectedPlan(plan)} className={`w-full py-3 rounded-lg text-sm transition-all ${styles.btn}`}>
+                        {isConsultationPlan ? "FALAR COM VENDAS" : "TESTAR GRÁTIS"}
                       </button>
                     </article>
                   );

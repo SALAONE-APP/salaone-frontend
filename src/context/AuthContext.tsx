@@ -8,6 +8,8 @@ import {
   logout as logoutRequest,
   switchSalon as switchSalonRequest,
   type StoredSalon,
+  type AccessibleSalon,
+  listAccessibleSalons,
 } from "../service/authService";
 
 export interface User {
@@ -30,11 +32,13 @@ export interface AuthContextData {
   signed: boolean;
   loading: boolean;
   salonAccess: StoredSalon | null;
+  accessibleSalons: AccessibleSalon[];
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   updateUser: (user: User) => void;
   enterSalonAccess: (salonId: string) => Promise<StoredSalon>;
   exitSalonAccess: () => Promise<void>;
+  switchAccessibleSalon: (salonId: string) => Promise<StoredSalon>;
 }
 
 function getStoredSalonAccess(user: User | null): StoredSalon | null {
@@ -73,6 +77,7 @@ export const AuthContext = createContext<AuthContextData | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => getStoredUser());
   const [salonAccess, setSalonAccess] = useState<StoredSalon | null>(() => getStoredSalonAccess(getStoredUser()));
+  const [accessibleSalons, setAccessibleSalons] = useState<AccessibleSalon[]>([]);
 
   useEffect(() => {
     if (!localStorage.getItem("token")) return;
@@ -111,6 +116,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [salonAccess]);
 
+  useEffect(() => {
+    if (!user || user.role === "super_admin") {
+      setAccessibleSalons([]);
+      return;
+    }
+    void listAccessibleSalons().then(setAccessibleSalons).catch(() => setAccessibleSalons([]));
+  }, [user?.id, user?.role]);
+
   async function login(email: string, password: string) {
     const response = await loginRequest({ email, password });
     localStorage.setItem("user", JSON.stringify(response.user));
@@ -122,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   function logout() {
     logoutRequest();
     setSalonAccess(null);
+    setAccessibleSalons([]);
     setUser(null);
   }
 
@@ -151,6 +165,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.dispatchEvent(new Event("user:updated"));
   }
 
+  async function switchAccessibleSalon(salonId: string) {
+    const response = await switchSalonRequest(salonId);
+    if (!response.salon) throw new Error("A unidade selecionada não foi retornada pelo servidor.");
+    setUser(response.user);
+    window.dispatchEvent(new Event("user:updated"));
+    return response.salon;
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -158,11 +180,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signed: Boolean(user && localStorage.getItem("token")),
         loading: false,
         salonAccess,
+        accessibleSalons,
         login,
         logout,
         updateUser,
         enterSalonAccess,
         exitSalonAccess,
+        switchAccessibleSalon,
       }}
     >
       {children}

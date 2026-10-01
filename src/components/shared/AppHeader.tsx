@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
 
@@ -24,6 +24,7 @@ interface AppHeaderProps {
 type StoredSalon = {
   name?: string;
   slug?: string;
+  id?: string;
   logoUrl?: string;
 };
 
@@ -47,7 +48,9 @@ export function AppHeader({
   actionLabel,
   actionHref,
 }: AppHeaderProps) {
-  const { user, salonAccess } = useAuth();
+  const { user, salonAccess, accessibleSalons, switchAccessibleSalon } = useAuth();
+  const navigate = useNavigate();
+  const [switchingSalon, setSwitchingSalon] = useState(false);
   const { setOpen: setSidebarOpen } = useSidebarMobile();
   const [salon, setSalon] = useState<StoredSalon | null>(() =>
     getStoredSalon()
@@ -106,6 +109,17 @@ export function AppHeader({
     };
   }, [user?.role, salonAccess]);
 
+  async function handleSalonChange(salonId: string) {
+    if (!salonId || salonId === salon?.id) return;
+    setSwitchingSalon(true);
+    try {
+      await switchAccessibleSalon(salonId);
+      navigate("/home", { replace: true });
+    } finally {
+      setSwitchingSalon(false);
+    }
+  }
+
   return (
     <header className="flex items-start justify-between px-4 py-4 md:items-center md:px-6">
       <div className="flex min-w-0 items-center gap-3">
@@ -139,6 +153,17 @@ export function AppHeader({
               </span>
             ))}
           </nav>
+          {accessibleSalons.length > 1 && (
+            <select
+              value={salon?.id || ""}
+              onChange={(event) => void handleSalonChange(event.target.value)}
+              disabled={switchingSalon}
+              aria-label="Selecionar unidade"
+              className="mt-2 max-w-48 rounded border border-border bg-background px-2 py-1 text-xs text-foreground disabled:opacity-60"
+            >
+              {accessibleSalons.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          )}
         </div>
       </div>
 
