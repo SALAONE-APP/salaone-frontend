@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { ShieldOff } from "lucide-react";
 
 import { AppHeader } from "../components/shared/AppHeader";
+import { SuperAdminSalonAccessBanner } from "../components/SuperAdminSalonAccessBanner";
 import { getProfileConfig, normalizeRole } from "../config/profileConfig";
 import type { UserRole } from "../config/profileConfig";
 import { useAuth } from "../hooks/useAuth";
@@ -110,6 +111,7 @@ function PageShell({
         actionLabel={actionLabel}
         actionHref={actionHref}
       />
+      <SuperAdminSalonAccessBanner />
       <div className="p-6">
         {blocked ? (
           <AccessDenied permission={route.requiredPermission!} />
@@ -126,10 +128,11 @@ function toChildPath(path: string) {
 }
 
 export function AppRoutes() {
-  const { user } = useAuth();
+  const { user, salonAccess } = useAuth();
   const role = normalizeRole(user?.role);
-  const profileConfig = getProfileConfig(role);
-  const { Layout, routes, headerActionLabel, headerActionHref } = routeGroups[role];
+  const effectiveRole: UserRole = role === "super_admin" && salonAccess ? "admin" : role;
+  const profileConfig = getProfileConfig(effectiveRole);
+  const { Layout, routes, headerActionLabel, headerActionHref } = routeGroups[effectiveRole];
 
   return (
     <PrivateRoute>

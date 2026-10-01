@@ -61,7 +61,7 @@ function togglePM(form: PlanForm, method: string): PlanForm {
 
 const FORM_FIELDS: { label: string; id: string; key: keyof PlanForm; type?: string; min?: string; maxLength?: number; placeholder: string }[] = [
   { label: "Nome do plano", id: "pn-name", key: "name", placeholder: "Ex.: Plano Basic", maxLength: 64 },
-  { label: "Valor (R$)", id: "pn-price", key: "price", placeholder: "Ex.: 39,90" },
+  { label: "Valor (R$)", id: "pn-price", key: "price", placeholder: "Ex.: 39,90 ou vazio para sob consulta" },
   { label: "Qtd. do intervalo", id: "pn-ic", key: "intervalCount", type: "number", min: "1", placeholder: "1" },
   { label: "Dias gratis (trial)", id: "pn-trial", key: "trialPeriodDays", type: "number", min: "0", placeholder: "0" },
   { label: "Ordem na landing", id: "pn-sort", key: "sortOrder", type: "number", placeholder: "0" },
@@ -110,7 +110,8 @@ export function SuperAdminPlansPage() {
     e.preventDefault();
     const cents = parseMoneyToCents(form.price);
     if (!form.name.trim()) { toast.error("Informe o nome do plano."); return; }
-    if (!cents) { toast.error("Informe um valor valido."); return; }
+    if (form.price.trim() && !cents) { toast.error("Informe um valor valido ou deixe o campo vazio para sob consulta."); return; }
+    const isConsultationPlan = cents === 0;
     setCreating(true);
     try {
       const result = await createPlatformPlan({
@@ -123,10 +124,10 @@ export function SuperAdminPlansPage() {
         maxAdmins: form.maxAdmins ? Number(form.maxAdmins) : null,
         maxReceptionists: form.maxReceptionists ? Number(form.maxReceptionists) : null,
         isPublic: form.isPublic, isRecommended: form.isRecommended,
-        sortOrder: Number(form.sortOrder || 0), syncPagarme: form.syncPagarme,
+        sortOrder: Number(form.sortOrder || 0), syncPagarme: isConsultationPlan ? false : form.syncPagarme,
       });
       const pagarmePlanId = result.pagarmePlanId || result.pagarme_plan_id;
-      const msg = form.syncPagarme && pagarmePlanId
+      const msg = !isConsultationPlan && form.syncPagarme && pagarmePlanId
         ? "Plano criado no Pagar.me e salvo."
         : "Plano salvo (sem Pagar.me).";
       toast.success(msg);
@@ -159,7 +160,7 @@ export function SuperAdminPlansPage() {
       : Array.isArray(plan.payment_methods) && plan.payment_methods!.length ? plan.payment_methods! : ["credit_card"];
     setEditForm({
       name: plan.name ?? "", description: plan.description ?? "",
-      price: plan.price != null ? Number(plan.price).toFixed(2).replace(".", ",") : "",
+      price: Number(plan.price) > 0 ? Number(plan.price).toFixed(2).replace(".", ",") : "",
       interval: plan.interval ?? "month",
       intervalCount: String(plan.intervalCount ?? plan.interval_count ?? 1),
       trialPeriodDays: String(plan.trialPeriodDays ?? plan.trial_period_days ?? 0),
@@ -181,7 +182,11 @@ export function SuperAdminPlansPage() {
     e.preventDefault();
     if (!editingPlan) return;
     const cents = parseMoneyToCents(editForm.price);
-    if (!cents) { toast.error("Informe um valor valido."); return; }
+    if (editForm.price.trim() && !cents) { toast.error("Informe um valor valido ou deixe o campo vazio para sob consulta."); return; }
+    if (cents === 0 && (editingPlan.pagarmePlanId || editingPlan.pagarme_plan_id)) {
+      toast.error("Um plano sincronizado com o Pagar.me não pode virar 'sob consulta'. Crie um novo plano.");
+      return;
+    }
     setSavingPlanId(editingPlan.id);
     try {
       await updatePlatformPlan(editingPlan.id, {
@@ -240,6 +245,7 @@ export function SuperAdminPlansPage() {
   };
 
   const inputCls = "h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40";
+  const creatingConsultationPlan = parseMoneyToCents(form.price) === 0;
 
   return (
     <div className="space-y-6">
@@ -307,16 +313,16 @@ export function SuperAdminPlansPage() {
         <div className="flex flex-wrap gap-4">
           {[{ key: "includesCrm", label: "Incluir CRM de Relacionamento" }, { key: "isPublic", label: "Exibir na landing page" }, { key: "isRecommended", label: "Marcar como recomendado" }, { key: "syncPagarme", label: "Sincronizar com Pagar.me" }].map((opt) => (
             <label key={opt.key} className="flex items-center gap-2 text-sm text-foreground">
-              <input type="checkbox" checked={Boolean(form[opt.key as keyof PlanForm])} onChange={(e) => setForm((p) => ({ ...p, [opt.key]: e.target.checked }))} className="rounded border-border accent-primary" />
+              <input type="checkbox" checked={opt.key === "syncPagarme" && creatingConsultationPlan ? false : Boolean(form[opt.key as keyof PlanForm])} disabled={opt.key === "syncPagarme" && creatingConsultationPlan} onChange={(e) => setForm((p) => ({ ...p, [opt.key]: e.target.checked }))} className="rounded border-border accent-primary disabled:opacity-40" />
               {opt.label}
             </label>
           ))}
         </div>
         <p className="text-xs text-muted-foreground">
-          {form.syncPagarme ? "O plano sera criado na API do Pagar.me. Requer PAGARME_SECRET_KEY configurada no servidor." : "Salva o plano apenas no banco, sem chamar a API do Pagar.me."}
+          {creatingConsultationPlan ? "Plano sob consulta: será salvo apenas no banco e encaminhará o interessado ao WhatsApp de vendas." : form.syncPagarme ? "O plano sera criado na API do Pagar.me. Requer PAGARME_SECRET_KEY configurada no servidor." : "Salva o plano apenas no banco, sem chamar a API do Pagar.me."}
         </p>
         <button type="submit" disabled={creating} className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-          {creating ? "Criando..." : form.syncPagarme ? "Criar plano no Pagar.me" : "Criar plano (so banco)"}
+          {creating ? "Criando..." : !creatingConsultationPlan && form.syncPagarme ? "Criar plano no Pagar.me" : "Criar plano (so banco)"}
         </button>
       </form>
 
@@ -353,7 +359,7 @@ export function SuperAdminPlansPage() {
                       {plan.description && <small className="text-muted-foreground">{plan.description}</small>}
                     </td>
                     <td className="px-5 py-3 text-muted-foreground">{fmtInterval(plan.interval, plan.intervalCount ?? plan.interval_count)}</td>
-                    <td className="px-5 py-3 font-medium text-foreground">{fmtCurrency(plan.price)}</td>
+                    <td className="px-5 py-3 font-medium text-foreground">{Number(plan.price) > 0 ? fmtCurrency(plan.price) : "Sob consulta"}</td>
                     <td className="px-5 py-3">
                       <span className={`block font-mono text-xs ${conflict ? "text-amber-600" : "text-muted-foreground"}`} title={conflict?.reason}>{pid || "-"}</span>
                       {conflict && <small className="text-amber-600">Configuracao divergente</small>}
@@ -405,7 +411,7 @@ export function SuperAdminPlansPage() {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">Valor (R$)</label>
-                  <input type="text" value={editForm.price} onChange={(e) => setEditForm((p) => ({ ...p, price: e.target.value }))} placeholder="Ex.: 99,90" required className={inputCls} />
+                  <input type="text" value={editForm.price} onChange={(e) => setEditForm((p) => ({ ...p, price: e.target.value }))} placeholder="Ex.: 99,90 ou vazio para sob consulta" className={inputCls} />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">Ordem na landing</label>
