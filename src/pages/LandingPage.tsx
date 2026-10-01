@@ -40,6 +40,7 @@ interface RegForm {
 }
 
 type SubscriptionProfessionalRule = "fixed" | "free_choice";
+type BillingCycle = "month" | "year";
 
 interface CardForm {
   number: string;
@@ -595,10 +596,12 @@ export function LandingPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [plansLoading, setPlansLoading] = useState(true);
   const [plansError, setPlansError] = useState("");
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("month");
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [paymentCtx, setPaymentCtx] = useState<PaymentCtx | null>(null);
   const [leadModalOpen, setLeadModalOpen] = useState(false);
-  const bestPlanId = getBestPlanId(plans);
+  const visiblePlans = plans.filter((plan) => plan.interval === billingCycle);
+  const bestPlanId = getBestPlanId(visiblePlans);
 
   useEffect(() => {
     apiFetchPlans()
@@ -606,6 +609,12 @@ export function LandingPage() {
       .catch(() => setPlansError("Não foi possível carregar os planos. Tente novamente."))
       .finally(() => setPlansLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (billingCycle === "month" && plans.length > 0 && !plans.some((plan) => plan.interval === "month") && plans.some((plan) => plan.interval === "year")) {
+      setBillingCycle("year");
+    }
+  }, [billingCycle, plans]);
 
   useEffect(() => {
     const target = (state as { scrollTo?: string } | null)?.scrollTo;
@@ -843,16 +852,35 @@ export function LandingPage() {
             <p className="text-neutral-400">Todos incluem agendamento online, cadastro de clientes e recorrência.</p>
           </div>
 
+          <div className="mb-10 flex justify-center">
+            <div className="inline-flex rounded-xl border border-neutral-800 bg-neutral-950 p-1">
+              <button
+                type="button"
+                onClick={() => setBillingCycle("month")}
+                className={`rounded-lg px-5 py-2.5 text-sm font-bold transition-colors ${billingCycle === "month" ? "bg-primary text-black" : "text-neutral-400 hover:text-white"}`}
+              >
+                MENSAL
+              </button>
+              <button
+                type="button"
+                onClick={() => setBillingCycle("year")}
+                className={`rounded-lg px-5 py-2.5 text-sm font-bold transition-colors ${billingCycle === "year" ? "bg-primary text-black" : "text-neutral-400 hover:text-white"}`}
+              >
+                ANUAL <span className="ml-1 text-xs">20% OFF</span>
+              </button>
+            </div>
+          </div>
+
           {plansError ? (
             <p className="text-center text-red-400 py-8 bg-red-500/5 border border-red-500/20 rounded-xl">{plansError}</p>
           ) : (
             <div className="grid sm:grid-cols-3 gap-6">
               {plansLoading ? (
                 <><PlanCardSkeleton /><PlanCardSkeleton /><PlanCardSkeleton /></>
-              ) : plans.length === 0 ? (
-                <p className="col-span-3 text-center text-neutral-500 py-8">Nenhum plano disponível no momento.</p>
+              ) : visiblePlans.length === 0 ? (
+                <p className="col-span-3 text-center text-neutral-500 py-8">Nenhum plano {billingCycle === "month" ? "mensal" : "anual"} disponível no momento.</p>
               ) : (
-                plans.map((plan, index) => {
+                visiblePlans.map((plan, index) => {
                   const isBestPlan = plan.id === bestPlanId;
                   // A cor de destaque e o selo precisam sempre apontar para o
                   // mesmo plano, independentemente da ordem retornada pela API.
@@ -863,7 +891,7 @@ export function LandingPage() {
                       {isBestPlan && (
                         <div className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full mb-4 w-fit ${styles.badge}`}>
                           <Star size={11} />
-                          Mais completo
+                          MAIS ESCOLHIDO
                         </div>
                       )}
                       <div className="mb-4">
@@ -885,7 +913,7 @@ export function LandingPage() {
                         </ul>
                       )}
                       <button onClick={() => setSelectedPlan(plan)} className={`w-full py-3 rounded-lg text-sm transition-all ${styles.btn}`}>
-                        Assinar {plan.name}
+                        TESTAR GRÁTIS
                       </button>
                     </article>
                   );
