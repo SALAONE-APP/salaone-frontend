@@ -47,13 +47,13 @@ export function AppHeader({
   actionLabel,
   actionHref,
 }: AppHeaderProps) {
-  const { user } = useAuth();
+  const { user, salonAccess } = useAuth();
   const { setOpen: setSidebarOpen } = useSidebarMobile();
   const [salon, setSalon] = useState<StoredSalon | null>(() =>
     getStoredSalon()
   );
   const [canUseAresChat, setCanUseAresChat] = useState(false);
-  const profileConfig = getProfileConfig(user?.role);
+  const profileConfig = getProfileConfig(user?.role === "super_admin" && salonAccess ? "admin" : user?.role);
   const userName = user?.name?.trim() || "Usuario";
   const salonName = salon?.name?.trim() || "SalaOne";
   const logoUrl = salon?.logoUrl?.trim() || "";
@@ -84,7 +84,7 @@ export function AppHeader({
   useEffect(() => {
     let active = true;
 
-    if (user?.role !== "admin") {
+    if (user?.role !== "admin" && !salonAccess) {
       setCanUseAresChat(false);
       return () => {
         active = false;
@@ -104,7 +104,7 @@ export function AppHeader({
     return () => {
       active = false;
     };
-  }, [user?.role]);
+  }, [user?.role, salonAccess]);
 
   return (
     <header className="flex items-start justify-between px-4 py-4 md:items-center md:px-6">
@@ -154,7 +154,7 @@ export function AppHeader({
           <Link to={actionHref}>{actionLabel}</Link>
         </Button>
 
-        {user?.role === "admin" && canUseAresChat && (
+        {(user?.role === "admin" || salonAccess) && canUseAresChat && (
           <AresChatButton salonSlug={salon?.slug} />
         )}
 
