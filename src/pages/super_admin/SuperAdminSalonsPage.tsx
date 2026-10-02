@@ -1,5 +1,6 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, LogIn } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import {
@@ -14,6 +15,7 @@ import {
   type SuperAdminSalonDetail,
   type SuperAdminSalonUser,
 } from "@/service/superAdminService";
+import { useAuth } from "@/hooks/useAuth";
 
 function fmtDate(value?: string | null) {
   if (!value) return "-";
@@ -80,6 +82,8 @@ const SUBSCRIPTION_OPTIONS = [
 ];
 
 export function SuperAdminSalonsPage() {
+  const navigate = useNavigate();
+  const { enterSalonAccess } = useAuth();
   const [salons, setSalons] = useState<SuperAdminSalon[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -93,6 +97,7 @@ export function SuperAdminSalonsPage() {
   const [selectedSalon, setSelectedSalon] = useState<SuperAdminSalonDetail | null>(null);
   const [selectedSalonUsers, setSelectedSalonUsers] = useState<SuperAdminSalonUser[]>([]);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [accessingSalonId, setAccessingSalonId] = useState<string | null>(null);
   const [deleteModal, setDeleteModal] = useState({ open: false, salonId: "", salonName: "", slug: "", typedSlug: "", isSubmitting: false });
   const [statusReasonModal, setStatusReasonModal] = useState({
     open: false, salonId: "", salonName: "", nextStatus: "", reason: "",
@@ -149,6 +154,19 @@ export function SuperAdminSalonsPage() {
   };
 
   const closeDetails = () => { setSelectedSalon(null); setSelectedSalonUsers([]); };
+
+  const accessSalon = async (salon: Pick<SuperAdminSalon, "id" | "name">) => {
+    setAccessingSalonId(salon.id);
+    try {
+      await enterSalonAccess(salon.id);
+      toast.success(`Acessando o painel de ${salon.name}.`);
+      navigate("/home", { replace: true });
+    } catch (error) {
+      toast.error((error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Não foi possível acessar este salão.");
+    } finally {
+      setAccessingSalonId(null);
+    }
+  };
 
   const performStatusUpdate = async (salonId: string, nextStatus: string, reason?: string | null) => {
     try {
@@ -309,6 +327,9 @@ export function SuperAdminSalonsPage() {
                   <td className="px-5 py-3">
                     <div className="flex flex-wrap gap-1">
                       <button type="button" onClick={() => void openDetails(shop.id)} className="rounded bg-secondary px-2 py-1 text-xs font-medium text-foreground hover:bg-secondary/80">Detalhes</button>
+                      <button type="button" onClick={() => void accessSalon(shop)} disabled={accessingSalonId !== null} className="inline-flex items-center gap-1 rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
+                        {accessingSalonId === shop.id ? <Loader2 size={12} className="animate-spin" /> : <LogIn size={12} />} Acessar
+                      </button>
                       <button type="button" onClick={() => void handleStatusUpdate(shop.id, "active")} className="rounded bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-500/20">Ativar</button>
                       <button type="button" onClick={() => void handleStatusUpdate(shop.id, "inactive")} className="rounded bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-500/20">Inativar</button>
                       <button type="button" onClick={() => void handleStatusUpdate(shop.id, "blocked")} className="rounded bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/20">Bloquear</button>

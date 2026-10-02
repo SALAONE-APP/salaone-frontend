@@ -11,6 +11,7 @@ import {
 import salaOneLogo from "../assets/image/logo-icone-salaone.jpeg";
 import api from "../service/api";
 import { createPagarmeCardToken } from "../service/pagarmeService";
+import { onlyDigits } from "@/utils/leadForm";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,6 +41,7 @@ interface RegForm {
 }
 
 type SubscriptionProfessionalRule = "fixed" | "free_choice";
+type BillingCycle = "month" | "year";
 
 interface CardForm {
   number: string;
@@ -218,6 +220,13 @@ function getBestPlanId(plans: Plan[]) {
 
     return Number(plan.sortOrder ?? 0) > Number(best.sortOrder ?? 0) ? plan : best;
   }, null)?.id;
+}
+
+function getVisiblePlanFeatures(features: string[]) {
+  // "crm" é uma flag interna usada na configuração do plano. Quando a
+  // descrição comercial de CRM já existe, não deve aparecer como um item
+  // duplicado no card da landing.
+  return features.filter((feature) => feature.trim().toLowerCase() !== "crm");
 }
 
 // ─── Register Modal ───────────────────────────────────────────────────────────
@@ -595,10 +604,12 @@ export function LandingPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [plansLoading, setPlansLoading] = useState(true);
   const [plansError, setPlansError] = useState("");
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("month");
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [paymentCtx, setPaymentCtx] = useState<PaymentCtx | null>(null);
   const [leadModalOpen, setLeadModalOpen] = useState(false);
-  const bestPlanId = getBestPlanId(plans);
+  const visiblePlans = plans.filter((plan) => plan.interval === billingCycle);
+  const bestPlanId = getBestPlanId(visiblePlans);
 
   useEffect(() => {
     apiFetchPlans()
@@ -606,6 +617,12 @@ export function LandingPage() {
       .catch(() => setPlansError("Não foi possível carregar os planos. Tente novamente."))
       .finally(() => setPlansLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (billingCycle === "month" && plans.length > 0 && !plans.some((plan) => plan.interval === "month") && plans.some((plan) => plan.interval === "year")) {
+      setBillingCycle("year");
+    }
+  }, [billingCycle, plans]);
 
   useEffect(() => {
     const target = (state as { scrollTo?: string } | null)?.scrollTo;
@@ -627,6 +644,16 @@ export function LandingPage() {
   const onRegistered = (plan: Plan, result: RegisterResult) => {
     setSelectedPlan(null);
     setPaymentCtx({ plan, customerName: result.user.name, customerEmail: result.user.email });
+  };
+
+  const openSalesWhatsApp = (plan: Plan) => {
+    const commercialPhone = onlyDigits(import.meta.env.VITE_LANDING_WHATSAPP_NUMBER || "");
+    if (!commercialPhone) {
+      setLeadModalOpen(true);
+      return;
+    }
+    const message = `Olá! Tenho interesse no plano ${plan.name} da SalaOne e gostaria de negociar uma proposta.`;
+    window.open(`https://wa.me/${commercialPhone}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
   };
 
   const onSubscriptionSuccess = () => { setPaymentCtx(null); navigate("/login"); };
@@ -843,17 +870,37 @@ export function LandingPage() {
             <p className="text-neutral-400">Todos incluem agendamento online, cadastro de clientes e recorrência.</p>
           </div>
 
+          <div className="mb-10 flex justify-center">
+            <div className="inline-flex rounded-xl border border-neutral-800 bg-neutral-950 p-1">
+              <button
+                type="button"
+                onClick={() => setBillingCycle("month")}
+                className={`rounded-lg px-5 py-2.5 text-sm font-bold transition-colors ${billingCycle === "month" ? "bg-primary text-black" : "text-neutral-400 hover:text-white"}`}
+              >
+                MENSAL
+              </button>
+              <button
+                type="button"
+                onClick={() => setBillingCycle("year")}
+                className={`rounded-lg px-5 py-2.5 text-sm font-bold transition-colors ${billingCycle === "year" ? "bg-primary text-black" : "text-neutral-400 hover:text-white"}`}
+              >
+                ANUAL <span className="ml-1 text-xs">20% OFF</span>
+              </button>
+            </div>
+          </div>
+
           {plansError ? (
             <p className="text-center text-red-400 py-8 bg-red-500/5 border border-red-500/20 rounded-xl">{plansError}</p>
           ) : (
             <div className="grid sm:grid-cols-3 gap-6">
               {plansLoading ? (
                 <><PlanCardSkeleton /><PlanCardSkeleton /><PlanCardSkeleton /></>
-              ) : plans.length === 0 ? (
-                <p className="col-span-3 text-center text-neutral-500 py-8">Nenhum plano disponível no momento.</p>
+              ) : visiblePlans.length === 0 ? (
+                <p className="col-span-3 text-center text-neutral-500 py-8">Nenhum plano {billingCycle === "month" ? "mensal" : "anual"} disponível no momento.</p>
               ) : (
-                plans.map((plan, index) => {
+                visiblePlans.map((plan, index) => {
                   const isBestPlan = plan.id === bestPlanId;
+                  const isConsultationPlan = Number(plan.price) <= 0;
                   // A cor de destaque e o selo precisam sempre apontar para o
                   // mesmo plano, independentemente da ordem retornada pela API.
                   const variant = isBestPlan ? "premium" : index === 0 ? "basic" : "master";
@@ -863,29 +910,33 @@ export function LandingPage() {
                       {isBestPlan && (
                         <div className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full mb-4 w-fit ${styles.badge}`}>
                           <Star size={11} />
-                          Mais completo
+                          MAIS ESCOLHIDO
                         </div>
                       )}
                       <div className="mb-4">
                         <h3 className="text-xl font-bold text-white">{plan.name}</h3>
                         {plan.description && <p className="text-neutral-500 text-sm mt-1">{plan.description}</p>}
                       </div>
-                      <div className="flex items-end gap-1 mb-6">
-                        <span className="text-neutral-400 text-sm mb-1">R$</span>
-                        <span className={`text-4xl font-black leading-none ${styles.price}`}>{formatPrice(plan.price)}</span>
-                        <span className="text-neutral-500 text-sm mb-1">{getPeriodLabel(plan.interval, plan.intervalCount)}</span>
-                      </div>
-                      {plan.features.length > 0 && (
+                      {isConsultationPlan ? (
+                        <div className={`mb-6 text-3xl font-black leading-none ${styles.price}`}>Sob consulta</div>
+                      ) : (
+                        <div className="flex items-end gap-1 mb-6">
+                          <span className="text-neutral-400 text-sm mb-1">R$</span>
+                          <span className={`text-4xl font-black leading-none ${styles.price}`}>{formatPrice(plan.price)}</span>
+                          <span className="text-neutral-500 text-sm mb-1">{getPeriodLabel(plan.interval, plan.intervalCount)}</span>
+                        </div>
+                      )}
+                      {getVisiblePlanFeatures(plan.features).length > 0 && (
                         <ul className="space-y-2.5 mb-8 flex-1">
-                          {plan.features.map((feature) => (
+                          {getVisiblePlanFeatures(plan.features).map((feature) => (
                             <li key={feature} className="flex items-start gap-2 text-sm text-neutral-300">
                               <CheckCircle2 size={15} className="text-primary mt-0.5 shrink-0" /> {feature}
                             </li>
                           ))}
                         </ul>
                       )}
-                      <button onClick={() => setSelectedPlan(plan)} className={`w-full py-3 rounded-lg text-sm transition-all ${styles.btn}`}>
-                        Assinar {plan.name}
+                      <button onClick={() => isConsultationPlan ? openSalesWhatsApp(plan) : setSelectedPlan(plan)} className={`w-full py-3 rounded-lg text-sm transition-all ${styles.btn}`}>
+                        {isConsultationPlan ? "FALAR COM VENDAS" : "TESTAR GRÁTIS"}
                       </button>
                     </article>
                   );

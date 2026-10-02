@@ -1,5 +1,7 @@
 import api from "./api";
 
+export const SUPER_ADMIN_ACCESS_STORAGE_KEY = "superAdminSalonAccess";
+
 export interface LoginPayload {
   email: string;
   password: string;
@@ -48,6 +50,10 @@ export interface AuthResponse {
   };
   memberships?: SalonMembership[];
   salon?: StoredSalon | null;
+}
+
+export interface AccessibleSalon extends StoredSalon {
+  role: string;
 }
 
 interface BackendAuthResponse {
@@ -121,6 +127,31 @@ export async function login(data: LoginPayload): Promise<AuthResponse> {
   };
 }
 
+function persistAuthResponse(response: AuthResponse) {
+  const token = response.accessToken || response.token || "";
+  if (!token) throw new Error("O servidor não retornou um token de acesso.");
+
+  localStorage.setItem("token", token);
+  if (response.refreshToken) localStorage.setItem("refreshToken", response.refreshToken);
+  else localStorage.removeItem("refreshToken");
+  localStorage.setItem("user", JSON.stringify(response.user));
+
+  if (response.salon) localStorage.setItem("salon", JSON.stringify(response.salon));
+  else localStorage.removeItem("salon");
+  window.dispatchEvent(new Event("salon:updated"));
+}
+
+export async function switchSalon(salonId: string | null): Promise<AuthResponse> {
+  const response = await api.post<AuthResponse>("/auth/switch-salon", { salonId });
+  persistAuthResponse(response.data);
+  return response.data;
+}
+
+export async function listAccessibleSalons(): Promise<AccessibleSalon[]> {
+  const response = await api.get<{ items: AccessibleSalon[] }>("/auth/salons");
+  return Array.isArray(response.data.items) ? response.data.items : [];
+}
+
 export async function register(_data: RegisterPayload) {
   void _data;
   throw new Error("O backend atual não oferece autocadastro público.");
@@ -131,6 +162,7 @@ export function logout() {
   localStorage.removeItem("refreshToken");
   localStorage.removeItem("user");
   localStorage.removeItem("salon");
+  localStorage.removeItem(SUPER_ADMIN_ACCESS_STORAGE_KEY);
 }
 
 export function isAuthenticated() {
@@ -152,6 +184,7 @@ export async function fetchMe() {
     role: normalizeRole(membership?.role ?? response.data.user.role),
     permissions: normalizePermissions(membership?.permissions),
     salonUserId: membership?.id ?? null,
+    activeSalonId: response.data.tenantContext?.salonId ?? null,
   };
 }
 
