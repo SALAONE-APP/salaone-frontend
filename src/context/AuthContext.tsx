@@ -92,6 +92,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { activeSalonId, ...userData } = freshUser;
         localStorage.setItem("user", JSON.stringify(userData));
         setUser(userData);
+        if (userData.role !== "super_admin") {
+          void listAccessibleSalons().then(setAccessibleSalons).catch(() => setAccessibleSalons([]));
+        }
         if (userData.role !== "super_admin" || (salonAccess && activeSalonId !== salonAccess.id)) {
           localStorage.removeItem(SUPER_ADMIN_ACCESS_STORAGE_KEY);
           setSalonAccess(null);
@@ -131,6 +134,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(SUPER_ADMIN_ACCESS_STORAGE_KEY);
     setSalonAccess(null);
     setUser(response.user);
+    if (response.user.role !== "super_admin") {
+      try {
+        setAccessibleSalons(await listAccessibleSalons());
+      } catch {
+        setAccessibleSalons([]);
+      }
+    } else {
+      setAccessibleSalons([]);
+    }
   }
 
   function logout() {

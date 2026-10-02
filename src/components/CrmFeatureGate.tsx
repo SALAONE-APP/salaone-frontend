@@ -7,7 +7,15 @@ import { getSalonPlatformSubscription, hasActivePlatformSubscription, type Platf
 
 export function subscriptionIncludesCrm(subscription: PlatformSubscription | null) {
   return hasActivePlatformSubscription(subscription)
-    && (subscription?.plan?.features ?? []).some((feature) => String(feature).trim().toLowerCase() === "crm");
+    && (subscription?.plan?.features ?? []).some((feature) => {
+      const normalized = String(feature)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .toLowerCase();
+
+      return /(^|\s)crm(\s|$)/.test(normalized);
+    });
 }
 
 export function CrmFeatureGate({ children }: { children: ReactNode }) {
