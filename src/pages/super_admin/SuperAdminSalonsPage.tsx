@@ -1,5 +1,5 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
-import { Loader2, LogIn } from "lucide-react";
+import { CreditCard, Loader2, LogIn, QrCode } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -9,11 +9,15 @@ import {
   listSuperAdminSalonUsers,
   updateSuperAdminSalonStatus,
   deleteSuperAdminSalon,
+  createSuperAdminSalonUnit,
+  createPagarmeSubscriptionPaymentLink,
+  getPlatformPlans,
   resetSuperAdminUserPassword,
   type SalonStatus,
   type SuperAdminSalon,
   type SuperAdminSalonDetail,
   type SuperAdminSalonUser,
+  type PlatformPlan,
 } from "@/service/superAdminService";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -85,6 +89,7 @@ export function SuperAdminSalonsPage() {
   const navigate = useNavigate();
   const { enterSalonAccess } = useAuth();
   const [salons, setSalons] = useState<SuperAdminSalon[]>([]);
+  const [platformPlans, setPlatformPlans] = useState<PlatformPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const limit = 15;
@@ -109,6 +114,11 @@ export function SuperAdminSalonsPage() {
     generatedPassword: "",
     isSubmitting: false,
   });
+  const [createUnitModal, setCreateUnitModal] = useState({
+    open: false, submitting: false, name: "", phone: "", ownerName: "", ownerEmail: "", ownerPassword: "", maxUnits: "1", unlimited: false,
+    billingMode: "free" as "free" | "manual_pix" | "card", negotiatedAmount: "", billingInterval: "month" as "month" | "year", dueDate: "", platformPlanId: "",
+  });
+  const [paymentLinkModal, setPaymentLinkModal] = useState({ open: false, salonName: "", url: "", expiresAt: null as string | null });
 
   const loadSalons = useCallback(async () => {
     const result = await listSuperAdminSalons({
@@ -133,6 +143,8 @@ export function SuperAdminSalonsPage() {
       try { await loadSalons(); } catch { toast.error("Nao foi possivel carregar as salões."); } finally { setLoading(false); }
     })();
   }, [loadSalons]);
+
+  useEffect(() => { void getPlatformPlans().then((plans) => setPlatformPlans(plans.filter((plan) => plan.active !== false))).catch(() => setPlatformPlans([])); }, []);
 
   const handleSearchSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -234,6 +246,40 @@ export function SuperAdminSalonsPage() {
     }
   };
 
+  const closeCreateUnitModal = () => setCreateUnitModal({ open: false, submitting: false, name: "", phone: "", ownerName: "", ownerEmail: "", ownerPassword: "", maxUnits: "1", unlimited: false, billingMode: "free", negotiatedAmount: "", billingInterval: "month", dueDate: "", platformPlanId: "" });
+  const submitCreateUnit = async () => {
+    const form = createUnitModal;
+    if (!form.name.trim() || !form.ownerEmail.trim()) { toast.error("Informe a unidade e o e-mail do responsável."); return; }
+    if (!form.unlimited && (!Number.isInteger(Number(form.maxUnits)) || Number(form.maxUnits) < 1)) { toast.error("Informe um limite de unidades válido."); return; }
+    const negotiatedAmount = form.negotiatedAmount.trim() ? Number(form.negotiatedAmount.replace(",", ".")) : undefined;
+    if (form.billingMode === "manual_pix" && (negotiatedAmount === undefined || !Number.isFinite(negotiatedAmount) || negotiatedAmount < 0)) { toast.error("Informe o valor negociado do PIX."); return; }
+    if (form.billingMode === "manual_pix" && !form.dueDate) { toast.error("Informe o vencimento do PIX."); return; }
+    if (form.billingMode !== "free" && !form.platformPlanId) { toast.error("Selecione o plano da assinatura."); return; }
+    setCreateUnitModal((current) => ({ ...current, submitting: true }));
+    try {
+      const result = await createSuperAdminSalonUnit({
+        name: form.name.trim(), businessType: "beauty_salon", phone: form.phone.trim() || null,
+        ownerName: form.ownerName.trim() || undefined, ownerEmail: form.ownerEmail.trim(), ownerPassword: form.ownerPassword.trim() || undefined,
+        maxSalonUnits: form.unlimited ? null : Number(form.maxUnits),
+        billingMode: form.billingMode,
+        negotiatedAmount: form.billingMode === "manual_pix" ? negotiatedAmount : undefined,
+        billingInterval: form.billingMode === "manual_pix" ? form.billingInterval : undefined,
+        dueDate: form.billingMode === "manual_pix" ? form.dueDate : undefined,
+        selectedPlanId: form.billingMode !== "free" ? form.platformPlanId : undefined,
+      });
+      if (form.billingMode === "card") {
+        const link = await createPagarmeSubscriptionPaymentLink(result.salon.id, form.platformPlanId);
+        setPaymentLinkModal({ open: true, salonName: result.salon.name, url: link.paymentUrl, expiresAt: link.expiresAt ?? null });
+        toast.success("Unidade criada. Envie o link para o cliente concluir a assinatura.");
+      } else toast.success(form.billingMode === "manual_pix" ? "Unidade criada e aguardando pagamento." : `Unidade criada para ${result.owner.name}.`);
+      closeCreateUnitModal();
+      await loadSalons();
+    } catch (error) {
+      toast.error((error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Não foi possível criar a unidade.");
+      setCreateUnitModal((current) => ({ ...current, submitting: false }));
+    }
+  };
+
   const subscriptionsByShop: Record<string, { planName: string | null; price: number | null }> = {};
   for (const shop of salons) {
     const platformSub = shop.platformSubscription;
@@ -248,9 +294,9 @@ export function SuperAdminSalonsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-base font-semibold text-foreground">Gestao de Salões</h3>
-        <p className="text-sm text-muted-foreground">Filtre, visualize detalhes e atualize o status das salões.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div><h3 className="text-base font-semibold text-foreground">Gestao de Salões</h3><p className="text-sm text-muted-foreground">Filtre, visualize detalhes e atualize o status das salões.</p></div>
+        <button type="button" onClick={() => setCreateUnitModal((current) => ({ ...current, open: true }))} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">Cadastrar unidade</button>
       </div>
 
       <form onSubmit={handleSearchSubmit} className="flex flex-wrap gap-2">
@@ -351,6 +397,36 @@ export function SuperAdminSalonsPage() {
           </div>
         </div>
       </div>
+
+      {createUnitModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={closeCreateUnitModal}>
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-4"><h3 className="text-lg font-semibold text-foreground">Cadastrar unidade</h3><p className="mt-1 text-sm text-muted-foreground">Defina o responsável e o limite contratado de unidades.</p></div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="space-y-1 text-sm text-muted-foreground sm:col-span-2">Nome da unidade<input value={createUnitModal.name} onChange={(e) => setCreateUnitModal((p) => ({ ...p, name: e.target.value }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground" /></label>
+              <label className="space-y-1 text-sm text-muted-foreground sm:col-span-2">Telefone da unidade (opcional)<input value={createUnitModal.phone} onChange={(e) => setCreateUnitModal((p) => ({ ...p, phone: e.target.value }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground" /></label>
+              <label className="space-y-1 text-sm text-muted-foreground">Nome do responsável<input value={createUnitModal.ownerName} onChange={(e) => setCreateUnitModal((p) => ({ ...p, ownerName: e.target.value }))} placeholder="Obrigatório se for uma conta nova" className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground" /></label>
+              <label className="space-y-1 text-sm text-muted-foreground">E-mail do responsável<input type="email" value={createUnitModal.ownerEmail} onChange={(e) => setCreateUnitModal((p) => ({ ...p, ownerEmail: e.target.value }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground" /></label>
+              <label className="space-y-1 text-sm text-muted-foreground sm:col-span-2">Senha temporária (necessária somente para conta nova)<input type="password" value={createUnitModal.ownerPassword} onChange={(e) => setCreateUnitModal((p) => ({ ...p, ownerPassword: e.target.value }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground" /></label>
+              <label className="space-y-1 text-sm text-muted-foreground">Limite de unidades<input type="number" min="1" disabled={createUnitModal.unlimited} value={createUnitModal.maxUnits} onChange={(e) => setCreateUnitModal((p) => ({ ...p, maxUnits: e.target.value }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground disabled:opacity-50" /></label>
+              <label className="flex items-end gap-2 pb-2 text-sm text-foreground"><input type="checkbox" checked={createUnitModal.unlimited} onChange={(e) => setCreateUnitModal((p) => ({ ...p, unlimited: e.target.checked }))} /> Unidades ilimitadas</label>
+            </div>
+            <p className="mt-4 rounded-lg bg-secondary/50 p-3 text-xs text-muted-foreground">Para um dono existente, informe apenas o e-mail. O novo limite substituirá o limite atual contratado.</p>
+            <fieldset className="mt-5">
+              <legend className="text-sm font-medium text-foreground">Cobrança inicial da unidade</legend>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                {([{ value: "free", label: "Sem cobrança", icon: CreditCard }, { value: "manual_pix", label: "PIX manual", icon: QrCode }, { value: "card", label: "Cartão recorrente", icon: CreditCard }] as const).map(({ value, label, icon: Icon }) => <label key={value} className={`cursor-pointer rounded-lg border p-3 text-sm ${createUnitModal.billingMode === value ? "border-primary bg-primary/5" : "border-border"}`}><input className="sr-only" type="radio" checked={createUnitModal.billingMode === value} onChange={() => setCreateUnitModal((p) => ({ ...p, billingMode: value }))} /><Icon size={17} className="mb-1.5 text-primary" /><span className="block font-medium text-foreground">{label}</span></label>)}
+              </div>
+            </fieldset>
+            {createUnitModal.billingMode === "manual_pix" && <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4"><label className="block space-y-1 text-sm text-muted-foreground">Plano da assinatura<select value={createUnitModal.platformPlanId} onChange={(e) => setCreateUnitModal((p) => ({ ...p, platformPlanId: e.target.value }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground"><option value="">Selecione um plano</option>{platformPlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} — {fmtCurrency(plan.price)}</option>)}</select></label></div>}
+            {createUnitModal.billingMode === "manual_pix" && <div className="mt-4 grid gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 sm:grid-cols-2"><label className="space-y-1 text-sm text-muted-foreground">Valor negociado<input inputMode="decimal" placeholder="Ex.: 99,90" value={createUnitModal.negotiatedAmount} onChange={(e) => setCreateUnitModal((p) => ({ ...p, negotiatedAmount: e.target.value }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground" /></label><label className="space-y-1 text-sm text-muted-foreground">Periodicidade<select value={createUnitModal.billingInterval} onChange={(e) => setCreateUnitModal((p) => ({ ...p, billingInterval: e.target.value as "month" | "year" }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground"><option value="month">Mensal</option><option value="year">Anual</option></select></label><label className="space-y-1 text-sm text-muted-foreground sm:col-span-2">Vencimento<input type="date" value={createUnitModal.dueDate} onChange={(e) => setCreateUnitModal((p) => ({ ...p, dueDate: e.target.value }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground" /></label><p className="text-xs text-amber-800 sm:col-span-2">A unidade será criada com o status “Aguardando pagamento”.</p></div>}
+            {createUnitModal.billingMode === "card" && <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-4"><label className="block space-y-1 text-sm text-muted-foreground">Plano da assinatura recorrente<select value={createUnitModal.platformPlanId} onChange={(e) => setCreateUnitModal((p) => ({ ...p, platformPlanId: e.target.value }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground"><option value="">Selecione um plano</option>{platformPlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} — {fmtCurrency(plan.price)}</option>)}</select></label><p className="mt-2 text-xs text-muted-foreground">Ao criar, será gerado um link do Pagar.me para você enviar ao cliente. A recorrência começa após o pagamento.</p></div>}
+            <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={closeCreateUnitModal} className="rounded border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-secondary">Cancelar</button><button type="button" onClick={() => void submitCreateUnit()} disabled={createUnitModal.submitting} className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{createUnitModal.submitting ? "Criando..." : "Criar unidade"}</button></div>
+          </div>
+        </div>
+      )}
+
+      {paymentLinkModal.open && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => setPaymentLinkModal((p) => ({ ...p, open: false }))}><div className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl" onClick={(event) => event.stopPropagation()}><h3 className="text-lg font-semibold text-foreground">Link de assinatura criado</h3><p className="mt-1 text-sm text-muted-foreground">Envie este link para {paymentLinkModal.salonName}. Após o pagamento, o Pagar.me ativa a recorrência.</p><input readOnly value={paymentLinkModal.url} className="mt-4 h-10 w-full rounded-lg border border-border bg-secondary px-3 text-sm text-foreground" /><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setPaymentLinkModal((p) => ({ ...p, open: false }))} className="rounded border border-border px-4 py-2 text-sm">Fechar</button><button type="button" onClick={() => void navigator.clipboard.writeText(paymentLinkModal.url).then(() => toast.success("Link copiado."))} className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Copiar link</button></div></div></div>}
 
       {/* Modal Detalhes */}
       {selectedSalon && (
