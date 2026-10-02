@@ -20,6 +20,9 @@ export interface SuperAdminPlatformSubscription {
   status: string;
   selected_plan: string;
   payment_method?: string | null;
+  billing_mode?: "free" | "manual_pix" | "card" | string | null;
+  manual_payment_status?: "not_applicable" | "pending" | "paid" | string | null;
+  billing_interval?: "month" | "year" | string | null;
   amount?: number | null;
   start_date?: string | null;
   next_billing_date?: string | null;
@@ -173,6 +176,9 @@ interface BackendSalon {
     status: string;
     start_date?: string | null;
     payment_method?: string | null;
+    billing_mode?: string | null;
+    manual_payment_status?: string | null;
+    billing_interval?: string | null;
     amount?: number | null;
     next_billing_date?: string | null;
     trial_ends_at?: string | null;
@@ -223,6 +229,9 @@ function mapBackendSalon(salon: BackendSalon): SuperAdminSalon {
       selected_plan: salon.salon_subscriptions.platform_plans?.name ?? "",
       start_date: salon.salon_subscriptions.start_date ?? null,
       payment_method: salon.salon_subscriptions.payment_method ?? null,
+      billing_mode: salon.salon_subscriptions.billing_mode ?? null,
+      manual_payment_status: salon.salon_subscriptions.manual_payment_status ?? null,
+      billing_interval: salon.salon_subscriptions.billing_interval ?? null,
       amount: salon.salon_subscriptions.amount ?? salon.salon_subscriptions.platform_plans?.price ?? null,
       next_billing_date: salon.salon_subscriptions.next_billing_date ?? null,
       trial_ends_at: salon.salon_subscriptions.trial_ends_at ?? null,
@@ -373,6 +382,29 @@ export async function deleteSuperAdminSalon(
   return response.data;
 }
 
+export async function createSuperAdminSalonUnit(data: {
+  name: string; businessType: string; slug?: string; document?: string | null; phone?: string | null; email?: string | null;
+  selectedPlanId?: string | null; ownerName?: string; ownerEmail: string; ownerPassword?: string; maxSalonUnits: number | null;
+  billingMode?: "free" | "manual_pix" | "card";
+  negotiatedAmount?: number;
+  billingInterval?: "month" | "year";
+  dueDate?: string;
+}) {
+  const response = await api.post<{ salon: SuperAdminSalon; owner: { id: string; name: string; email: string }; currentUnits: number; maxSalonUnits: number | null }>("/super-admin/salons/units", data);
+  return response.data;
+}
+
+export async function createPagarmeSubscriptionPaymentLink(
+  salonId: string,
+  platformPlanId: string,
+): Promise<{ paymentUrl: string; expiresAt?: string | null }> {
+  const response = await api.post<{ paymentUrl: string; expiresAt?: string | null }>(
+    `/super-admin/salons/${salonId}/platform-subscription/card-payment-link`,
+    { platformPlanId },
+  );
+  return response.data;
+}
+
 export async function activatePixPlatformSubscription(
   salonId: string,
   payload: {
@@ -385,6 +417,13 @@ export async function activatePixPlatformSubscription(
   const response = await api.post<SuperAdminPlatformSubscription>(
     `/super-admin/salons/${salonId}/platform-subscription/pix/activate`,
     payload
+  );
+  return response.data;
+}
+
+export async function confirmManualPixPayment(salonId: string): Promise<SuperAdminPlatformSubscription> {
+  const response = await api.post<SuperAdminPlatformSubscription>(
+    `/super-admin/salons/${salonId}/platform-subscription/manual-pix/confirm`
   );
   return response.data;
 }

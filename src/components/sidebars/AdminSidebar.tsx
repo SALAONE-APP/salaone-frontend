@@ -99,6 +99,7 @@ function buildSections(canUseCrm: boolean): SidebarSection[] {
           label: "Administracao",
           children: [
             { icon: UserCog, label: "Funcionarios", href: "/users" },
+            { icon: Boxes, label: "Minhas unidades", href: "/my-units" },
             { icon: Users, label: "Clientes", href: "/customers" },
             { icon: ClipboardPlus, label: "Prontuário", href: "/client-records" },
             { icon: Settings, label: "Configuracoes", href: "/settings" },
