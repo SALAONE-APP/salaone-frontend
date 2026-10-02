@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { AlertTriangle, Filter, Instagram, Loader2, MessageCircle, Plus, Search, UserCog } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { AlertTriangle, Filter, Instagram, Loader2, MessageCircle, Plus, Search, Settings2, UserCog } from "lucide-react";
 import { toast } from "sonner";
 
 import { SalesLeadCreateDialog } from "@/components/SalesLeadCreateDialog";
 import { SalesLeadDetailDialog } from "@/components/SalesLeadDetailDialog";
+import { SalesPipelineManagerDialog } from "@/components/SalesPipelineManagerDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,19 +29,18 @@ import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import {
   SALES_CHANNELS,
-  SALES_LEAD_STAGES,
   SALES_LOST_REASONS,
   listSalesLeads,
   SALES_PRODUCT_BUSINESS_LABELS,
   SALES_PRODUCT_LABELS,
   salesChannelLabel,
-  salesLeadStageLabel,
   salesLostReasonLabel,
   updateSalesLead,
   type SalesLead,
   type UpdateSalesLeadInput,
 } from "@/service/salesCrmService";
 import { listSuperAdminUsers, type SuperAdminUser } from "@/service/superAdminService";
+import { useSalesPipelines } from "@/hooks/useSalesPipelines";
 import { useSalesProduct } from "@/hooks/useSalesProduct";
 
 function getInitials(name: string) {
@@ -53,7 +54,7 @@ function getInitials(name: string) {
 
 function isOverdue(lead: SalesLead) {
   if (!lead.nextActionAt) return false;
-  if (lead.stage === "fechado" || lead.stage === "perdido") return false;
+  if (lead.resolvedAt) return false;
   return new Date(lead.nextActionAt).getTime() < Date.now();
 }
 
@@ -66,6 +67,19 @@ interface PendingLostReasonDrag {
 export function SalesCrmKanbanPage() {
   const product = useSalesProduct();
   const business = SALES_PRODUCT_BUSINESS_LABELS[product];
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { pipelines, loading: pipelinesLoading, reload: reloadPipelines } = useSalesPipelines(product);
+  const [managerOpen, setManagerOpen] = useState(false);
+  // Funil aberto: o da URL (?pipeline=) se existir neste produto, senao o padrao.
+  const activePipeline = useMemo(
+    () => pipelines.find((item) => item.id === searchParams.get("pipeline")) ?? pipelines[0] ?? null,
+    [pipelines, searchParams],
+  );
+  const activePipelineId = activePipeline?.id ?? null;
+  const lostStageKeys = useMemo(
+    () => new Set((activePipeline?.stages ?? []).filter((stage) => stage.terminalOutcome === "perdido").map((stage) => stage.key)),
+    [activePipeline],
+  );
   const { user } = useAuth();
   const isSuperAdmin = user?.role === "super_admin";
 
@@ -91,14 +105,15 @@ export function SalesCrmKanbanPage() {
     if (!silent) setLoading(true);
     if (!silent) setError(null);
     try {
-      const result = await listSalesLeads({ product, limit: 200 });
+      if (!activePipelineId) return;
+      const result = await listSalesLeads({ product, pipelineId: activePipelineId, limit: 200 });
       setLeads(result.items);
     } catch {
       if (!silent) setError("Não foi possível carregar o funil de vendas.");
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [product]);
+  }, [product, activePipelineId]);
 
   useEffect(() => {
     void load();
@@ -140,11 +155,11 @@ export function SalesCrmKanbanPage() {
 
   const columns = useMemo(
     () =>
-      SALES_LEAD_STAGES.map((stage) => {
-        const stageCards = visibleLeads.filter((lead) => lead.stage === stage).sort((a, b) => a.sortOrder - b.sortOrder);
-        return { key: stage, label: salesLeadStageLabel(stage), cards: stageCards };
+      (activePipeline?.stages ?? []).map((stage) => {
+        const stageCards = visibleLeads.filter((lead) => lead.stage === stage.key).sort((a, b) => a.sortOrder - b.sortOrder);
+        return { key: stage.key, label: stage.label, cards: stageCards };
       }),
-    [visibleLeads],
+    [visibleLeads, activePipeline],
   );
 
   async function reorderColumn(stageKey: string, orderedIds: string[], draggedCardId: string, lostReason?: string) {
@@ -161,7 +176,7 @@ export function SalesCrmKanbanPage() {
           ...item,
           stage: isDragged ? stageKey : item.stage,
           sortOrder: nextSortOrderById.get(item.id)!,
-          lostReason: isDragged && stageChanged && stageKey === "perdido" ? lostReason ?? item.lostReason : item.lostReason,
+          lostReason: isDragged && stageChanged && lostStageKeys.has(stageKey) ? lostReason ?? item.lostReason : item.lostReason,
         };
       }),
     );
@@ -176,7 +191,7 @@ export function SalesCrmKanbanPage() {
           const payload: UpdateSalesLeadInput = { sortOrder: nextSortOrderById.get(item.id)! };
           if (item.id === draggedCardId && stageChanged) {
             payload.stage = stageKey;
-            if (stageKey === "perdido") payload.lostReason = lostReason;
+            if (lostStageKeys.has(stageKey)) payload.lostReason = lostReason;
           }
           return updateSalesLead(item.id, payload);
         }),
@@ -270,7 +285,7 @@ export function SalesCrmKanbanPage() {
     }
 
     const draggedLead = leadsRef.current.find((item) => item.id === state.cardId);
-    if (draggedLead && draggedLead.stage !== stageKey && stageKey === "perdido") {
+    if (draggedLead && draggedLead.stage !== stageKey && lostStageKeys.has(stageKey)) {
       setPendingLostReason("");
       setPendingLostReasonDrag({ stageKey, siblingIds, cardId: state.cardId });
       return;
@@ -316,10 +331,18 @@ export function SalesCrmKanbanPage() {
             Acompanhe a prospecção de novos clientes do {SALES_PRODUCT_LABELS[product]} ({business.plural}), do primeiro contato ao fechamento.
           </p>
         </div>
-        <Button size="sm" className="gap-2 self-start" onClick={() => setCreateOpen(true)}>
-          <Plus size={14} />
-          Novo Lead
-        </Button>
+        <div className="flex items-center gap-2 self-start">
+          {isSuperAdmin && (
+            <Button size="sm" variant="outline" className="gap-2" onClick={() => setManagerOpen(true)}>
+              <Settings2 size={14} />
+              Gerenciar funis
+            </Button>
+          )}
+          <Button size="sm" className="gap-2" onClick={() => setCreateOpen(true)} disabled={!activePipeline}>
+            <Plus size={14} />
+            Novo Lead
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 lg:flex-row lg:items-center lg:justify-between">
@@ -333,6 +356,20 @@ export function SalesCrmKanbanPage() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {pipelines.length > 1 && activePipeline && (
+            <Select value={activePipeline.id} onValueChange={(value) => setSearchParams({ pipeline: value }, { replace: true })}>
+              <SelectTrigger className="h-8 w-48 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {pipelines.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
@@ -374,7 +411,7 @@ export function SalesCrmKanbanPage() {
         </div>
       </div>
 
-      {loading ? (
+      {loading || pipelinesLoading ? (
         <div className="flex items-center justify-center rounded-xl border border-border bg-card p-16">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
@@ -479,9 +516,24 @@ export function SalesCrmKanbanPage() {
       <SalesLeadDetailDialog leadId={selectedLeadId} onClose={() => setSelectedLeadId(null)} onChanged={() => void load()} />
       <SalesLeadCreateDialog
         product={product}
+        pipelineId={activePipelineId ?? undefined}
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={() => void load()}
+      />
+
+      <SalesPipelineManagerDialog
+        product={product}
+        open={managerOpen}
+        onClose={() => setManagerOpen(false)}
+        pipelines={pipelines}
+        onChanged={() => {
+          void reloadPipelines().then((updated) => {
+            // Se o funil aberto foi excluido, volta para o padrao; senao recarrega os leads dele.
+            if (!updated.some((item) => item.id === activePipelineId)) setSearchParams({}, { replace: true });
+            void load();
+          });
+        }}
       />
 
       <Dialog open={Boolean(pendingLostReasonDrag)} onOpenChange={(open) => !open && setPendingLostReasonDrag(null)}>

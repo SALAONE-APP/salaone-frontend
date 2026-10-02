@@ -39,6 +39,7 @@ export interface AuthContextData {
   enterSalonAccess: (salonId: string) => Promise<StoredSalon>;
   exitSalonAccess: () => Promise<void>;
   switchAccessibleSalon: (salonId: string) => Promise<StoredSalon>;
+  refreshAccessibleSalons: () => Promise<void>;
 }
 
 function getStoredSalonAccess(user: User | null): StoredSalon | null {
@@ -173,6 +174,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return response.salon;
   }
 
+  async function refreshAccessibleSalons() {
+    if (!user || user.role === "super_admin") return;
+    setAccessibleSalons(await listAccessibleSalons());
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -187,6 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         enterSalonAccess,
         exitSalonAccess,
         switchAccessibleSalon,
+        refreshAccessibleSalons,
       }}
     >
       {children}
