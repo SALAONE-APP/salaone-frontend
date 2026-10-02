@@ -21,10 +21,10 @@ import {
   getSalesDashboard,
   SALES_PRODUCT_LABELS,
   salesChannelLabel,
-  salesLeadStageLabel,
   salesLostReasonLabel,
   type SalesDashboard,
 } from "@/service/salesCrmService";
+import { useSalesPipelines } from "@/hooks/useSalesPipelines";
 import { useSalesProduct } from "@/hooks/useSalesProduct";
 
 const PALETTE = [
@@ -53,22 +53,27 @@ function Panel({ title, subtitle, children }: { title: string; subtitle?: string
 
 export function SalesCrmDashboardPage() {
   const product = useSalesProduct();
+  const { pipelines, loading: pipelinesLoading } = useSalesPipelines(product);
+  // "all" = todos os funis do produto (sem grafico por etapa, que depende do funil).
+  const [pipelineChoice, setPipelineChoice] = useState<string | null>(null);
+  const pipelineFilter = pipelineChoice ?? pipelines[0]?.id ?? "all";
   const [months, setMonths] = useState(6);
   const [dashboard, setDashboard] = useState<SalesDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (pipelinesLoading) return;
     setLoading(true);
     setError(null);
-    getSalesDashboard({ product, trendMonths: months })
+    getSalesDashboard({ product, pipelineId: pipelineFilter === "all" ? undefined : pipelineFilter, trendMonths: months })
       .then(setDashboard)
       .catch(() => setError("Não foi possível carregar o dashboard."))
       .finally(() => setLoading(false));
-  }, [product, months]);
+  }, [product, months, pipelineFilter, pipelinesLoading]);
 
   const funnelWithLabel = useMemo(
-    () => (dashboard?.funnel ?? []).map((item) => ({ ...item, label: salesLeadStageLabel(item.stage) })),
+    () => dashboard?.funnel ?? [],
     [dashboard],
   );
 
@@ -82,8 +87,6 @@ export function SalesCrmDashboardPage() {
     [dashboard],
   );
 
-  const totalLeads = useMemo(() => (dashboard?.funnel ?? []).reduce((sum, item) => sum + item.count, 0), [dashboard]);
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -91,16 +94,33 @@ export function SalesCrmDashboardPage() {
           <h1 className="text-xl font-semibold text-foreground">Dashboard Comercial · {SALES_PRODUCT_LABELS[product]}</h1>
           <p className="text-sm text-muted-foreground">Visão consolidada do funil de prospecção do {SALES_PRODUCT_LABELS[product]}.</p>
         </div>
-        <Select value={String(months)} onValueChange={(v) => setMonths(Number(v))}>
-          <SelectTrigger className="w-40 self-start">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="3">Últimos 3 meses</SelectItem>
-            <SelectItem value="6">Últimos 6 meses</SelectItem>
-            <SelectItem value="12">Últimos 12 meses</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap items-center gap-2 self-start">
+          {pipelines.length > 0 && (
+            <Select value={pipelineFilter} onValueChange={setPipelineChoice}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {pipelines.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name}
+                  </SelectItem>
+                ))}
+                <SelectItem value="all">Todos os funis</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+          <Select value={String(months)} onValueChange={(v) => setMonths(Number(v))}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="3">Últimos 3 meses</SelectItem>
+              <SelectItem value="6">Últimos 6 meses</SelectItem>
+              <SelectItem value="12">Últimos 12 meses</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {loading ? (
@@ -114,19 +134,15 @@ export function SalesCrmDashboardPage() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-xl border border-border bg-card p-3">
               <p className="text-xs text-muted-foreground">Total de leads</p>
-              <p className="text-lg font-semibold text-foreground">{totalLeads}</p>
+              <p className="text-lg font-semibold text-foreground">{dashboard.totals.total}</p>
             </div>
             <div className="rounded-xl border border-border bg-card p-3">
-              <p className="text-xs text-muted-foreground">Fechados</p>
-              <p className="text-lg font-semibold text-foreground">
-                {dashboard.funnel.find((item) => item.stage === "fechado")?.count ?? 0}
-              </p>
+              <p className="text-xs text-muted-foreground">Ganhos</p>
+              <p className="text-lg font-semibold text-foreground">{dashboard.totals.won}</p>
             </div>
             <div className="rounded-xl border border-border bg-card p-3">
               <p className="text-xs text-muted-foreground">Perdidos</p>
-              <p className="text-lg font-semibold text-foreground">
-                {dashboard.funnel.find((item) => item.stage === "perdido")?.count ?? 0}
-              </p>
+              <p className="text-lg font-semibold text-foreground">{dashboard.totals.lost}</p>
             </div>
             <div className="rounded-xl border border-border bg-card p-3">
               <p className="text-xs text-muted-foreground">Canais ativos</p>
@@ -137,7 +153,9 @@ export function SalesCrmDashboardPage() {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Panel title="Funil por etapa" subtitle="Quantidade de leads em cada etapa do funil">
               {funnelWithLabel.length === 0 ? (
-                <EmptyPanel message="Nenhum lead cadastrado ainda." />
+                <EmptyPanel
+                  message={pipelineFilter === "all" ? "Escolha um funil para ver a quantidade por etapa." : "Nenhum lead cadastrado ainda."}
+                />
               ) : (
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">

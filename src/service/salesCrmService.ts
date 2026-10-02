@@ -36,16 +36,6 @@ export type SalesLostReason = (typeof SALES_LOST_REASONS)[number];
 export const SALES_CONTACT_TYPES = ["whatsapp", "instagram_dm", "ligacao", "email", "presencial", "reuniao"] as const;
 export type SalesContactType = (typeof SALES_CONTACT_TYPES)[number];
 
-export const SALES_LEAD_STAGES = [
-  "novo_lead",
-  "em_conversa",
-  "interessado",
-  "quer_saber_mais",
-  "fechado",
-  "perdido",
-] as const;
-export type SalesLeadStage = (typeof SALES_LEAD_STAGES)[number];
-
 export const SALES_ACTIVITY_TYPES = [
   "contact",
   "stage_changed",
@@ -81,15 +71,6 @@ export const SALES_CONTACT_TYPE_LABELS: Record<SalesContactType, string> = {
   reuniao: "Reunião",
 };
 
-export const SALES_LEAD_STAGE_LABELS: Record<SalesLeadStage, string> = {
-  novo_lead: "Novo Lead",
-  em_conversa: "Em conversa",
-  interessado: "Interessado",
-  quer_saber_mais: "Quer saber mais",
-  fechado: "Fechado",
-  perdido: "Perdido",
-};
-
 export const SALES_ACTIVITY_TYPE_LABELS: Record<SalesActivityTypeValue, string> = {
   contact: "Contato registrado",
   stage_changed: "Mudou de etapa",
@@ -110,17 +91,45 @@ export function salesContactTypeLabel(contactType: string) {
   return SALES_CONTACT_TYPE_LABELS[contactType as SalesContactType] ?? contactType;
 }
 
-export function salesLeadStageLabel(stage: string) {
-  return SALES_LEAD_STAGE_LABELS[stage as SalesLeadStage] ?? stage;
+// Etapas sao editaveis por funil: o rotulo vem do funil; se a etapa nao existe
+// mais (ex.: historico de uma etapa removida), cai numa versao legivel da key.
+export function salesLeadStageLabel(stage: string, pipeline?: Pick<SalesPipeline, "stages"> | null) {
+  const found = pipeline?.stages.find((item) => item.key === stage);
+  if (found) return found.label;
+  const readable = stage.replace(/_/g, " ").trim();
+  return readable.charAt(0).toUpperCase() + readable.slice(1);
 }
 
 export function salesActivityTypeLabel(activityType: string) {
   return SALES_ACTIVITY_TYPE_LABELS[activityType as SalesActivityTypeValue] ?? activityType;
 }
 
+export type SalesTerminalOutcome = "ganho" | "perdido";
+
+export interface SalesStageDefinition {
+  key: string;
+  label: string;
+  sortOrder: number;
+  isTerminal: boolean;
+  terminalOutcome: SalesTerminalOutcome | null;
+}
+
+export interface SalesPipeline {
+  id: string;
+  product: SalesProduct;
+  name: string;
+  isDefault: boolean;
+  sortOrder: number;
+  stages: SalesStageDefinition[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SalesLead {
   id: string;
   product: SalesProduct;
+  pipelineId: string;
+  outcome: SalesTerminalOutcome | null;
   contactName: string;
   salonName: string | null;
   phone: string;
@@ -188,6 +197,9 @@ export interface SalesScript {
 
 export interface SalesDashboardFunnelStage {
   stage: string;
+  label: string;
+  isTerminal: boolean;
+  terminalOutcome: SalesTerminalOutcome | null;
   count: number;
 }
 
@@ -214,7 +226,16 @@ export interface SalesDashboardResponsiblePerformance {
   avgDaysToClose: number | null;
 }
 
+export interface SalesDashboardTotals {
+  total: number;
+  won: number;
+  lost: number;
+  open: number;
+}
+
 export interface SalesDashboard {
+  pipelineId: string | null;
+  totals: SalesDashboardTotals;
   funnel: SalesDashboardFunnelStage[];
   byChannel: SalesDashboardChannel[];
   lostReasons: SalesDashboardLostReason[];
@@ -232,6 +253,7 @@ export interface PaginatedSalesLeads {
 
 export interface ListSalesLeadsFilters {
   product: SalesProduct;
+  pipelineId?: string;
   stage?: string;
   channel?: string;
   responsibleId?: string;
@@ -242,6 +264,7 @@ export interface ListSalesLeadsFilters {
 
 export interface CreateSalesLeadInput {
   product: SalesProduct;
+  pipelineId?: string;
   contactName: string;
   salonName?: string | null;
   phone: string;
@@ -364,7 +387,74 @@ export async function deleteSalesScriptAttachment(scriptId: string, attachmentId
   await api.delete(`/sales-crm/scripts/${scriptId}/attachments/${attachmentId}`);
 }
 
-export async function getSalesDashboard(filters: { product: SalesProduct; trendMonths?: number }) {
+export async function getSalesDashboard(filters: { product: SalesProduct; pipelineId?: string; trendMonths?: number }) {
   const response = await api.get<SalesDashboard>("/sales-crm/dashboard", { params: filters });
   return response.data;
 }
+
+export interface SalesPipelineInput {
+  name: string;
+  stages: SalesStageDefinition[];
+}
+
+export interface UpdateSalesPipelineInput {
+  name?: string;
+  sortOrder?: number;
+  isDefault?: true;
+  stages?: SalesStageDefinition[];
+  // { chaveDaEtapaRemovida: chaveDaEtapaDestino }
+  stageMigrations?: Record<string, string>;
+}
+
+export interface StageHasLeadsDetail {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export async function listSalesPipelines(product: SalesProduct) {
+  const response = await api.get<{ pipelines: SalesPipeline[] }>("/sales-crm/pipelines", { params: { product } });
+  return response.data.pipelines;
+}
+
+export async function createSalesPipeline(product: SalesProduct, input: SalesPipelineInput) {
+  const response = await api.post<{ pipeline: SalesPipeline }>("/sales-crm/pipelines", { product, ...input });
+  return response.data.pipeline;
+}
+
+export async function updateSalesPipeline(id: string, input: UpdateSalesPipelineInput) {
+  const response = await api.patch<{ pipeline: SalesPipeline }>(`/sales-crm/pipelines/${id}`, input);
+  return response.data.pipeline;
+}
+
+export async function deleteSalesPipeline(id: string) {
+  await api.delete(`/sales-crm/pipelines/${id}`);
+}
+
+// Modelos para criar um funil novo; as keys sao fixas so dentro do modelo.
+export const SALES_PIPELINE_TEMPLATES: Array<{ id: string; name: string; description: string; stages: SalesStageDefinition[] }> = [
+  {
+    id: "padrao",
+    name: "Funil padrão",
+    description: "Novo Lead, Em conversa, Interessado, Quer saber mais, Fechado e Perdido.",
+    stages: [
+      { key: "novo_lead", label: "Novo Lead", sortOrder: 0, isTerminal: false, terminalOutcome: null },
+      { key: "em_conversa", label: "Em conversa", sortOrder: 1, isTerminal: false, terminalOutcome: null },
+      { key: "interessado", label: "Interessado", sortOrder: 2, isTerminal: false, terminalOutcome: null },
+      { key: "quer_saber_mais", label: "Quer saber mais", sortOrder: 3, isTerminal: false, terminalOutcome: null },
+      { key: "fechado", label: "Fechado", sortOrder: 4, isTerminal: true, terminalOutcome: "ganho" },
+      { key: "perdido", label: "Perdido", sortOrder: 5, isTerminal: true, terminalOutcome: "perdido" },
+    ],
+  },
+  {
+    id: "simples",
+    name: "Funil simples",
+    description: "Só o essencial: Novo, Em andamento, Ganho e Perdido.",
+    stages: [
+      { key: "novo", label: "Novo", sortOrder: 0, isTerminal: false, terminalOutcome: null },
+      { key: "em_andamento", label: "Em andamento", sortOrder: 1, isTerminal: false, terminalOutcome: null },
+      { key: "ganho", label: "Ganho", sortOrder: 2, isTerminal: true, terminalOutcome: "ganho" },
+      { key: "perdido", label: "Perdido", sortOrder: 3, isTerminal: true, terminalOutcome: "perdido" },
+    ],
+  },
+];
