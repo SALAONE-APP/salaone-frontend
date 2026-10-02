@@ -23,12 +23,12 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   SALES_CHANNELS,
   SALES_CONTACT_TYPES,
-  SALES_LEAD_STAGES,
   SALES_LOST_REASONS,
   deleteSalesLead,
   getSalesLead,
   createSalesActivity,
   listSalesActivities,
+  listSalesPipelines,
   listSalesScripts,
   salesActivityTypeLabel,
   salesChannelLabel,
@@ -37,6 +37,7 @@ import {
   salesLostReasonLabel,
   updateSalesLead,
   type SalesLead,
+  type SalesPipeline,
   type SalesLeadActivity,
   type SalesScript,
 } from "@/service/salesCrmService";
@@ -90,6 +91,7 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
   const [responsibleId, setResponsibleId] = useState("");
   const [scriptId, setScriptId] = useState("none");
   const [stage, setStage] = useState("");
+  const [pipeline, setPipeline] = useState<SalesPipeline | null>(null);
   const [lostReason, setLostReason] = useState("");
   const [nextAction, setNextAction] = useState("");
   const [nextActionAt, setNextActionAt] = useState("");
@@ -105,6 +107,9 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
       const [leadData, activitiesData] = await Promise.all([getSalesLead(id), listSalesActivities(id)]);
       setLead(leadData);
       listSalesScripts({ product: leadData.product, active: true }).then(setScriptOptions).catch(() => null);
+      listSalesPipelines(leadData.product)
+        .then((list) => setPipeline(list.find((item) => item.id === leadData.pipelineId) ?? null))
+        .catch(() => null);
       setActivities(activitiesData);
       setContactName(leadData.contactName);
       setSalonName(leadData.salonName ?? "");
@@ -144,9 +149,11 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
     }
   }, [leadId, load, isSuperAdmin]);
 
+  const isLostStage = pipeline?.stages.find((item) => item.key === stage)?.terminalOutcome === "perdido";
+
   async function handleSave() {
     if (!lead) return;
-    if (stage === "perdido" && !lostReason) {
+    if (isLostStage && !lostReason) {
       toast.error("Selecione o motivo da perda antes de salvar.");
       return;
     }
@@ -166,7 +173,7 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
         nextAction: nextAction.trim() || null,
         nextActionAt: nextActionAt ? new Date(nextActionAt).toISOString() : null,
         stage,
-        lostReason: stage === "perdido" ? lostReason : undefined,
+        lostReason: isLostStage ? lostReason : undefined,
       });
       setLead(updated);
       setStage(updated.stage);
@@ -225,7 +232,7 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
               {lead ? (
                 <>
                   {lead.contactName}
-                  <Badge variant="outline">{salesLeadStageLabel(lead.stage)}</Badge>
+                  <Badge variant="outline">{salesLeadStageLabel(lead.stage, pipeline)}</Badge>
                 </>
               ) : (
                 "Carregando lead..."
@@ -284,16 +291,16 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    {SALES_LEAD_STAGES.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {salesLeadStageLabel(option)}
+                    {(pipeline?.stages ?? [{ key: stage, label: salesLeadStageLabel(stage) }]).map((option) => (
+                      <SelectItem key={option.key} value={option.key}>
+                        {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              {stage === "perdido" && (
+              {isLostStage && (
                 <div>
                   <Label>Motivo da perda</Label>
                   <Select value={lostReason} onValueChange={setLostReason}>
@@ -415,7 +422,7 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
                         </div>
                         {activity.fromStage && activity.toStage && (
                           <p className="mt-1 text-muted-foreground">
-                            {salesLeadStageLabel(activity.fromStage)} → {salesLeadStageLabel(activity.toStage)}
+                            {salesLeadStageLabel(activity.fromStage, pipeline)} → {salesLeadStageLabel(activity.toStage, pipeline)}
                           </p>
                         )}
                         {activity.contactType && (

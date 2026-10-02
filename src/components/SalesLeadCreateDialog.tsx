@@ -21,6 +21,7 @@ import { listSuperAdminUsers, type SuperAdminUser } from "@/service/superAdminSe
 
 interface Props {
   product: SalesProduct;
+  pipelineId?: string;
   open: boolean;
   onClose: () => void;
   onCreated: (lead: SalesLead) => void;
@@ -31,7 +32,7 @@ function extractErrorMessage(error: unknown, fallback: string) {
   return typeof value === "string" ? value : fallback;
 }
 
-export function SalesLeadCreateDialog({ product, open, onClose, onCreated }: Props) {
+export function SalesLeadCreateDialog({ product, pipelineId, open, onClose, onCreated }: Props) {
   const { user } = useAuth();
   const isSalesRep = user?.role === "sales_rep";
 
@@ -101,6 +102,7 @@ export function SalesLeadCreateDialog({ product, open, onClose, onCreated }: Pro
     try {
       const lead = await createSalesLead({
         product,
+        pipelineId,
         contactName: contactName.trim(),
         salonName: salonName.trim() || null,
         phone: phone.trim(),
