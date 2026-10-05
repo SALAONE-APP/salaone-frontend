@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, AlertTriangle, Check, RefreshCw } from 'lucide-react';
+import { AlertCircle, Check, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,22 +13,6 @@ import {
   type PlatformPlan,
   type PlatformSubscription,
 } from '@/service/platformSubscriptionService';
-import { getSalonProfile } from '@/service/salonProfileService';
-
-const TRIAL_PERIOD_DAYS = 14;
-
-function computeTrialInfo(createdAt: string | null | undefined, platformSubscriptionStatus: string | null | undefined) {
-  if (!createdAt) return null;
-  const subStatus = String(platformSubscriptionStatus || '').toLowerCase().trim();
-  if (subStatus === 'active') return null;
-  const created = new Date(createdAt);
-  const trialEndsAt = new Date(created.getTime() + TRIAL_PERIOD_DAYS * 24 * 60 * 60 * 1000);
-  const now = new Date();
-  if (now > trialEndsAt) return null;
-  const msLeft = trialEndsAt.getTime() - now.getTime();
-  const daysLeft = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
-  return { daysLeft, trialEndsAt };
-}
 
 function formatCurrency(value: number | null | undefined) {
   const n = Number(value ?? 0);
@@ -95,7 +79,6 @@ export function PlatformSubscriptionTab() {
   const [selectedPlan, setSelectedPlan] = useState<PlatformPlan | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [changePlanTarget, setChangePlanTarget] = useState<PlatformPlan | null>(null);
-  const [trialInfo, setTrialInfo] = useState<{ daysLeft: number; trialEndsAt: Date } | null>(null);
 
   const loadSubscription = useCallback(async () => {
     setLoadingSubscription(true);
@@ -126,12 +109,6 @@ export function PlatformSubscriptionTab() {
   useEffect(() => {
     loadSubscription();
     loadPlans();
-    getSalonProfile()
-      .then((profile) => {
-        const info = computeTrialInfo(profile.createdAt, profile.platformSubscriptionStatus);
-        setTrialInfo(info);
-      })
-      .catch(() => {});
   }, [loadSubscription, loadPlans]);
 
   const normalizedStatus = currentSub ? normalizeStatus(currentSub.status) : '';
@@ -175,23 +152,6 @@ export function PlatformSubscriptionTab() {
 
   return (
     <div className="space-y-6">
-
-      {/* Banner de período de teste */}
-      {trialInfo && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-5 py-4">
-          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-500" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-amber-600">
-              Você está no período de teste —{' '}
-              {trialInfo.daysLeft === 1 ? '1 dia restante' : `${trialInfo.daysLeft} dias restantes`}
-            </p>
-            <p className="mt-0.5 text-xs text-amber-600/80">
-              Assine um plano para garantir o acesso após{' '}
-              {trialInfo.trialEndsAt.toLocaleDateString('pt-BR')}.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Card de assinatura atual */}
       <div className="bg-card rounded-xl border border-border p-6">

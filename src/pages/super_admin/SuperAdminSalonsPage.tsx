@@ -10,7 +10,6 @@ import {
   updateSuperAdminSalonStatus,
   deleteSuperAdminSalon,
   createSuperAdminSalonUnit,
-  createPagarmeSubscriptionPaymentLink,
   getPlatformPlans,
   resetSuperAdminUserPassword,
   type SalonStatus,
@@ -118,7 +117,6 @@ export function SuperAdminSalonsPage() {
     open: false, submitting: false, name: "", phone: "", ownerName: "", ownerEmail: "", ownerPassword: "", maxUnits: "1", unlimited: false,
     billingMode: "free" as "free" | "manual_pix" | "card", negotiatedAmount: "", billingInterval: "month" as "month" | "year", dueDate: "", platformPlanId: "",
   });
-  const [paymentLinkModal, setPaymentLinkModal] = useState({ open: false, salonName: "", url: "", expiresAt: null as string | null });
 
   const loadSalons = useCallback(async () => {
     const result = await listSuperAdminSalons({
@@ -267,11 +265,7 @@ export function SuperAdminSalonsPage() {
         dueDate: form.billingMode === "manual_pix" ? form.dueDate : undefined,
         selectedPlanId: form.platformPlanId,
       });
-      if (form.billingMode === "card") {
-        const link = await createPagarmeSubscriptionPaymentLink(result.salon.id, form.platformPlanId);
-        setPaymentLinkModal({ open: true, salonName: result.salon.name, url: link.paymentUrl, expiresAt: link.expiresAt ?? null });
-        toast.success("Unidade criada. Envie o link para o cliente concluir a assinatura.");
-      } else toast.success(form.billingMode === "manual_pix" ? "Unidade criada e aguardando pagamento." : `Unidade criada para ${result.owner.name}.`);
+      toast.success(form.billingMode === "manual_pix" ? "Unidade criada e aguardando pagamento." : `Unidade criada para ${result.owner.name}.`);
       closeCreateUnitModal();
       await loadSalons();
     } catch (error) {
@@ -418,14 +412,12 @@ export function SuperAdminSalonsPage() {
                 {([{ value: "free", label: "Sem cobrança", icon: CreditCard }, { value: "manual_pix", label: "PIX manual", icon: QrCode }, { value: "card", label: "Cartão recorrente", icon: CreditCard }] as const).map(({ value, label, icon: Icon }) => <label key={value} className={`cursor-pointer rounded-lg border p-3 text-sm ${createUnitModal.billingMode === value ? "border-primary bg-primary/5" : "border-border"}`}><input className="sr-only" type="radio" checked={createUnitModal.billingMode === value} onChange={() => setCreateUnitModal((p) => ({ ...p, billingMode: value }))} /><Icon size={17} className="mb-1.5 text-primary" /><span className="block font-medium text-foreground">{label}</span></label>)}
               </div>
             </fieldset>
-            <div className={`mt-4 rounded-lg border p-4 ${createUnitModal.billingMode === "manual_pix" ? "border-amber-500/30 bg-amber-500/5" : createUnitModal.billingMode === "card" ? "border-primary/20 bg-primary/5" : "border-border bg-secondary/30"}`}><label className="block space-y-1 text-sm text-muted-foreground">{createUnitModal.billingMode === "free" ? "Plano liberado sem cobrança" : createUnitModal.billingMode === "card" ? "Plano da assinatura recorrente" : "Plano da assinatura"}<select value={createUnitModal.platformPlanId} onChange={(e) => setCreateUnitModal((p) => ({ ...p, platformPlanId: e.target.value }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground"><option value="">Selecione um plano</option>{platformPlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} — {fmtCurrency(plan.price)}</option>)}</select></label>{createUnitModal.billingMode === "free" && <p className="mt-2 text-xs text-muted-foreground">O plano fica ativo sem cobrança, liberando somente os recursos incluídos nele.</p>}{createUnitModal.billingMode === "card" && <p className="mt-2 text-xs text-muted-foreground">Ao criar, será gerado um link do Pagar.me para você enviar ao cliente. A recorrência começa após o pagamento.</p>}</div>
+            <div className={`mt-4 rounded-lg border p-4 ${createUnitModal.billingMode === "manual_pix" ? "border-amber-500/30 bg-amber-500/5" : createUnitModal.billingMode === "card" ? "border-primary/20 bg-primary/5" : "border-border bg-secondary/30"}`}><label className="block space-y-1 text-sm text-muted-foreground">{createUnitModal.billingMode === "free" ? "Plano liberado sem cobrança" : createUnitModal.billingMode === "card" ? "Plano da assinatura recorrente" : "Plano da assinatura"}<select value={createUnitModal.platformPlanId} onChange={(e) => setCreateUnitModal((p) => ({ ...p, platformPlanId: e.target.value }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground"><option value="">Selecione um plano</option>{platformPlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} — {fmtCurrency(plan.price)}</option>)}</select></label>{createUnitModal.billingMode === "free" && <p className="mt-2 text-xs text-muted-foreground">O plano fica ativo sem cobrança, liberando somente os recursos incluídos nele.</p>}{createUnitModal.billingMode === "card" && <p className="mt-2 text-xs text-muted-foreground">O link de pagamento poderá ser gerado na tela de Assinaturas quando o período de teste terminar.</p>}</div>
             {createUnitModal.billingMode === "manual_pix" && <div className="mt-4 grid gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 sm:grid-cols-2"><label className="space-y-1 text-sm text-muted-foreground">Valor negociado<input inputMode="decimal" placeholder="Ex.: 99,90" value={createUnitModal.negotiatedAmount} onChange={(e) => setCreateUnitModal((p) => ({ ...p, negotiatedAmount: e.target.value }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground" /></label><label className="space-y-1 text-sm text-muted-foreground">Periodicidade<select value={createUnitModal.billingInterval} onChange={(e) => setCreateUnitModal((p) => ({ ...p, billingInterval: e.target.value as "month" | "year" }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground"><option value="month">Mensal</option><option value="year">Anual</option></select></label><label className="space-y-1 text-sm text-muted-foreground sm:col-span-2">Vencimento<input type="date" value={createUnitModal.dueDate} onChange={(e) => setCreateUnitModal((p) => ({ ...p, dueDate: e.target.value }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground" /></label><p className="text-xs text-amber-800 sm:col-span-2">A unidade será criada com o status “Aguardando pagamento”.</p></div>}
             <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={closeCreateUnitModal} className="rounded border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-secondary">Cancelar</button><button type="button" onClick={() => void submitCreateUnit()} disabled={createUnitModal.submitting} className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{createUnitModal.submitting ? "Criando..." : "Criar unidade"}</button></div>
           </div>
         </div>
       )}
-
-      {paymentLinkModal.open && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => setPaymentLinkModal((p) => ({ ...p, open: false }))}><div className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl" onClick={(event) => event.stopPropagation()}><h3 className="text-lg font-semibold text-foreground">Link de assinatura criado</h3><p className="mt-1 text-sm text-muted-foreground">Envie este link para {paymentLinkModal.salonName}. Após o pagamento, o Pagar.me ativa a recorrência.</p><input readOnly value={paymentLinkModal.url} className="mt-4 h-10 w-full rounded-lg border border-border bg-secondary px-3 text-sm text-foreground" /><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setPaymentLinkModal((p) => ({ ...p, open: false }))} className="rounded border border-border px-4 py-2 text-sm">Fechar</button><button type="button" onClick={() => void navigator.clipboard.writeText(paymentLinkModal.url).then(() => toast.success("Link copiado."))} className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Copiar link</button></div></div></div>}
 
       {/* Modal Detalhes */}
       {selectedSalon && (

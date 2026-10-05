@@ -100,11 +100,10 @@ function PageShell({
   actionHref: string;
 }) {
   const { can, isAdmin } = usePermissions();
-  const { user, salonAccess } = useAuth();
   const Page = route.Component;
   const blocked =
     route.requiredPermission && !isAdmin && !can(route.requiredPermission);
-  const isAdminHome = route.path === "/home" && (user?.role === "admin" || Boolean(salonAccess));
+  const isAdminHome = route.path === "/home" && isAdmin;
 
   return (
     <>
