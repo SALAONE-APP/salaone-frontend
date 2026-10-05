@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 
 import {
   activatePixPlatformSubscription,
+  createPagarmeSubscriptionPaymentLink,
   listSuperAdminSalons,
   getPlatformPlans,
   type PlatformPlan,
@@ -71,6 +72,12 @@ function getTrialEndsAt(shop: SuperAdminSalon) {
   return start.toISOString();
 }
 
+function canGeneratePaymentLink(trialEndsAt: string | null) {
+  if (!trialEndsAt) return true;
+  const date = new Date(trialEndsAt);
+  return Number.isNaN(date.getTime()) || date.getTime() <= Date.now();
+}
+
 export function SuperAdminSubscriptionsPage() {
   const [salons, setSalons] = useState<SuperAdminSalon[]>([]);
   const [plans, setPlans] = useState<PlatformPlan[]>([]);
@@ -84,6 +91,8 @@ export function SuperAdminSubscriptionsPage() {
     events: CalendarSubscriptionEvent[];
   } | null>(null);
   const [showDefaulters, setShowDefaulters] = useState(false);
+  const [generatingPaymentLinkFor, setGeneratingPaymentLinkFor] = useState<string | null>(null);
+  const [paymentLinkModal, setPaymentLinkModal] = useState({ open: false, salonName: "", url: "", expiresAt: null as string | null });
   const [pixModal, setPixModal] = useState({
     open: false,
     salonId: "",
@@ -178,6 +187,26 @@ export function SuperAdminSubscriptionsPage() {
     }
   };
 
+  const generatePaymentLink = async (shop: SuperAdminSalon) => {
+    const platformPlanId = shop.platformSubscription?.platform_plans?.id;
+    if (!platformPlanId) {
+      toast.error("Este salão não possui um plano de plataforma vinculado.");
+      return;
+    }
+
+    setGeneratingPaymentLinkFor(shop.id);
+    try {
+      const link = await createPagarmeSubscriptionPaymentLink(shop.id, platformPlanId);
+      setPaymentLinkModal({ open: true, salonName: shop.name, url: link.paymentUrl, expiresAt: link.expiresAt ?? null });
+      toast.success("Link de pagamento criado. Envie-o ao responsável pelo salão.");
+      await loadData();
+    } catch {
+      toast.error("Não foi possível gerar o link de pagamento.");
+    } finally {
+      setGeneratingPaymentLinkFor(null);
+    }
+  };
+
   const rows = useMemo(() =>
     salons.map((shop) => {
       const trialEndsAt = getTrialEndsAt(shop);
@@ -189,6 +218,7 @@ export function SuperAdminSubscriptionsPage() {
         status: shop.platformSubscription?.status ?? "none",
         paymentMethod: shop.platformSubscription?.payment_method ?? "-",
         trialEndsAt,
+        canGeneratePaymentLink: canGeneratePaymentLink(trialEndsAt),
         startedAt: shop.platformSubscription?.start_date ?? null,
         nextBillingAt: shop.platformSubscription?.next_billing_date
           ?? (shop.platformSubscription?.status === "trialing" ? trialEndsAt : null),
@@ -397,7 +427,15 @@ export function SuperAdminSubscriptionsPage() {
                   <td className="px-5 py-3 font-medium text-foreground">{fmtCurrency(row.price)}</td>
                   <td className="px-5 py-3">
                     {row.paymentMethod === "credit_card" ? (
-                      <span className="text-xs font-medium text-muted-foreground">Renovacao automatica</span>
+                      <button
+                        type="button"
+                        onClick={() => void generatePaymentLink(row.shop)}
+                        disabled={generatingPaymentLinkFor === row.id || !row.shop.platformSubscription?.platform_plans?.id || !row.canGeneratePaymentLink}
+                        title={row.canGeneratePaymentLink ? undefined : "Disponível após o fim do período de teste"}
+                        className="inline-flex items-center gap-1.5 rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {generatingPaymentLinkFor === row.id ? <><Loader2 size={14} className="animate-spin" /> Gerando...</> : row.canGeneratePaymentLink ? "Gerar link pagamento" : "Aguardando fim do teste"}
+                      </button>
                     ) : (
                       <button
                         type="button"
@@ -567,6 +605,20 @@ export function SuperAdminSubscriptionsPage() {
               >
                 {pixModal.isSubmitting ? "Renovando..." : "Confirmar pagamento e renovar"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {paymentLinkModal.open && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => setPaymentLinkModal((prev) => ({ ...prev, open: false }))}>
+          <div className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-foreground">Link de pagamento criado</h3>
+            <p className="mt-1 text-sm text-muted-foreground">Envie este link para {paymentLinkModal.salonName}. A recorrência será ativada pelo Pagar.me após o pagamento.</p>
+            <input readOnly value={paymentLinkModal.url} className="mt-4 h-10 w-full rounded-lg border border-border bg-secondary px-3 text-sm text-foreground" />
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setPaymentLinkModal((prev) => ({ ...prev, open: false }))} className="rounded border border-border px-4 py-2 text-sm">Fechar</button>
+              <button type="button" onClick={() => void navigator.clipboard.writeText(paymentLinkModal.url).then(() => toast.success("Link copiado."))} className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Copiar link</button>
             </div>
           </div>
         </div>
