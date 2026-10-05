@@ -171,7 +171,7 @@ export function isAuthenticated() {
 
 export async function fetchMe() {
   const response = await api.get<{
-    user: AuthResponse["user"];
+    user: AuthResponse["user"] & { photo_url?: string | null };
     memberships: SalonMembership[];
     tenantContext: { salonId: string } | null;
   }>("/auth/me");
@@ -179,8 +179,11 @@ export async function fetchMe() {
     (item) => item.salon_id === response.data.tenantContext?.salonId,
   ) ?? response.data.memberships[0];
 
+  const user = response.data.user;
+
   return {
-    ...response.data.user,
+    ...user,
+    photoUrl: user.photoUrl ?? user.photo_url ?? null,
     role: normalizeRole(membership?.role ?? response.data.user.role),
     permissions: normalizePermissions(membership?.permissions),
     salonUserId: membership?.id ?? null,
