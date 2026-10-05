@@ -107,7 +107,7 @@ export async function updateUser(userId: string, data: UpdateUserPayload) {
 }
 
 export async function updateMyProfile(
-  data: Pick<UpdateUserPayload, "name" | "email" | "phone" | "birthDate" | "photoUrl" | "photoPublicId">
+  data: Pick<UpdateUserPayload, "name" | "email" | "phone" | "cpf" | "birthDate" | "photoUrl" | "photoPublicId">
 ) {
   const response = await api.patch<UserProfile>("/users/me", data);
 
