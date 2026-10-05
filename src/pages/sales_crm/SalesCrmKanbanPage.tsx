@@ -64,6 +64,9 @@ interface PendingLostReasonDrag {
   cardId: string;
 }
 
+// Igual ao teto da API (GET /sales-crm/leads aceita ate 500).
+const LEADS_FETCH_LIMIT = 500;
+
 export function SalesCrmKanbanPage() {
   const product = useSalesProduct();
   const business = SALES_PRODUCT_BUSINESS_LABELS[product];
@@ -84,6 +87,7 @@ export function SalesCrmKanbanPage() {
   const isSuperAdmin = user?.role === "super_admin";
 
   const [leads, setLeads] = useState<SalesLead[]>([]);
+  const [totalLeads, setTotalLeads] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -106,8 +110,9 @@ export function SalesCrmKanbanPage() {
     if (!silent) setError(null);
     try {
       if (!activePipelineId) return;
-      const result = await listSalesLeads({ product, pipelineId: activePipelineId, limit: 200 });
+      const result = await listSalesLeads({ product, pipelineId: activePipelineId, limit: LEADS_FETCH_LIMIT });
       setLeads(result.items);
+      setTotalLeads(result.total);
     } catch {
       if (!silent) setError("Não foi possível carregar o funil de vendas.");
     } finally {
@@ -156,7 +161,10 @@ export function SalesCrmKanbanPage() {
   const columns = useMemo(
     () =>
       (activePipeline?.stages ?? []).map((stage) => {
-        const stageCards = visibleLeads.filter((lead) => lead.stage === stage.key).sort((a, b) => a.sortOrder - b.sortOrder);
+        // Empate de sortOrder: mais antigo primeiro (lead novo entra no fim da coluna, como sempre foi).
+        const stageCards = visibleLeads
+          .filter((lead) => lead.stage === stage.key)
+          .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.localeCompare(b.createdAt));
         return { key: stage.key, label: stage.label, cards: stageCards };
       }),
     [visibleLeads, activePipeline],
@@ -410,6 +418,16 @@ export function SalesCrmKanbanPage() {
           )}
         </div>
       </div>
+
+      {!loading && totalLeads > leads.length && (
+        <div className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-warning" />
+          <p>
+            Mostrando os {leads.length} leads mais recentes de {totalLeads}. Os mais antigos não aparecem no quadro; fale com o suporte para arquivar os
+            que já foram resolvidos.
+          </p>
+        </div>
+      )}
 
       {loading || pipelinesLoading ? (
         <div className="flex items-center justify-center rounded-xl border border-border bg-card p-16">
