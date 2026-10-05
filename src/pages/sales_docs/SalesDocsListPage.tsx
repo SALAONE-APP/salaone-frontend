@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowDown, ArrowUp, FileText, Loader2, Plus, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, FileText, Loader2, Paperclip, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -156,6 +156,12 @@ export function SalesDocsListPage() {
                   <Link to={`/documentacoes/${product}/${doc.slug}`} className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 hover:bg-muted/50">
                     <FileText size={16} className="shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{doc.title}</span>
+                    {doc.attachmentCount > 0 && (
+                      <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground" title={`${doc.attachmentCount} anexo(s)`}>
+                        <Paperclip size={12} />
+                        {doc.attachmentCount}
+                      </span>
+                    )}
                     {!doc.active && <Badge variant="outline">Rascunho</Badge>}
                     <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">Atualizado em {dateFormat.format(new Date(doc.updatedAt))}</span>
                   </Link>

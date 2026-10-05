@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Loader2, Pencil, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { SalesDocAttachments } from "@/components/docs/SalesDocAttachments";
 import { SalesDocContent } from "@/components/docs/SalesDocContent";
 import { SalesDocEditor } from "@/components/docs/SalesDocEditor";
 import {
@@ -31,6 +32,7 @@ import {
   salesDocCategoryLabel,
   updateSalesDoc,
   type SalesDoc,
+  type SalesDocAttachment,
   type SalesDocCategory,
 } from "@/service/salesDocService";
 
@@ -55,6 +57,9 @@ export function SalesDocPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Anexo ja e salvo na hora no servidor; aqui so refletimos na tela, sem mexer no estado de edicao.
+  const setAttachments = useCallback((attachments: SalesDocAttachment[]) => setDoc((current) => (current ? { ...current, attachments } : current)), []);
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<SalesDocCategory>("outros");
@@ -178,6 +183,8 @@ export function SalesDocPage() {
 
           <SalesDocEditor initialContent={doc.content} onChange={setContent} />
 
+          <SalesDocAttachments docId={doc.id} attachments={doc.attachments ?? []} editable onChange={setAttachments} />
+
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={handleCancel} disabled={saving}>
               Cancelar
@@ -216,6 +223,7 @@ export function SalesDocPage() {
             )}
           </header>
           <SalesDocContent html={doc.content} />
+          <SalesDocAttachments docId={doc.id} attachments={doc.attachments ?? []} editable={false} onChange={setAttachments} />
         </>
       )}
 
