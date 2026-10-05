@@ -13,6 +13,8 @@ import { RedirectToDefaultProduct } from "../pages/sales_crm/RedirectToDefaultPr
 import { keyedByProduct } from "../pages/sales_crm/keyedByProduct";
 import { SalesCrmKanbanPage } from "../pages/sales_crm/SalesCrmKanbanPage";
 import { SalesCrmScriptsPage } from "../pages/sales_crm/SalesCrmScriptsPage";
+import { SalesDocPage } from "../pages/sales_docs/SalesDocPage";
+import { SalesDocsListPage } from "../pages/sales_docs/SalesDocsListPage";
 import type { AppRoute } from "./types";
 
 export const superAdminRoutes: AppRoute[] = [
@@ -99,5 +101,17 @@ export const superAdminRoutes: AppRoute[] = [
     title: "Scripts Comerciais",
     breadcrumbs: ["CRM Comercial", "Scripts"],
     Component: keyedByProduct(SalesCrmScriptsPage),
+  },
+  {
+    path: "/documentacoes/:product",
+    title: "Documentações",
+    breadcrumbs: ["Documentações"],
+    Component: keyedByProduct(SalesDocsListPage),
+  },
+  {
+    path: "/documentacoes/:product/:slug",
+    title: "Documentação",
+    breadcrumbs: ["Documentações", "Documento"],
+    Component: keyedByProduct(SalesDocPage),
   },
 ];
