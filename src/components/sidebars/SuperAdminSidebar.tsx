@@ -11,6 +11,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { docsMenuItem } from "./docsMenu";
 import { salesCrmProductItems } from "./salesCrmMenu";
 import { ProfileSidebar } from "../shared/ProfileSidebar";
 import type { SidebarSection } from "../shared/ProfileSidebar";
@@ -33,6 +34,7 @@ const sections: SidebarSection[] = [
         label: "CRM Comercial",
         children: salesCrmProductItems,
       },
+      docsMenuItem,
     ],
   },
 ];
