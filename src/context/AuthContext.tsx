@@ -33,7 +33,7 @@ export interface AuthContextData {
   loading: boolean;
   salonAccess: StoredSalon | null;
   accessibleSalons: AccessibleSalon[];
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   logout: () => void;
   updateUser: (user: User) => void;
   enterSalonAccess: (salonId: string) => Promise<StoredSalon>;
@@ -128,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void listAccessibleSalons().then(setAccessibleSalons).catch(() => setAccessibleSalons([]));
   }, [user?.id, user?.role]);
 
-  async function login(email: string, password: string) {
+  async function login(email: string, password: string): Promise<User> {
     const response = await loginRequest({ email, password });
     localStorage.setItem("user", JSON.stringify(response.user));
     localStorage.removeItem(SUPER_ADMIN_ACCESS_STORAGE_KEY);
@@ -143,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       setAccessibleSalons([]);
     }
+    return response.user;
   }
 
   function logout() {

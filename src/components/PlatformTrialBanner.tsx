@@ -17,11 +17,18 @@ function getDaysLeft(endsAt: Date) {
 }
 
 function getTrialInfoFromSubscription(subscription: PlatformSubscription | null): TrialInfo | null {
-  if (subscription?.status?.trim().toLowerCase() !== "trialing" || !subscription.nextBillingDate) {
-    return null;
-  }
+  if (!subscription) return null;
 
-  const endsAt = new Date(subscription.nextBillingDate);
+  const status = subscription.status?.trim().toLowerCase();
+  const isExplicitTrial = status === "trialing";
+  const trialDays = Number(subscription.plan?.trialPeriodDays ?? 0);
+  const isActiveTrial = status === "active" && trialDays > 0;
+
+  if (!isExplicitTrial && !isActiveTrial) return null;
+
+  const endsAt = isExplicitTrial && subscription.nextBillingDate
+    ? new Date(subscription.nextBillingDate)
+    : new Date(new Date(subscription.startDate ?? subscription.createdAt ?? "").getTime() + trialDays * DAY_IN_MS);
   if (Number.isNaN(endsAt.getTime())) return null;
 
   const daysLeft = getDaysLeft(endsAt);
@@ -44,17 +51,30 @@ export function PlatformTrialBanner() {
 
   useEffect(() => {
     let active = true;
+    const profileRequest = getSalonProfile();
 
-    void Promise.allSettled([getSalonPlatformSubscription(), getSalonProfile()]).then(([subscriptionResult, profileResult]) => {
-      if (!active || subscriptionResult.status !== "fulfilled") return;
+    void getSalonPlatformSubscription()
+      .then(async ({ subscription }) => {
+        if (!active) return;
 
-      const subscription = subscriptionResult.value.subscription;
-      const subscriptionStatus = subscription?.status?.trim().toLowerCase();
-      const info = getTrialInfoFromSubscription(subscription)
-        ?? (subscriptionStatus ? null : getFallbackTrialInfo(profileResult.status === "fulfilled" ? profileResult.value.createdAt : null));
+        const info = getTrialInfoFromSubscription(subscription);
+        if (info) {
+          setTrialInfo(info);
+          return;
+        }
 
-      setTrialInfo(info);
-    });
+        // Apenas contas que ainda não têm assinatura usam a data de criação
+        // como contingência. Assim, uma assinatura paga não exibe aviso indevido.
+        if (subscription) return;
+        const profile = await profileRequest.catch(() => null);
+        if (active) setTrialInfo(getFallbackTrialInfo(profile?.createdAt));
+      })
+      .catch(async () => {
+        // Se a assinatura ainda não estiver disponível, mantém o fallback
+        // para que uma conta nova não fique sem o aviso.
+        const profile = await profileRequest.catch(() => null);
+        if (active) setTrialInfo(getFallbackTrialInfo(profile?.createdAt));
+      });
 
     return () => {
       active = false;

@@ -6,6 +6,7 @@ import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 import loginProfessional from "../assets/image/salaone-login-professional.png";
 import salaOneLogo from "../assets/image/logo-icone-salaone.jpeg";
 import { useAuth } from "../hooks/useAuth";
+import { getDefaultRouteForRole } from "../config/profileConfig";
 
 type ApiErrorResponse = {
   message?: string;
@@ -47,8 +48,8 @@ export function Login() {
     try {
       setLoading(true);
       setErrorMessage("");
-      await login(email.trim(), password);
-      navigate("/", { replace: true });
+      const loggedUser = await login(email.trim(), password);
+      navigate(getDefaultRouteForRole(loggedUser.role), { replace: true });
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
