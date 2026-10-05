@@ -253,6 +253,9 @@ export function BookingsPage() {
   const [rescheduleSlots, setRescheduleSlots] = useState<string[]>([]);
   const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
+  const [extensionAppointment, setExtensionAppointment] = useState<Appointment | null>(null);
+  const [extendedEndTime, setExtendedEndTime] = useState("");
+  const [extending, setExtending] = useState(false);
   const [blockedDateWarning, setBlockedDateWarning] =
     useState<BlockedDate | null>(null);
   const [salonProfile, setSalonProfile] = useState<SalonProfile | null>(null);
@@ -881,6 +884,42 @@ export function BookingsPage() {
     }
   }
 
+  const extensionEndTimeOptions = useMemo(() => {
+    if (!extensionAppointment) return [];
+    const end = new Date(extensionAppointment.endAt);
+    if (Number.isNaN(end.getTime())) return [];
+    const startMinutes = end.getHours() * 60 + end.getMinutes();
+    const options: string[] = [];
+    for (let minutes = startMinutes + 15; minutes <= 23 * 60 + 45; minutes += 15) {
+      options.push(`${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`);
+    }
+    return options;
+  }, [extensionAppointment]);
+
+  function openExtensionDialog(appointment: Appointment) {
+    const end = new Date(appointment.endAt);
+    const proposedEnd = new Date(end.getTime() + 30 * 60_000);
+    setExtensionAppointment(appointment);
+    setExtendedEndTime(
+      `${String(proposedEnd.getHours()).padStart(2, "0")}:${String(proposedEnd.getMinutes()).padStart(2, "0")}`,
+    );
+  }
+
+  async function handleExtension() {
+    if (!extensionAppointment || !extendedEndTime) return;
+    setExtending(true);
+    try {
+      await updateAppointment(extensionAppointment.id, { extendedEndTime });
+      toast.success("Atendimento prorrogado. O período adicional foi bloqueado na agenda.");
+      setExtensionAppointment(null);
+      await loadAppointments();
+    } catch (err) {
+      toast.error(getApiMessage(err));
+    } finally {
+      setExtending(false);
+    }
+  }
+
   function openTransferDialog(appointment: Appointment) {
     setAppointmentToTransfer(appointment);
     setTransferProfessionalId(appointment.professional?.id ?? "");
@@ -1345,7 +1384,13 @@ export function BookingsPage() {
                                     <ArrowLeftRight size={14} />
                                     Transferir profissional
                                   </DropdownMenuItem>
-                                </>
+                                  </>
+                                )}
+                              {user?.role !== "client" && ["scheduled", "confirmed", "in_service"].includes(appointment.status) && (
+                                <DropdownMenuItem onClick={() => openExtensionDialog(appointment)}>
+                                  <Clock size={14} />
+                                  Prorrogar atendimento
+                                </DropdownMenuItem>
                               )}
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
@@ -1489,6 +1534,49 @@ export function BookingsPage() {
             >
               {rescheduling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Confirmar alteracao
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(extensionAppointment)}
+        onOpenChange={(open) => {
+          if (!open && !extending) setExtensionAppointment(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Prorrogar atendimento</DialogTitle>
+            <DialogDescription>
+              Escolha até que horário o atendimento continuará. O período adicional será bloqueado para novos agendamentos.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-secondary/30 p-3 text-sm">
+              <p className="font-medium">{extensionAppointment?.dependent?.name || extensionAppointment?.client?.name || "Cliente"}</p>
+              <p className="text-muted-foreground">
+                Término atual: {extensionAppointment ? formatDateTime(extensionAppointment.endAt).time : "-"}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="extended-end-time">Novo horário de término</Label>
+              <Select value={extendedEndTime} onValueChange={setExtendedEndTime}>
+                <SelectTrigger id="extended-end-time"><SelectValue placeholder="Selecione o horário" /></SelectTrigger>
+                <SelectContent>
+                  {extensionEndTimeOptions.map((time) => <SelectItem key={time} value={time}>{time}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {extensionEndTimeOptions.length === 0 && (
+                <p className="text-xs text-amber-600">Não há mais horários disponíveis neste dia para prorrogar.</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={extending} onClick={() => setExtensionAppointment(null)}>Cancelar</Button>
+            <Button disabled={extending || !extendedEndTime || extensionEndTimeOptions.length === 0} onClick={() => void handleExtension()}>
+              {extending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Bloquear período adicional
             </Button>
           </DialogFooter>
         </DialogContent>
