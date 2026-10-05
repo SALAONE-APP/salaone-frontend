@@ -12,6 +12,8 @@ interface TrialInfo {
   endsAt: Date;
 }
 
+interface OverdueInfo { daysOverdue: number; blockedAt: Date; }
+
 const trialCachePrefix = "platformTrial:";
 
 function getTrialCacheKey() {
@@ -86,6 +88,7 @@ export function PlatformTrialBanner() {
   const cachedTrialInfo = getCachedTrialInfo();
   const [trialInfo, setTrialInfo] = useState<TrialInfo | null>(cachedTrialInfo);
   const [checkingTrial, setCheckingTrial] = useState(!cachedTrialInfo);
+  const [overdueInfo, setOverdueInfo] = useState<OverdueInfo | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -99,6 +102,13 @@ export function PlatformTrialBanner() {
     void getSalonPlatformSubscription()
       .then(async ({ subscription }) => {
         if (!active) return;
+
+        const blockedAt = subscription?.accessBlockedAt ? new Date(subscription.accessBlockedAt) : null;
+        if (subscription && Number(subscription.daysOverdue) > 0 && blockedAt && !Number.isNaN(blockedAt.getTime())) {
+          setOverdueInfo({ daysOverdue: Number(subscription.daysOverdue), blockedAt });
+        } else {
+          setOverdueInfo(null);
+        }
 
         const info = getTrialInfoFromSubscription(subscription);
         if (info) {
@@ -130,14 +140,23 @@ export function PlatformTrialBanner() {
     };
   }, []);
 
-  if (!trialInfo && !checkingTrial) return null;
+  if (!trialInfo && !overdueInfo && !checkingTrial) return null;
 
   return (
     <div className="sticky top-3 z-30 mb-6">
       <div className="flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 shadow-sm backdrop-blur sm:px-5">
         <AlertTriangle size={19} className="mt-0.5 shrink-0 text-amber-600" aria-hidden="true" />
         <div className="min-w-0">
-          {trialInfo ? (
+          {overdueInfo ? (
+            <>
+              <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                Pagamento em atraso há {overdueInfo.daysOverdue} {overdueInfo.daysOverdue === 1 ? "dia" : "dias"}.
+              </p>
+              <p className="mt-0.5 text-xs text-amber-700/85 dark:text-amber-300/85">
+                Confirme o pagamento para evitar o bloqueio do acesso em {overdueInfo.blockedAt.toLocaleDateString("pt-BR")}.
+              </p>
+            </>
+          ) : trialInfo ? (
             <>
               <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
                 Seu período de teste termina em {trialInfo.daysLeft === 1 ? "1 dia" : `${trialInfo.daysLeft} dias`}.

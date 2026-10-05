@@ -26,6 +26,8 @@ export interface PlatformSubscription {
   canceledAt: string | null;
   startDate: string | null;
   createdAt: string | null;
+  daysOverdue?: number;
+  accessBlockedAt?: string | null;
 }
 
 export function hasActivePlatformSubscription(
