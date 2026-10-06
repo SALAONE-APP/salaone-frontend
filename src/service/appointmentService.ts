@@ -145,7 +145,7 @@ export async function createAppointment(data: CreateAppointmentPayload) {
 
 export async function updateAppointment(
   appointmentId: string,
-  data: { status?: AppointmentStatus; completedAt?: string; notes?: string | null; professionalId?: string; date?: string; time?: string; pauseStartTime?: string | null; pauseEndTime?: string | null },
+  data: { status?: AppointmentStatus; completedAt?: string; notes?: string | null; professionalId?: string; date?: string; time?: string; pauseStartTime?: string | null; pauseEndTime?: string | null; extendedEndTime?: string },
 ) {
   const response = await api.patch<Appointment>(`/appointments/${appointmentId}`, data);
 

@@ -35,6 +35,8 @@ import {
   type Appointment,
 } from "@/service/appointmentService";
 import { listProfessionals, type Professional } from "@/service/professionalService";
+import { ensureMyBookableProfessional } from "@/service/professionalService";
+import { useAuth } from "@/hooks/useAuth";
 import { getSalonProfile, type SalonProfile } from "@/service/salonProfileService";
 import { getHomeInfo } from "@/service/homeInfoService";
 import { listServices, type Service } from "@/service/serviceService";
@@ -191,9 +193,11 @@ interface FitBookingDialogProps {
 }
 
 function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProps) {
+  const { user } = useAuth();
   const [services, setServices] = useState<Service[]>([]);
   const [clientId, setClientId] = useState("");
   const [clientName, setClientName] = useState("");
+  const [bookForSelf, setBookForSelf] = useState(false);
   const [clientPickerOpen, setClientPickerOpen] = useState(false);
   const [serviceIds, setServiceIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
@@ -326,14 +330,33 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
 
             <div className="space-y-2">
               <Label>Cliente</Label>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full justify-start font-normal"
-                onClick={() => setClientPickerOpen(true)}
-              >
-                {clientName || "Selecionar cliente"}
-              </Button>
+              {bookForSelf ? (
+                <div className="flex h-9 items-center rounded-md border border-border bg-secondary/40 px-3 text-sm text-foreground">
+                  {user?.name || "Administrador"}
+                  <span className="ml-auto text-xs text-muted-foreground">(você)</span>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-start font-normal"
+                  onClick={() => setClientPickerOpen(true)}
+                >
+                  {clientName || "Selecionar cliente"}
+                </Button>
+              )}
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                <Checkbox
+                  checked={bookForSelf}
+                  onCheckedChange={(checked) => {
+                    const isSelf = checked === true;
+                    setBookForSelf(isSelf);
+                    setClientId(isSelf ? user?.id ?? "" : "");
+                    setClientName(isSelf ? user?.name ?? "Eu mesmo" : "");
+                  }}
+                />
+                Marcar para mim mesmo
+              </label>
             </div>
           </div>
 
@@ -408,6 +431,7 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
       open={clientPickerOpen}
       onClose={() => setClientPickerOpen(false)}
       onSelect={(client) => {
+        setBookForSelf(false);
         setClientId(client.id);
         setClientName(client.name);
       }}
@@ -420,6 +444,7 @@ function FitBookingDialog({ slotInfo, onClose, onSuccess }: FitBookingDialogProp
 
 export function FitAppointmentPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(getTodaySaoPaulo);
@@ -452,11 +477,19 @@ export function FitAppointmentPage() {
 
   /* Load professionals once */
   useEffect(() => {
-    listProfessionals({ page: 1, limit: 100 })
+    const prepareProfessionals = user?.role === "admin"
+      ? ensureMyBookableProfessional().catch((err) => {
+          toast.error(getApiMessage(err));
+          return null;
+        })
+      : Promise.resolve(null);
+
+    prepareProfessionals
+      .then(() => listProfessionals({ page: 1, limit: 100 }))
       .then((r) => setProfessionals(r.items))
       .catch((err) => toast.error(getApiMessage(err)))
       .finally(() => setLoadingProfessionals(false));
-  }, []);
+  }, [user?.role]);
 
   useEffect(() => {
     getSalonProfile().then(setSalonProfile).catch(() => null);

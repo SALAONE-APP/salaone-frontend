@@ -278,6 +278,7 @@ export function ClientSettingsPage() {
         name,
         email,
         phone: phone || null,
+        cpf: profileForm.cpf.replace(/[^0-9]/g, '') || null,
         birthDate: profileForm.birthDate || null,
       });
       updateAuthUser({ ...user, ...updated });

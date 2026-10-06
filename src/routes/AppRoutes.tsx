@@ -4,6 +4,8 @@ import { ShieldOff } from "lucide-react";
 
 import { AppHeader } from "../components/shared/AppHeader";
 import { SuperAdminSalonAccessBanner } from "../components/SuperAdminSalonAccessBanner";
+import { PlatformTrialBanner } from "../components/PlatformTrialBanner";
+import { PlatformAccessGate } from "../components/PlatformAccessGate";
 import { getProfileConfig, normalizeRole } from "../config/profileConfig";
 import type { UserRole } from "../config/profileConfig";
 import { useAuth } from "../hooks/useAuth";
@@ -102,6 +104,7 @@ function PageShell({
   const Page = route.Component;
   const blocked =
     route.requiredPermission && !isAdmin && !can(route.requiredPermission);
+  const isAdminHome = route.path === "/home" && isAdmin;
 
   return (
     <>
@@ -113,6 +116,7 @@ function PageShell({
       />
       <SuperAdminSalonAccessBanner />
       <div className="p-6">
+        {isAdminHome && <PlatformTrialBanner />}
         {blocked ? (
           <AccessDenied permission={route.requiredPermission!} />
         ) : (
@@ -141,7 +145,9 @@ export function AppRoutes() {
         <Route
           element={
             <ProtectedRoute allowedRoles={[role]}>
-              <Layout />
+              <PlatformAccessGate>
+                <Layout />
+              </PlatformAccessGate>
             </ProtectedRoute>
           }
         >

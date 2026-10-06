@@ -6,6 +6,16 @@ import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 import loginProfessional from "../assets/image/salaone-login-professional.png";
 import salaOneLogo from "../assets/image/logo-icone-salaone.jpeg";
 import { useAuth } from "../hooks/useAuth";
+import { getDefaultRouteForRole } from "../config/profileConfig";
+import { Button } from "../components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
 
 type ApiErrorResponse = {
   message?: string;
@@ -13,6 +23,7 @@ type ApiErrorResponse = {
     data?: {
       message?: string;
       error?: string;
+      code?: string;
     };
   };
 };
@@ -35,6 +46,7 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [subscriptionBlocked, setSubscriptionBlocked] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -47,9 +59,14 @@ export function Login() {
     try {
       setLoading(true);
       setErrorMessage("");
-      await login(email.trim(), password);
-      navigate("/", { replace: true });
+      setSubscriptionBlocked(false);
+      const loggedUser = await login(email.trim(), password);
+      navigate(getDefaultRouteForRole(loggedUser.role), { replace: true });
     } catch (error) {
+      const apiError = error as ApiErrorResponse;
+      if (apiError.response?.data?.code === "SALON_SUBSCRIPTION_OVERDUE") {
+        setSubscriptionBlocked(true);
+      }
       setErrorMessage(getErrorMessage(error));
     } finally {
       setLoading(false);
@@ -157,6 +174,21 @@ export function Login() {
           </p>
         </form>
       </main>
+      <Dialog open={subscriptionBlocked} onOpenChange={setSubscriptionBlocked}>
+        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Acesso bloqueado</DialogTitle>
+            <DialogDescription>
+              O pagamento deste salão está em atraso há mais de 5 dias. O acesso foi bloqueado até que a assinatura seja regularizada.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button className="w-full sm:w-auto" onClick={() => setSubscriptionBlocked(false)}>
+              Entendi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

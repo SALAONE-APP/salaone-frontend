@@ -69,6 +69,11 @@ export async function getMyProfessional(): Promise<Professional> {
   return normalizeProfessional(response.data.employee);
 }
 
+export async function ensureMyBookableProfessional(): Promise<Professional> {
+  const response = await api.post<{ employee: BackendEmployee }>("/employees/me/bookable");
+  return normalizeProfessional(response.data.employee);
+}
+
 export interface CreateProfessionalPayload {
   displayName: string;
   commissionPercent?: number | null;

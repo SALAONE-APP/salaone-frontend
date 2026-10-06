@@ -52,10 +52,10 @@ function formatDateTimeBR(isoString: string): { date: string; time: string } {
 
 export function buildWhatsAppMessage(data: WhatsAppMessageData): string {
   const confirmed = data.appointmentStatus === "confirmed" || data.appointmentStatus === "completed";
-  const title = confirmed ? "*AGENDAMENTO CONFIRMADO*" : "*AGENDAMENTO REALIZADO*";
+  const title = "*COMPROVANTE DE AGENDAMENTO*";
   const statusMessage = confirmed
-    ? "Seu agendamento foi confirmado com sucesso."
-    : "Seu agendamento foi realizado e aguarda confirmacao do salao.";
+    ? "Meu agendamento foi confirmado."
+    : "Acabei de realizar este agendamento. O horário está reservado e aguardo a confirmação do salão.";
   const serviceList = data.services.map((s) => `  - ${s}`).join("\n");
   const productLines = (data.products ?? []).map((product) =>
     `  - ${product.quantity}x ${product.name}${
@@ -77,7 +77,7 @@ export function buildWhatsAppMessage(data: WhatsAppMessageData): string {
   return [
     title,
     ``,
-    `Ola, ${data.clientName}!`,
+    `Olá! Estou enviando meu comprovante de agendamento.`,
     ``,
     statusMessage,
     ``,
@@ -92,7 +92,7 @@ export function buildWhatsAppMessage(data: WhatsAppMessageData): string {
     totalLine,
     ...mapsLine,
     ``,
-    `Aguardamos voce. Obrigado pela preferencia!`,
+    `Obrigado!`,
   ]
     .join("\n")
     .replace(/\n{3,}/g, "\n\n");

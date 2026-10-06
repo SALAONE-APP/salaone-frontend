@@ -264,7 +264,8 @@ export function PaymentsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>(() => serviceTabId ? "service_tab" : "all");
-  const [dateFilter, setDateFilter] = useState(() => requestedDate || localDateKey(new Date()));
+  const [dateFrom, setDateFrom] = useState(() => requestedDate || localDateKey(new Date()));
+  const [dateTo, setDateTo] = useState(() => requestedDate || localDateKey(new Date()));
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -283,7 +284,9 @@ export function PaymentsPage() {
 
   useEffect(() => {
     setTypeFilter(serviceTabId ? "service_tab" : "all");
-    setDateFilter(requestedDate || localDateKey(new Date()));
+    const date = requestedDate || localDateKey(new Date());
+    setDateFrom(date);
+    setDateTo(date);
     setPage(1);
   }, [requestedDate, serviceTabId]);
 
@@ -295,8 +298,8 @@ export function PaymentsPage() {
       const result = await listAllPayments({
         status: statusFilter === "all" || statusFilter === "confirmed" ? undefined : statusFilter,
         confirmed: statusFilter === "confirmed" ? true : undefined,
-        dateFrom: dateFilter || undefined,
-        dateTo: dateFilter || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
         page,
         limit,
       });
@@ -313,7 +316,7 @@ export function PaymentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [dateFilter, page, statusFilter]);
+  }, [dateFrom, dateTo, page, statusFilter]);
 
   useEffect(() => {
     void loadPayments();
@@ -323,7 +326,9 @@ export function PaymentsPage() {
     const term = normalizeText(search.trim());
 
     return payments.filter((payment) => {
-      if (dateFilter && paymentDateKey(payment) !== dateFilter) return false;
+      const paymentDate = paymentDateKey(payment);
+      if (dateFrom && paymentDate < dateFrom) return false;
+      if (dateTo && paymentDate > dateTo) return false;
       if (statusFilter === "confirmed" && payment.status !== "paid" && payment.status !== "approved") return false;
       if (typeFilter !== "all" && payment.paymentType !== typeFilter) return false;
       if (serviceTabId && payment.serviceTab?.id !== serviceTabId) return false;
@@ -346,7 +351,7 @@ export function PaymentsPage() {
 
       return haystack.includes(term);
     });
-  }, [dateFilter, payments, search, serviceTabId, statusFilter, typeFilter]);
+  }, [dateFrom, dateTo, payments, search, serviceTabId, statusFilter, typeFilter]);
 
   const { selectedRows, toggleRow, toggleAll } = useTableSelection(
     filteredPayments.map((payment) => payment.id),
@@ -569,12 +574,29 @@ export function PaymentsPage() {
               />
               <Input
                 type="date"
-                value={dateFilter}
+                value={dateFrom}
                 onChange={(event) => {
-                  setDateFilter(event.target.value);
+                  setDateFrom(event.target.value);
                   setPage(1);
                 }}
-                aria-label="Filtrar pagamentos por data"
+                aria-label="Data inicial dos pagamentos"
+                className="h-9 w-full bg-secondary pl-9 text-sm sm:w-40"
+              />
+            </div>
+            <div className="relative">
+              <Calendar
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                size={14}
+              />
+              <Input
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(event) => {
+                  setDateTo(event.target.value);
+                  setPage(1);
+                }}
+                aria-label="Data final dos pagamentos"
                 className="h-9 w-full bg-secondary pl-9 text-sm sm:w-40"
               />
             </div>
