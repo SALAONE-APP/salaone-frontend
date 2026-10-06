@@ -61,6 +61,10 @@ type CalendarSubscriptionEvent = {
 function getTrialEndsAt(shop: SuperAdminSalon) {
   const subscription = shop.platformSubscription;
   if (!subscription) return null;
+  // O backend preserva `trial_ends_at` como histórico após a conversão do
+  // teste. Essa data só deve ser apresentada enquanto a assinatura estiver
+  // efetivamente no período de teste.
+  if (subscription.status !== "trialing") return null;
   if (subscription.trial_ends_at) return subscription.trial_ends_at;
 
   const trialDays = Number(subscription.platform_plans?.trial_period_days ?? 0);
@@ -242,6 +246,8 @@ export function SuperAdminSubscriptionsPage() {
         paymentMethod: shop.platformSubscription?.payment_method ?? "-",
         trialEndsAt,
         canGeneratePaymentLink: canGeneratePaymentLink(trialEndsAt),
+        hasActiveCardRecurrence: shop.platformSubscription?.payment_method === "credit_card"
+          && shop.platformSubscription.status === "active",
         startedAt: shop.platformSubscription?.start_date ?? null,
         nextBillingAt: shop.platformSubscription?.next_billing_date
           ?? (shop.platformSubscription?.status === "trialing" ? trialEndsAt : null),
@@ -453,11 +459,11 @@ export function SuperAdminSubscriptionsPage() {
                       <button
                         type="button"
                         onClick={() => void generatePaymentLink(row.shop)}
-                        disabled={generatingPaymentLinkFor === row.id || !row.shop.platformSubscription?.platform_plans?.id || !row.canGeneratePaymentLink}
-                        title={row.canGeneratePaymentLink ? undefined : "Disponível após o fim do período de teste"}
-                        className="inline-flex items-center gap-1.5 rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={row.hasActiveCardRecurrence || generatingPaymentLinkFor === row.id || !row.shop.platformSubscription?.platform_plans?.id || !row.canGeneratePaymentLink}
+                        title={row.hasActiveCardRecurrence ? "Assinatura com cobrança recorrente automática no cartão" : row.canGeneratePaymentLink ? undefined : "Disponível após o fim do período de teste"}
+                        className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-100 ${row.hasActiveCardRecurrence ? "bg-emerald-500/10 text-emerald-700" : "bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"}`}
                       >
-                        {generatingPaymentLinkFor === row.id ? <><Loader2 size={14} className="animate-spin" /> Gerando...</> : row.canGeneratePaymentLink ? "Gerar link pagamento" : "Aguardando fim do teste"}
+                        {generatingPaymentLinkFor === row.id ? <><Loader2 size={14} className="animate-spin" /> Gerando...</> : row.hasActiveCardRecurrence ? "Recorrência no cartão" : row.canGeneratePaymentLink ? "Gerar link pagamento" : "Aguardando fim do teste"}
                       </button>
                     ) : (
                       <button
