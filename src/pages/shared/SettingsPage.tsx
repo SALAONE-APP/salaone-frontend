@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Store,
   Bell,
@@ -172,7 +173,9 @@ function formatPhone(value: string) {
 
 export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps) {
   const { user, updateUser } = useAuth();
-  const [activeTab, setActiveTab] = useState('general');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(requestedTab === 'meuPlano' ? 'meuPlano' : 'general');
   const [profilePhotoUrl, setProfilePhotoUrl] = useState(user?.photoUrl ?? '');
   const [isUploadingProfilePhoto, setIsUploadingProfilePhoto] = useState(false);
   const profilePhotoFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -276,6 +279,15 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   const salon = useMemo(() => getStoredSalon(), []);
   const canManageSecurityDocuments = user?.role === 'admin' || user?.isAdmin === true;
   const isAdmin = user?.role === 'admin' || user?.isAdmin === true;
+
+  function handleTabChange(tab: string) {
+    setActiveTab(tab);
+    if (tab === 'meuPlano') {
+      setSearchParams({ tab });
+    } else if (searchParams.has('tab')) {
+      setSearchParams({});
+    }
+  }
   const registrationLink = useMemo(() => {
     const slug = businessSlug || salon?.slug;
 
@@ -1483,7 +1495,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
 
   return (
     <div className="space-y-6">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className={`grid w-full lg:w-auto ${isAdmin ? 'grid-cols-5' : 'grid-cols-6'}`}>
           <TabsTrigger value="general" className="gap-2">
             <Store size={14} />
