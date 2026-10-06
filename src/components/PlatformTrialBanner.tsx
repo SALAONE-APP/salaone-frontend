@@ -59,14 +59,26 @@ function getTrialInfoFromSubscription(subscription: PlatformSubscription | null)
 
   const status = subscription.status?.trim().toLowerCase();
   const isExplicitTrial = status === "trialing";
+  const hasRecordedTrialEnd = Boolean(subscription.trialEndsAt);
   const trialDays = Number(subscription.plan?.trialPeriodDays ?? 0);
-  const isActiveTrial = status === "active" && trialDays > 0;
+  const startedAt = new Date(subscription.startDate ?? subscription.createdAt ?? "");
+  const expectedTrialEnd = new Date(startedAt.getTime() + trialDays * DAY_IN_MS);
+  const nextBillingAt = subscription.nextBillingDate ? new Date(subscription.nextBillingDate) : null;
+  // Assinaturas em teste podem chegar como "active" enquanto a cobranca
+  // inicial ainda está agendada. Nesse caso, nextBillingDate é o fim real.
+  const isLegacyActiveTrial = status === "active"
+    && trialDays > 0
+    && nextBillingAt
+    && !Number.isNaN(expectedTrialEnd.getTime())
+    && Date.now() < expectedTrialEnd.getTime();
 
-  if (!isExplicitTrial && !isActiveTrial) return null;
+  if (!isExplicitTrial && !hasRecordedTrialEnd && !isLegacyActiveTrial) return null;
 
-  const endsAt = isExplicitTrial && subscription.nextBillingDate
-    ? new Date(subscription.nextBillingDate)
-    : new Date(new Date(subscription.startDate ?? subscription.createdAt ?? "").getTime() + trialDays * DAY_IN_MS);
+  const endsAt = subscription.trialEndsAt
+    ? new Date(subscription.trialEndsAt)
+    : subscription.nextBillingDate
+      ? new Date(subscription.nextBillingDate)
+      : expectedTrialEnd;
   if (Number.isNaN(endsAt.getTime())) return null;
 
   const daysLeft = getDaysLeft(endsAt);

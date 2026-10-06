@@ -52,6 +52,7 @@ export interface SuperAdminSalon {
   blockedReason?: string | null;
   blockedAt?: string | null;
   deactivatedAt?: string | null;
+  billingSalonId?: string | null;
   admin?: {
     id: string;
     name: string;
@@ -170,6 +171,7 @@ interface BackendSalon {
   blocked_reason?: string | null;
   blocked_at?: string | null;
   deactivated_at?: string | null;
+  billing_salon_id?: string | null;
   metrics?: Partial<SuperAdminSalon["metrics"]>;
   salon_subscriptions?: {
     id: string;
@@ -223,6 +225,7 @@ function mapBackendSalon(salon: BackendSalon): SuperAdminSalon {
     blockedReason: salon.blocked_reason ?? null,
     blockedAt: salon.blocked_at ?? null,
     deactivatedAt: salon.deactivated_at ?? null,
+    billingSalonId: salon.billing_salon_id ?? null,
     platformSubscription: salon.salon_subscriptions ? {
       id: salon.salon_subscriptions.id,
       status: salon.salon_subscriptions.status,

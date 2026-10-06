@@ -78,6 +78,29 @@ function canGeneratePaymentLink(trialEndsAt: string | null) {
   return Number.isNaN(date.getTime()) || date.getTime() <= Date.now();
 }
 
+function onlyBillingSalons(salons: SuperAdminSalon[]) {
+  const masterByOwnerEmail = new Map<string, SuperAdminSalon>();
+
+  for (const salon of salons) {
+    if (salon.billingSalonId || !salon.email) continue;
+    const ownerEmail = salon.email.trim().toLowerCase();
+    if (!ownerEmail) continue;
+
+    const currentMaster = masterByOwnerEmail.get(ownerEmail);
+    if (!currentMaster || new Date(salon.createdAt).getTime() < new Date(currentMaster.createdAt).getTime()) {
+      masterByOwnerEmail.set(ownerEmail, salon);
+    }
+  }
+
+  return salons.filter((salon) => {
+    if (salon.billingSalonId) return false;
+    if (!salon.email) return true;
+
+    const master = masterByOwnerEmail.get(salon.email.trim().toLowerCase());
+    return !master || master.id === salon.id;
+  });
+}
+
 export function SuperAdminSubscriptionsPage() {
   const [salons, setSalons] = useState<SuperAdminSalon[]>([]);
   const [plans, setPlans] = useState<PlatformPlan[]>([]);
@@ -122,7 +145,7 @@ export function SuperAdminSubscriptionsPage() {
         if (all.length >= (result?.total ?? 0) || items.length < 100) break;
         page++;
       }
-      setSalons(all);
+      setSalons(onlyBillingSalons(all));
     } catch { toast.error("Nao foi possivel carregar as assinaturas."); } finally { setLoading(false); }
   };
 

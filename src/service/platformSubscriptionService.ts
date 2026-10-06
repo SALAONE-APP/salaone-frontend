@@ -23,6 +23,7 @@ export interface PlatformSubscription {
   plan: PlatformPlan | null;
   amount: number | null;
   nextBillingDate: string | null;
+  trialEndsAt?: string | null;
   canceledAt: string | null;
   startDate: string | null;
   createdAt: string | null;
