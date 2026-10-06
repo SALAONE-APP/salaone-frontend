@@ -1521,23 +1521,28 @@ export function ClientBookingsPage() {
               {whatsAppData?.appointmentStatus === "confirmed" ||
               whatsAppData?.appointmentStatus === "completed"
                 ? "✅ Agendamento confirmado!"
-                : "✅ Agendamento realizado!"}
+                : "✅ Horário reservado!"}
             </DialogTitle>
             <DialogDescription>
               {whatsAppData?.appointmentStatus === "confirmed" ||
               whatsAppData?.appointmentStatus === "completed"
                 ? "Seu agendamento foi confirmado com sucesso."
-                : "Seu agendamento aguarda confirmação do salão."}
+                : "Seu agendamento foi realizado e seu horário já está reservado. Agora, basta aguardar: o salão confirmará em breve."}
             </DialogDescription>
           </DialogHeader>
 
           {whatsAppData && (
-            <div className="space-y-1 rounded-md border border-border bg-secondary/40 p-4 text-sm">
-              <p><span className="font-medium">Profissional:</span> {whatsAppData.professionalName}</p>
-              <p><span className="font-medium">Data:</span> {whatsAppData.date}</p>
-              <p><span className="font-medium">Horário:</span> {whatsAppData.time}</p>
-              <p><span className="font-medium">Serviços:</span> {whatsAppData.services.join(", ")}</p>
-            </div>
+            <>
+              <div className="space-y-1 rounded-md border border-border bg-secondary/40 p-4 text-sm">
+                <p><span className="font-medium">Profissional:</span> {whatsAppData.professionalName}</p>
+                <p><span className="font-medium">Data:</span> {whatsAppData.date}</p>
+                <p><span className="font-medium">Horário:</span> {whatsAppData.time}</p>
+                <p><span className="font-medium">Serviços:</span> {whatsAppData.services.join(", ")}</p>
+              </div>
+              <p className="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-300">
+                Para sua segurança, envie o comprovante automático ao WhatsApp do salão. Isso ajuda a localizar seu agendamento rapidamente.
+              </p>
+            </>
           )}
 
           <DialogFooter className="flex-col gap-2 sm:flex-col">
@@ -1550,7 +1555,7 @@ export function ClientBookingsPage() {
                 setWhatsAppData(null);
               }}
             >
-              Enviar comprovante no WhatsApp
+              Enviar comprovante automático no WhatsApp
             </Button>
             <Button variant="outline" className="w-full" onClick={() => setWhatsAppData(null)}>
               Fechar
