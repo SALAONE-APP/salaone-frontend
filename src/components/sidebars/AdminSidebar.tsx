@@ -57,7 +57,6 @@ function buildSections(canUseCrm: boolean): SidebarSection[] {
           label: "Financeiro",
           children: [
             { icon: CreditCard, label: "Pagamentos", href: "/payments" },
-            { icon: CreditCard, label: "Assinaturas", href: "/subscriptions" },
             { icon: ReceiptText, label: "Pedidos de produtos", href: "/product-orders" },
             { icon: CircleDollarSign, label: "Fechamento de caixa", href: "/cash-closing" },
             { icon: HandCoins, label: "Pagamento Funcionario", href: "/employee-payroll" },
