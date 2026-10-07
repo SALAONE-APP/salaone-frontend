@@ -172,7 +172,7 @@ function formatPhone(value: string) {
 }
 
 export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps) {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, salonAccess } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState(requestedTab === 'meuPlano' ? 'meuPlano' : 'general');
@@ -277,8 +277,9 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   const [subscriptionProfessionalRule, setSubscriptionProfessionalRule] = useState<SubscriptionProfessionalRule>('fixed');
   const [hasLoadedProfessionalRule, setHasLoadedProfessionalRule] = useState(false);
   const salon = useMemo(() => getStoredSalon(), []);
-  const canManageSecurityDocuments = user?.role === 'admin' || user?.isAdmin === true;
-  const isAdmin = user?.role === 'admin' || user?.isAdmin === true;
+  const isSuperAdminAccess = user?.role === 'super_admin' && Boolean(salonAccess);
+  const isAdmin = user?.role === 'admin' || user?.isAdmin === true || isSuperAdminAccess;
+  const canManageSecurityDocuments = isAdmin;
 
   function handleTabChange(tab: string) {
     setActiveTab(tab);
@@ -2783,7 +2784,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         {/* Meu Plano — admin only */}
         {isAdmin && (
           <TabsContent value="meuPlano" className="space-y-6">
-            <PlatformSubscriptionTab />
+            <PlatformSubscriptionTab readOnly={isSuperAdminAccess} />
           </TabsContent>
         )}
       </Tabs>
