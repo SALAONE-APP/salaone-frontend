@@ -176,6 +176,7 @@ export interface SalesScriptAttachment {
   type: SalesScriptAttachmentType;
   name: string;
   url: string;
+  downloadUrl?: string;
   mimeType: string;
   bytes: number;
   createdAt: string;

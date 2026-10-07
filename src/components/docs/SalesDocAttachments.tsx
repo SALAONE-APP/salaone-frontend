@@ -117,7 +117,7 @@ export function SalesDocAttachments({ docId, attachments, editable, onChange }: 
             return (
               <li key={attachment.id} className="flex items-center gap-3 px-3 py-2">
                 <Icon size={16} className="shrink-0 text-muted-foreground" />
-                <a href={attachment.url} target="_blank" rel="noopener noreferrer" download={attachment.name} className="min-w-0 flex-1 truncate text-sm font-medium text-foreground hover:text-primary hover:underline">
+                <a href={attachment.downloadUrl ?? attachment.url} target="_blank" rel="noopener noreferrer" download={attachment.name} className="min-w-0 flex-1 truncate text-sm font-medium text-foreground hover:text-primary hover:underline">
                   {attachment.name}
                 </a>
                 <span className="shrink-0 text-xs text-muted-foreground">{formatBytes(attachment.bytes)}</span>
