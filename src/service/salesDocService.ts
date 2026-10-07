@@ -23,6 +23,8 @@ export interface SalesDocAttachment {
   type: SalesDocAttachmentType;
   name: string;
   url: string;
+  // Arquivo cru (pdf/documento): link com o nome original. Os demais abrem pelo proprio url.
+  downloadUrl?: string;
   mimeType: string;
   bytes: number;
   createdAt: string;
