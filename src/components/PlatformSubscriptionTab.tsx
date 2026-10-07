@@ -67,7 +67,7 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
   expired: 'destructive',
 };
 
-export function PlatformSubscriptionTab() {
+export function PlatformSubscriptionTab({ readOnly = false }: { readOnly?: boolean }) {
   const [currentSub, setCurrentSub] = useState<PlatformSubscription | null>(null);
   const [plans, setPlans] = useState<PlatformPlan[]>([]);
   const [loadingSubscription, setLoadingSubscription] = useState(true);
@@ -108,8 +108,8 @@ export function PlatformSubscriptionTab() {
 
   useEffect(() => {
     loadSubscription();
-    loadPlans();
-  }, [loadSubscription, loadPlans]);
+    if (!readOnly) loadPlans();
+  }, [loadSubscription, loadPlans, readOnly]);
 
   const normalizedStatus = currentSub ? normalizeStatus(currentSub.status) : '';
   const hasActiveSub = hasActivePlatformSubscription(currentSub);
@@ -214,7 +214,7 @@ export function PlatformSubscriptionTab() {
               </div>
             </div>
 
-            {hasActiveSub && (
+            {hasActiveSub && !readOnly && (
               confirmCancel ? (
                 <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
                   <div className="flex items-start gap-2 text-sm text-foreground">
@@ -255,7 +255,7 @@ export function PlatformSubscriptionTab() {
       </div>
 
       {/* Grid de planos */}
-      <div className="bg-card rounded-xl border border-border p-6">
+      {!readOnly && <div className="bg-card rounded-xl border border-border p-6">
         <h3 className="text-lg font-medium text-foreground mb-4">
           {hasActiveSub ? 'Fazer upgrade de plano' : 'Escolha seu plano'}
         </h3>
@@ -361,7 +361,7 @@ export function PlatformSubscriptionTab() {
             })}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Modal de troca de plano */}
       {changePlanTarget && (
