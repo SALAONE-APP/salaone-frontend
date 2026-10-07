@@ -98,11 +98,14 @@ export async function login(data: LoginPayload): Promise<AuthResponse> {
     password: data.password,
   });
 
-  const membership = response.data.memberships[0];
+  // Um superadmin pode também ter vínculo com algum salão (por exemplo,
+  // como cliente). O vínculo não representa seu papel global de plataforma.
+  const isSuperAdmin = response.data.user.role === "super_admin";
+  const membership = isSuperAdmin ? undefined : response.data.memberships[0];
   const user = {
     ...response.data.user,
-    role: normalizeRole(membership?.role ?? response.data.user.role),
-    permissions: normalizePermissions(membership?.permissions),
+    role: isSuperAdmin ? "super_admin" : normalizeRole(membership?.role ?? response.data.user.role),
+    permissions: isSuperAdmin ? null : normalizePermissions(membership?.permissions),
     salonUserId: membership?.id ?? null,
   };
 
