@@ -1,4 +1,5 @@
 import { AdminDashboard } from "../pages/admin/AdminDashboard";
+import { AdminSubscriptionsPage } from "../pages/admin/AdminSubscriptionsPage";
 import { AdminSettingsPage } from "../pages/admin/AdminSettingsPage";
 import { MyUnitsPage } from "../pages/admin/MyUnitsPage";
 import { EmployeePayrollPage } from "../pages/admin/EmployeePayrollPage";
@@ -64,6 +65,12 @@ export const adminRoutes: AppRoute[] = [
     title: "Pagamentos",
     breadcrumbs: ["Financeiro", "Pagamentos"],
     Component: PaymentsPage,
+  },
+  {
+    path: "/subscriptions",
+    title: "Assinaturas",
+    breadcrumbs: ["Financeiro", "Assinaturas"],
+    Component: AdminSubscriptionsPage,
   },
   {
     path: "/product-orders",
