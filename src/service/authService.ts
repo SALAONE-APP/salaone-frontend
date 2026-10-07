@@ -175,17 +175,23 @@ export async function fetchMe() {
     memberships: SalonMembership[];
     tenantContext: { salonId: string } | null;
   }>("/auth/me");
-  const membership = response.data.memberships.find(
-    (item) => item.salon_id === response.data.tenantContext?.salonId,
-  ) ?? response.data.memberships[0];
-
   const user = response.data.user;
+  // O superadmin pode possuir um vínculo comum (inclusive como cliente) em
+  // algum salão. Esse vínculo não pode substituir seu papel global enquanto
+  // ele acessa o contexto do salão, ou o painel passa a renderizar como
+  // cliente e encerra o acesso de suporte.
+  const isSuperAdmin = user.role === "super_admin";
+  const membership = isSuperAdmin
+    ? undefined
+    : response.data.memberships.find(
+      (item) => item.salon_id === response.data.tenantContext?.salonId,
+    ) ?? response.data.memberships[0];
 
   return {
     ...user,
     photoUrl: user.photoUrl ?? user.photo_url ?? null,
-    role: normalizeRole(membership?.role ?? response.data.user.role),
-    permissions: normalizePermissions(membership?.permissions),
+    role: isSuperAdmin ? "super_admin" : normalizeRole(membership?.role ?? user.role),
+    permissions: isSuperAdmin ? null : normalizePermissions(membership?.permissions),
     salonUserId: membership?.id ?? null,
     activeSalonId: response.data.tenantContext?.salonId ?? null,
   };
