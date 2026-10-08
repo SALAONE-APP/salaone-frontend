@@ -49,7 +49,9 @@ export async function listProfessionals(
     params: { availabilityDate: params.availabilityDate },
   });
   const items = response.data.employees
-    .filter((employee) => employee.is_professional !== false)
+    // A tela do cliente deve aceitar somente profissionais explicitamente
+    // ativos. Campos ausentes nunca devem fazer um administrador aparecer.
+    .filter((employee) => employee.is_active === true && employee.is_professional === true)
     .map(normalizeProfessional);
 
   return { page: 1, limit: items.length, total: items.length, items };
@@ -58,7 +60,7 @@ export async function listProfessionals(
 export async function listBookableProfessionals(): Promise<ListProfessionalsResponse> {
   const response = await api.get<{ employees: BackendEmployee[] }>("/employees/bookable");
   const items = response.data.employees
-    .filter((employee) => employee.is_active !== false && employee.is_professional !== false)
+    .filter((employee) => employee.is_active === true && employee.is_professional === true)
     .map(normalizeProfessional);
 
   return { page: 1, limit: items.length, total: items.length, items };
