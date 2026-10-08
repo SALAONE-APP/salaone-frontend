@@ -80,6 +80,7 @@ interface ProductFormState {
   subscriberDiscount: string;
   imageUrl: string;
   imagePublicId: string | null;
+  expirationDate: string;
   active: boolean;
 }
 
@@ -91,6 +92,7 @@ const emptyForm: ProductFormState = {
   subscriberDiscount: "0",
   imageUrl: "",
   imagePublicId: null,
+  expirationDate: "",
   active: true,
 };
 
@@ -153,6 +155,7 @@ function productToForm(product: Product): ProductFormState {
     subscriberDiscount: String(product.subscriberDiscount ?? product.subscriber_discount ?? 0),
     imageUrl: product.imageUrl ?? product.image_url ?? "",
     imagePublicId: product.imagePublicId ?? product.image_public_id ?? null,
+    expirationDate: product.expirationDate?.slice(0, 10) ?? "",
     active: product.active !== false,
   };
 }
@@ -287,6 +290,9 @@ export function ProductsPage() {
     ) {
       return "O desconto para assinantes deve estar entre 0 e 100.";
     }
+    if (form.expirationDate && Number.isNaN(new Date(`${form.expirationDate}T00:00:00`).getTime())) {
+      return "Informe uma data de validade válida.";
+    }
 
     return null;
   }
@@ -308,6 +314,7 @@ export function ProductsPage() {
       subscriberDiscount: Number(form.subscriberDiscount),
       imageUrl: form.imageUrl || null,
       imagePublicId: form.imagePublicId,
+      expirationDate: form.expirationDate || null,
       active: form.active,
     };
 
@@ -634,6 +641,18 @@ export function ProductsPage() {
                   value={form.subscriberDiscount}
                   onChange={(event) => setField("subscriberDiscount", event.target.value)}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="product-expiration-date">Data de validade</Label>
+                <Input
+                  id="product-expiration-date"
+                  type="date"
+                  value={form.expirationDate}
+                  onChange={(event) => setField("expirationDate", event.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Deixe em branco quando o produto não tiver validade a controlar.
+                </p>
               </div>
               <div className="space-y-3 md:col-span-2">
                 <Label htmlFor="product-image-file">Foto do produto</Label>

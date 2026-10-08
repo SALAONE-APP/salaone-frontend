@@ -13,6 +13,8 @@ export interface Product {
   imagePublicId?: string | null;
   image_public_id?: string | null;
   stock: number;
+  /** Data de validade no formato ISO (AAAA-MM-DD). Ausente quando não se aplica. */
+  expirationDate?: string | null;
   active: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -33,6 +35,7 @@ export interface ProductPayload {
   subscriberDiscount?: number;
   imageUrl?: string | null;
   imagePublicId?: string | null;
+  expirationDate?: string | null;
   active?: boolean;
 }
 
