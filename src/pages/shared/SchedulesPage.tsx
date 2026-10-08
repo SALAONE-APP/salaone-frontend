@@ -860,7 +860,7 @@ export function SchedulesPage() {
 
       {/* Dialog: add/edit blocked date */}
       <Dialog open={blockedDateDialogOpen} onOpenChange={setBlockedDateDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] touch-pan-y overflow-y-scroll overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))] [-webkit-overflow-scrolling:touch] sm:max-h-[calc(100vh-2rem)] sm:max-w-2xl sm:p-6">
           <DialogHeader>
             <DialogTitle>{editingBlockedDate ? "Editar Data Bloqueada" : "Adicionar Data Bloqueada"}</DialogTitle>
           </DialogHeader>
