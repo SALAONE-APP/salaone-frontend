@@ -31,6 +31,7 @@ interface StockFormState {
   quantity: string;
   purchasePrice: string;
   salePrice: string;
+  expirationDate: string;
   occurredAt: string;
   note: string;
 }
@@ -41,6 +42,7 @@ const emptyForm: StockFormState = {
   quantity: "1",
   purchasePrice: "",
   salePrice: "",
+  expirationDate: "",
   occurredAt: toLocalDatetimeInputValue(new Date()),
   note: "",
 };
@@ -271,6 +273,9 @@ export function StockPage() {
     }
     if (Number.isNaN(purchasePrice)) return "Informe um valor de compra valido.";
     if (Number.isNaN(salePrice)) return "Informe um valor de venda valido.";
+    if (form.expirationDate && Number.isNaN(new Date(`${form.expirationDate}T00:00:00`).getTime())) {
+      return "Informe uma data de validade valida.";
+    }
     if (!form.occurredAt || Number.isNaN(new Date(form.occurredAt).getTime())) {
       return "Informe data e horario validos.";
     }
@@ -296,6 +301,7 @@ export function StockPage() {
         quantity: Number(form.quantity),
         purchasePrice: parseCurrencyInput(form.purchasePrice),
         salePrice: parseCurrencyInput(form.salePrice),
+        expirationDate: form.type === "entry" && form.expirationDate ? form.expirationDate : undefined,
         occurredAt: new Date(form.occurredAt).toISOString(),
         note: form.note.trim() || null,
       });
@@ -427,6 +433,11 @@ export function StockPage() {
                   Estoque atual: {selectedProduct.stock} un. | Venda:{" "}
                   {formatCurrency(selectedProduct.price)}
                 </p>
+                {selectedProduct.expirationDate ? (
+                  <p className="mt-1 text-muted-foreground">
+                    Validade atual: {formatExpirationDate(selectedProduct.expirationDate)}
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -499,6 +510,20 @@ export function StockPage() {
                 inputMode="decimal"
               />
             </div>
+            {form.type === "entry" ? (
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="stock-expiration-date">Data de validade</Label>
+                <Input
+                  id="stock-expiration-date"
+                  type="date"
+                  value={form.expirationDate}
+                  onChange={(event) => setField("expirationDate", event.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Opcional. A data informada atualiza a validade deste produto; deixe em branco para manter a atual.
+                </p>
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-2">

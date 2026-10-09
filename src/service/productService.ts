@@ -72,6 +72,8 @@ export interface ProductStockMovementPayload {
   quantity: number;
   purchasePrice?: number | null;
   salePrice?: number | null;
+  /** Atualiza a validade do produto ao registrar uma entrada. */
+  expirationDate?: string | null;
   occurredAt?: string;
   note?: string | null;
 }
