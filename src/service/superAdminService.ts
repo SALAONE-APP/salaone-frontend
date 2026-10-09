@@ -397,6 +397,11 @@ export async function createSuperAdminSalonUnit(data: {
   return response.data;
 }
 
+export async function updateSuperAdminSalonUnitLimit(salonId: string, maxSalonUnits: number | null): Promise<{ currentUnits: number; maxSalonUnits: number | null; owner: { id: string; name: string; email: string } }> {
+  const response = await api.patch(`/super-admin/salons/${salonId}/unit-limit`, { maxSalonUnits });
+  return response.data;
+}
+
 export async function createPagarmeSubscriptionPaymentLink(
   salonId: string,
   platformPlanId: string,
