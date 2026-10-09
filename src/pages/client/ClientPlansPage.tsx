@@ -169,6 +169,7 @@ function SubscribeModal({ plan, isChangingPlan, onClose, onSuccess }: SubscribeM
           <div className="text-right">
             <p className="text-muted-foreground">Valor mensal</p>
             <p className="font-semibold text-foreground">{formatCurrency(plan.price)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">1x de {formatCurrency(plan.price)} sem juros por mês</p>
           </div>
         </div>
 

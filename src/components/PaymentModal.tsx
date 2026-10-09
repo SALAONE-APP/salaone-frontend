@@ -62,6 +62,12 @@ const emptyCard: CardFormData = {
   installments: 1,
 };
 
+function installmentLabel(amount: number, installments: number) {
+  const count = Math.max(1, installments);
+  const value = amount / count;
+  return `${count}x de ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value)} sem juros`;
+}
+
 function onlyNumbers(value: unknown): string {
   return String(value || "").replace(/\D/g, "");
 }
@@ -100,6 +106,7 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
   const pixPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const method = data.paymentMethod;
+  const selectedInstallments = Math.max(1, Number(cardForm.installments || 1));
 
   useEffect(() => {
     if (!isOpen) {
@@ -450,11 +457,14 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">1x sem parcelamento</SelectItem>
-                  <SelectItem value="2">2x</SelectItem>
-                  <SelectItem value="3">3x</SelectItem>
+                  {Array.from({ length: 12 }, (_, index) => index + 1).map((installments) => (
+                    <SelectItem key={installments} value={String(installments)}>
+                      {installmentLabel(data.amount, installments)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">Total: {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(data.amount)} · {installmentLabel(data.amount, selectedInstallments)}</p>
             </div>
 
             <div className="flex gap-2 pt-2">
