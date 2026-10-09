@@ -431,6 +431,54 @@ export async function confirmManualPixPayment(salonId: string): Promise<SuperAdm
   return response.data;
 }
 
+export type ManualPlatformPaymentMethod = "pix" | "cash";
+
+export interface ManualPlatformSubscriptionPayment {
+  id: string;
+  salonId: string;
+  salonName: string;
+  subscriptionId: string;
+  platformPlanId: string;
+  planName: string;
+  paymentMethod: ManualPlatformPaymentMethod | "credit_card";
+  amount: number;
+  paidAt: string | null;
+  previousDueDate: string | null;
+  nextBillingDate: string | null;
+  referenceCode: string | null;
+  automatic: boolean;
+  createdAt: string;
+}
+
+export async function registerManualPlatformSubscriptionPayment(
+  salonId: string,
+  payload: {
+    platformPlanId: string;
+    paymentMethod: ManualPlatformPaymentMethod;
+    amount: number;
+    paidAt?: string;
+    nextBillingDate?: string;
+    referenceCode?: string;
+    idempotencyKey: string;
+  },
+): Promise<{ subscription: SuperAdminPlatformSubscription; payment: ManualPlatformSubscriptionPayment; duplicated: boolean }> {
+  const response = await api.post(`/super-admin/salons/${salonId}/platform-subscription/payments`, payload);
+  return response.data;
+}
+
+export async function listPlatformSubscriptionPayments(params: {
+  salonId?: string;
+  paymentDate?: string;
+  page?: number;
+  limit?: number;
+} = {}): Promise<PaginatedResponse<ManualPlatformSubscriptionPayment>> {
+  const response = await api.get<PaginatedResponse<ManualPlatformSubscriptionPayment>>(
+    "/super-admin/platform-subscription-payments",
+    { params },
+  );
+  return response.data;
+}
+
 /* ─── usuários globais ─── */
 
 export async function listSuperAdminUsers(params: {

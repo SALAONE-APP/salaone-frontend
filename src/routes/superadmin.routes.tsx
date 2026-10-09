@@ -8,6 +8,7 @@ import { SuperAdminReportsPage } from "../pages/super_admin/SuperAdminReportsPag
 import { SuperAdminAresChatPage } from "../pages/super_admin/SuperAdminAresChatPage";
 import { SuperAdminFeatureUpdatesPage } from "../pages/super_admin/SuperAdminFeatureUpdatesPage";
 import { SuperAdminLandingLeadsPage } from "../pages/super_admin/SuperAdminLandingLeadsPage";
+import { SuperAdminFinancialPage } from "../pages/super_admin/SuperAdminFinancialPage";
 import { SalesCrmDashboardPage } from "../pages/sales_crm/SalesCrmDashboardPage";
 import { RedirectToDefaultProduct } from "../pages/sales_crm/RedirectToDefaultProduct";
 import { keyedByProduct } from "../pages/sales_crm/keyedByProduct";
@@ -41,6 +42,12 @@ export const superAdminRoutes: AppRoute[] = [
     title: "Assinaturas",
     breadcrumbs: ["Super Admin", "Assinaturas"],
     Component: SuperAdminSubscriptionsPage,
+  },
+  {
+    path: "/financial",
+    title: "Financeiro diário",
+    breadcrumbs: ["Super Admin", "Financeiro diário"],
+    Component: SuperAdminFinancialPage,
   },
   {
     path: "/pending-charges",

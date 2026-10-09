@@ -2,13 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { PlatformPaymentRegistrationModal } from "@/components/PlatformPaymentRegistrationModal";
 
 import {
   activatePixPlatformSubscription,
   createPagarmeSubscriptionPaymentLink,
   listSuperAdminSalons,
   getPlatformPlans,
+  listPlatformSubscriptionPayments,
   type PlatformPlan,
+  type ManualPlatformSubscriptionPayment,
   type SuperAdminSalon,
 } from "@/service/superAdminService";
 
@@ -108,6 +111,7 @@ function onlyBillingSalons(salons: SuperAdminSalon[]) {
 export function SuperAdminSubscriptionsPage() {
   const [salons, setSalons] = useState<SuperAdminSalon[]>([]);
   const [plans, setPlans] = useState<PlatformPlan[]>([]);
+  const [payments, setPayments] = useState<ManualPlatformSubscriptionPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const now = new Date();
@@ -120,6 +124,8 @@ export function SuperAdminSubscriptionsPage() {
   const [showDefaulters, setShowDefaulters] = useState(false);
   const [generatingPaymentLinkFor, setGeneratingPaymentLinkFor] = useState<string | null>(null);
   const [paymentLinkModal, setPaymentLinkModal] = useState({ open: false, salonName: "", url: "", expiresAt: null as string | null });
+  const [paymentTarget, setPaymentTarget] = useState<SuperAdminSalon | null>(null);
+  const [paymentMode, setPaymentMode] = useState<"payment" | "upgrade">("payment");
   const [pixModal, setPixModal] = useState({
     open: false,
     salonId: "",
@@ -134,11 +140,13 @@ export function SuperAdminSubscriptionsPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [plansData] = await Promise.all([
+      const [plansData, paymentsData] = await Promise.all([
         getPlatformPlans(),
+        listPlatformSubscriptionPayments({ paymentDate: new Date().toISOString().slice(0, 10), limit: 100 }),
       ]);
       const activePlans = plansData.filter((plan) => plan.active !== false);
       setPlans(activePlans);
+      setPayments(Array.isArray(paymentsData.items) ? paymentsData.items : []);
 
       const all: SuperAdminSalon[] = [];
       let page = 1;
@@ -455,6 +463,9 @@ export function SuperAdminSubscriptionsPage() {
                   <td className="px-5 py-3 text-muted-foreground">{fmtDate(row.nextBillingAt)}</td>
                   <td className="px-5 py-3 font-medium text-foreground">{fmtCurrency(row.price)}</td>
                   <td className="px-5 py-3">
+                    <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={() => { setPaymentMode("payment"); setPaymentTarget(row.shop); }} className="rounded bg-primary/10 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/20">Registrar pagamento</button>
+                    <button type="button" onClick={() => { setPaymentMode("upgrade"); setPaymentTarget(row.shop); }} className="rounded border border-primary/30 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/10">Fazer upgrade</button>
                     {row.paymentMethod === "credit_card" ? (
                       <button
                         type="button"
@@ -475,6 +486,7 @@ export function SuperAdminSubscriptionsPage() {
                         Renovar ciclo PIX
                       </button>
                     )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -482,6 +494,13 @@ export function SuperAdminSubscriptionsPage() {
           </table>
         </div>
       </div>
+
+      <section className="overflow-hidden rounded-xl border border-border bg-card">
+        <div className="border-b border-border px-5 py-4"><h4 className="font-semibold text-foreground">Renovações registradas hoje</h4><p className="text-xs text-muted-foreground">Inclui lançamentos manuais e confirmações de recorrência no cartão.</p></div>
+        <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground"><th className="px-5 py-3">Salão</th><th className="px-5 py-3">Plano</th><th className="px-5 py-3">Método</th><th className="px-5 py-3">Valor</th><th className="px-5 py-3">Próximo vencimento</th><th className="px-5 py-3">Referência</th></tr></thead><tbody>{payments.length === 0 ? <tr><td colSpan={6} className="p-7 text-center text-muted-foreground">Nenhuma renovação registrada hoje.</td></tr> : payments.map((payment) => <tr key={payment.id} className="border-b border-border last:border-0"><td className="px-5 py-3 font-medium">{payment.salonName}</td><td className="px-5 py-3">{payment.planName}</td><td className="px-5 py-3">{payment.automatic ? "Cartão recorrente" : payment.paymentMethod === "pix" ? "PIX" : "Dinheiro"}</td><td className="px-5 py-3 font-medium">{fmtCurrency(payment.amount)}</td><td className="px-5 py-3 text-muted-foreground">{fmtDate(payment.nextBillingDate)}</td><td className="px-5 py-3 text-muted-foreground">{payment.referenceCode || "-"}</td></tr>)}</tbody></table></div>
+      </section>
+
+      {paymentTarget && <PlatformPaymentRegistrationModal salonId={paymentTarget.id} salonName={paymentTarget.name} currentPlanId={paymentTarget.platformSubscription?.platform_plans?.id} currentDueDate={paymentTarget.platformSubscription?.next_billing_date} mode={paymentMode} onClose={() => setPaymentTarget(null)} onSuccess={loadData} />}
 
       {selectedCalendarDay && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setSelectedCalendarDay(null)}>
