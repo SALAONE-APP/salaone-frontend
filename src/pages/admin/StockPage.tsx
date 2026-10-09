@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
+  CalendarClock,
   Boxes,
+  CircleAlert,
   Loader2,
   PackageSearch,
   Search,
@@ -29,6 +31,7 @@ interface StockFormState {
   quantity: string;
   purchasePrice: string;
   salePrice: string;
+  expirationDate: string;
   occurredAt: string;
   note: string;
 }
@@ -39,6 +42,7 @@ const emptyForm: StockFormState = {
   quantity: "1",
   purchasePrice: "",
   salePrice: "",
+  expirationDate: "",
   occurredAt: toLocalDatetimeInputValue(new Date()),
   note: "",
 };
@@ -94,6 +98,30 @@ function getProductCode(product: Product) {
   return product.id.slice(0, 8).toUpperCase();
 }
 
+function expirationDateValue(value: string) {
+  const [year, month, day] = value.slice(0, 10).split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function daysUntilExpiration(value: string) {
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((expirationDateValue(value).getTime() - startOfToday.getTime()) / 86_400_000);
+}
+
+function formatExpirationDate(value: string) {
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium" }).format(expirationDateValue(value));
+}
+
+function expirationStatus(value: string) {
+  const days = daysUntilExpiration(value);
+  if (days < 0) return { days, label: "Vencido", className: "border-red-500/20 bg-red-500/10 text-red-700" };
+  if (days === 0) return { days, label: "Vence hoje", className: "border-red-500/20 bg-red-500/10 text-red-700" };
+  if (days <= 5) return { days, label: `${days} dia${days === 1 ? "" : "s"}`, className: "border-red-500/20 bg-red-500/10 text-red-700" };
+  if (days <= 15) return { days, label: `${days} dias`, className: "border-amber-500/20 bg-amber-500/10 text-amber-700" };
+  return { days, label: `${days} dias`, className: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700" };
+}
+
 export function StockPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [movements, setMovements] = useState<ProductStockMovement[]>([]);
@@ -107,6 +135,7 @@ export function StockPage() {
   const [loadingMovements, setLoadingMovements] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stockView, setStockView] = useState<"movements" | "expirations">("movements");
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === form.productId) ?? null,
@@ -134,14 +163,50 @@ export function StockPage() {
       .filter((movement) => movement.type === "exit")
       .reduce((sum, movement) => sum + movement.quantity, 0);
     const lowStock = products.filter((product) => product.active && product.stock <= 10).length;
+    const expiringSoon = products.filter((product) => {
+      if (!product.active || !product.expirationDate) return false;
+      const days = daysUntilExpiration(product.expirationDate);
+      return days >= 0 && days <= 15;
+    }).length;
 
     return {
       totalProducts: products.length,
       lowStock,
       entries,
       exits,
+      expiringSoon,
     };
   }, [movements, products]);
+
+  const productsWithExpiration = useMemo(
+    () => products
+      .filter((product) => product.active && product.expirationDate)
+      .sort((first, second) =>
+        expirationDateValue(first.expirationDate!).getTime() - expirationDateValue(second.expirationDate!).getTime(),
+      ),
+    [products],
+  );
+
+  const expiresWithinFiveDays = useMemo(
+    () => productsWithExpiration.filter((product) => {
+      const days = daysUntilExpiration(product.expirationDate!);
+      return days >= 0 && days <= 5;
+    }),
+    [productsWithExpiration],
+  );
+
+  const expiredProducts = useMemo(
+    () => productsWithExpiration.filter((product) => daysUntilExpiration(product.expirationDate!) < 0),
+    [productsWithExpiration],
+  );
+
+  const expiresWithinFifteenDays = useMemo(
+    () => productsWithExpiration.filter((product) => {
+      const days = daysUntilExpiration(product.expirationDate!);
+      return days > 5 && days <= 15;
+    }),
+    [productsWithExpiration],
+  );
 
   const loadProducts = useCallback(async () => {
     setLoadingProducts(true);
@@ -208,6 +273,9 @@ export function StockPage() {
     }
     if (Number.isNaN(purchasePrice)) return "Informe um valor de compra valido.";
     if (Number.isNaN(salePrice)) return "Informe um valor de venda valido.";
+    if (form.expirationDate && Number.isNaN(new Date(`${form.expirationDate}T00:00:00`).getTime())) {
+      return "Informe uma data de validade valida.";
+    }
     if (!form.occurredAt || Number.isNaN(new Date(form.occurredAt).getTime())) {
       return "Informe data e horario validos.";
     }
@@ -233,6 +301,7 @@ export function StockPage() {
         quantity: Number(form.quantity),
         purchasePrice: parseCurrencyInput(form.purchasePrice),
         salePrice: parseCurrencyInput(form.salePrice),
+        expirationDate: form.type === "entry" && form.expirationDate ? form.expirationDate : undefined,
         occurredAt: new Date(form.occurredAt).toISOString(),
         note: form.note.trim() || null,
       });
@@ -254,7 +323,7 @@ export function StockPage() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="mb-1 text-sm text-muted-foreground">Produtos ativos</p>
           <h3 className="text-2xl font-semibold text-foreground">{stats.totalProducts}</h3>
@@ -271,9 +340,44 @@ export function StockPage() {
           <p className="mb-1 text-sm text-muted-foreground">Saidas recentes</p>
           <h3 className="text-2xl font-semibold text-foreground">{stats.exits}</h3>
         </div>
+        <button
+          type="button"
+          onClick={() => setStockView("expirations")}
+          className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 text-left transition-colors hover:bg-amber-500/10"
+        >
+          <p className="mb-1 text-sm text-muted-foreground">Vencem em até 15 dias</p>
+          <h3 className="text-2xl font-semibold text-amber-700">{stats.expiringSoon}</h3>
+        </button>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,420px)_1fr]">
+      {(expiredProducts.length > 0 || expiresWithinFiveDays.length > 0 || expiresWithinFifteenDays.length > 0) && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+          <div className="flex items-start gap-3">
+            <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <div className="text-sm">
+              <p className="font-medium text-foreground">Atenção às validades do estoque</p>
+              <p className="mt-1 text-muted-foreground">
+                {expiredProducts.length > 0 ? `${expiredProducts.length} produto(s) vencido(s). ` : ""}
+                {expiresWithinFiveDays.length > 0 ? `${expiresWithinFiveDays.length} produto(s) vence(m) em até 5 dias.` : ""}
+                {expiresWithinFiveDays.length > 0 && expiresWithinFifteenDays.length > 0 ? " " : ""}
+                {expiresWithinFifteenDays.length > 0 ? `${expiresWithinFifteenDays.length} produto(s) vence(m) entre 6 e 15 dias.` : ""}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 border-b border-border">
+        <button type="button" onClick={() => setStockView("movements")} className={`border-b-2 px-3 py-2 text-sm font-medium ${stockView === "movements" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}>
+          Movimentações
+        </button>
+        <button type="button" onClick={() => setStockView("expirations")} className={`flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium ${stockView === "expirations" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}>
+          <CalendarClock className="h-4 w-4" /> Validades
+          {stats.expiringSoon > 0 ? <Badge variant="secondary">{stats.expiringSoon}</Badge> : null}
+        </button>
+      </div>
+
+      {stockView === "movements" ? <div className="grid gap-6 xl:grid-cols-[minmax(0,420px)_1fr]">
         <form
           onSubmit={handleSubmit}
           className="space-y-5 rounded-xl border border-border bg-card p-5"
@@ -329,6 +433,11 @@ export function StockPage() {
                   Estoque atual: {selectedProduct.stock} un. | Venda:{" "}
                   {formatCurrency(selectedProduct.price)}
                 </p>
+                {selectedProduct.expirationDate ? (
+                  <p className="mt-1 text-muted-foreground">
+                    Validade atual: {formatExpirationDate(selectedProduct.expirationDate)}
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -401,6 +510,20 @@ export function StockPage() {
                 inputMode="decimal"
               />
             </div>
+            {form.type === "entry" ? (
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="stock-expiration-date">Data de validade</Label>
+                <Input
+                  id="stock-expiration-date"
+                  type="date"
+                  value={form.expirationDate}
+                  onChange={(event) => setField("expirationDate", event.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Opcional. A data informada atualiza a validade deste produto; deixe em branco para manter a atual.
+                </p>
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-2">
@@ -545,7 +668,33 @@ export function StockPage() {
             </div>
           )}
         </div>
-      </div>
+      </div> : (
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="border-b border-border p-4">
+            <h3 className="text-base font-medium text-foreground">Produtos por validade</h3>
+            <p className="mt-1 text-sm text-muted-foreground">A lista mostra primeiro os produtos com vencimento mais próximo.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead><tr className="border-b border-border">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Produto</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Validade</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Situação</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Estoque</th>
+              </tr></thead>
+              <tbody>{productsWithExpiration.length === 0 ? <tr><td colSpan={4} className="p-8 text-center text-sm text-muted-foreground"><CalendarClock className="mx-auto mb-2 h-5 w-5" />Nenhum produto com validade cadastrada.</td></tr> : productsWithExpiration.map((product) => {
+                const status = expirationStatus(product.expirationDate!);
+                return <tr key={product.id} className="border-b border-border last:border-b-0 hover:bg-secondary/30">
+                  <td className="px-4 py-3"><p className="text-sm font-medium text-foreground">{product.name}</p><p className="text-xs text-muted-foreground">{product.category || "Sem categoria"}</p></td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-foreground">{formatExpirationDate(product.expirationDate!)}</td>
+                  <td className="px-4 py-3"><Badge variant="outline" className={status.className}>{status.label}</Badge></td>
+                  <td className="px-4 py-3 text-sm text-foreground">{product.stock} un.</td>
+                </tr>;
+              })}</tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
