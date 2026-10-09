@@ -130,6 +130,7 @@ export function SubscriptionPaymentModal({ isOpen, plan, onClose, onSuccess }: S
             <p className="font-semibold text-foreground">
               R$ {amount.toFixed(2).replace('.', ',')}
             </p>
+            <p className="mt-1 text-xs text-muted-foreground">1x de R$ {amount.toFixed(2).replace('.', ',')} sem juros por mês</p>
           </div>
         </div>
 

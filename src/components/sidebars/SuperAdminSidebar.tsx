@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Banknote,
   Building2,
   ContactRound,
   CreditCard,
@@ -34,6 +35,7 @@ const sections: SidebarSection[] = [
         label: "CRM Comercial",
         children: salesCrmProductItems,
       },
+      { icon: Banknote, label: "Financeiro diário", href: "/financial" },
       docsMenuItem,
     ],
   },

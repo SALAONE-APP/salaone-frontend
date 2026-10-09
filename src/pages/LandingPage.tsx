@@ -541,6 +541,8 @@ function SubscriptionPaymentModal({ plan, customerName, customerEmail, onClose, 
             </span>
           </label>
 
+          <p className="text-xs text-neutral-500">Cobrança no cartão: 1x de R$ {formatPrice(plan.price)} sem juros a cada período.</p>
+
           {error && (
             <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>
           )}
