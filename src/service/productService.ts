@@ -6,6 +6,8 @@ export interface Product {
   description?: string | null;
   category?: string | null;
   price: number;
+  creditInstallments?: number;
+  creditHasInterest?: boolean;
   subscriberDiscount?: number;
   subscriber_discount?: number;
   imageUrl?: string | null;
@@ -32,6 +34,8 @@ export interface ProductPayload {
   description?: string | null;
   category?: string | null;
   price: number;
+  creditInstallments?: number;
+  creditHasInterest?: boolean;
   subscriberDiscount?: number;
   imageUrl?: string | null;
   imagePublicId?: string | null;
@@ -171,6 +175,8 @@ export interface WalkInProductSalePayload {
   method: "pix" | "debito" | "credito" | "dinheiro";
   paidAt?: string;
   note?: string | null;
+  installments?: number | null;
+  hasInterest?: boolean | null;
 }
 
 export async function createWalkInProductSale(data: WalkInProductSalePayload) {
@@ -193,6 +199,8 @@ export interface ProductOrder {
     method: string;
     status: string;
     paidAt?: string | null;
+    installments?: number | null;
+    hasInterest?: boolean | null;
   } | null;
   items: Array<{
     productId: string;

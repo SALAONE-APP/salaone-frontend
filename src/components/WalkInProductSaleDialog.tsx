@@ -36,6 +36,8 @@ export function WalkInProductSaleDialog({ open, onOpenChange, onSuccess }: {
   const [lines, setLines] = useState<SaleLine[]>([]);
   const [search, setSearch] = useState("");
   const [method, setMethod] = useState<WalkInMethod>("dinheiro");
+  const [installments, setInstallments] = useState(1);
+  const [hasInterest, setHasInterest] = useState(false);
   const [paidAt, setPaidAt] = useState(() => toLocalValue(new Date()));
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
@@ -77,9 +79,9 @@ export function WalkInProductSaleDialog({ open, onOpenChange, onSuccess }: {
 
     setSaving(true);
     try {
-      await createWalkInProductSale({ items, method, paidAt: new Date(paidAt).toISOString(), note: note.trim() || undefined });
+      await createWalkInProductSale({ items, method, paidAt: new Date(paidAt).toISOString(), note: note.trim() || undefined, installments: method === "credito" ? installments : null, hasInterest: method === "credito" ? hasInterest : null });
       toast.success("Venda avulsa registrada no estoque e no caixa.");
-      setLines([]); setSearch(""); setMethod("dinheiro"); setNote(""); setPaidAt(toLocalValue(new Date()));
+      setLines([]); setSearch(""); setMethod("dinheiro"); setInstallments(1); setHasInterest(false); setNote(""); setPaidAt(toLocalValue(new Date()));
       onOpenChange(false);
       await onSuccess();
     } catch (error) {
@@ -119,6 +121,10 @@ export function WalkInProductSaleDialog({ open, onOpenChange, onSuccess }: {
           <div className="space-y-2"><Label htmlFor="walk-in-method">Forma de pagamento</Label><select id="walk-in-method" value={method} onChange={(event) => setMethod(event.target.value as WalkInMethod)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">{Object.entries(methodLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
           <div className="space-y-2"><Label htmlFor="walk-in-paid-at">Recebido em</Label><Input id="walk-in-paid-at" type="datetime-local" value={paidAt} onChange={(event) => setPaidAt(event.target.value)} /></div>
         </div>
+        {method === "credito" && <div className="grid grid-cols-2 gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+          <label className="space-y-1 text-sm font-medium">Parcelas<select value={installments} onChange={(event) => setInstallments(Number(event.target.value))} className="h-10 w-full rounded-md border border-input bg-background px-3"><option value={1}>À vista</option>{Array.from({ length: 11 }, (_, value) => value + 2).map((value) => <option key={value} value={value}>{value}x</option>)}</select></label>
+          <label className="space-y-1 text-sm font-medium">Juros<select value={hasInterest ? "com" : "sem"} onChange={(event) => setHasInterest(event.target.value === "com")} className="h-10 w-full rounded-md border border-input bg-background px-3"><option value="sem">Sem juros</option><option value="com">Com juros</option></select></label>
+        </div>}
         <div className="space-y-2"><Label htmlFor="walk-in-note">Observacao</Label><Textarea id="walk-in-note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="Opcional" /></div>
         <div className="flex justify-between rounded-md bg-muted p-3"><span className="font-medium">Total da venda</span><span className="text-lg font-semibold">{money(total)}</span></div>
       </div>

@@ -56,7 +56,7 @@ type ApiPaymentWithType = PaymentRecord & { paymentType: PaymentType | "extra" }
 type StatusFilter = "all" | "confirmed" | PaymentStatus;
 type TypeFilter = "all" | PaymentType;
 type SplitMethod = "pix" | "debito" | "credito" | "dinheiro";
-type SplitPart = { method: SplitMethod; amount: string };
+type SplitPart = { method: SplitMethod; amount: string; installments?: number; hasInterest?: boolean };
 const MAX_ADJUSTMENT_NOTE_LENGTH = 200;
 // Os meios abaixo são exclusivos do recebimento presencial no painel.
 // Eles não dependem dos meios habilitados para o checkout online.
@@ -105,7 +105,10 @@ const methodLabels: Record<PaymentMethod, string> = {
 function paymentMethodDisplay(payment: PaymentWithType) {
   const tabPayments = payment.serviceTab?.payments ?? [];
   if (payment.paymentType !== "service_tab" || tabPayments.length === 0) {
-    return methodLabels[payment.method] || payment.method;
+    const label = methodLabels[payment.method] || payment.method;
+    return payment.method === "credito" && payment.installments && payment.installments > 1
+      ? `${label} — ${payment.installments}x ${payment.hasInterest ? "com juros" : "sem juros"}`
+      : label;
   }
   const totals = tabPayments.reduce<Partial<Record<PaymentMethod, number>>>((result, item) => {
     result[item.method] = (result[item.method] ?? 0) + item.amount;
@@ -279,6 +282,8 @@ export function PaymentsPage() {
   const [adjustmentNote, setAdjustmentNote] = useState("");
   const [methodPaymentDialog, setMethodPaymentDialog] = useState<PaymentWithType | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>("dinheiro");
+  const [creditInstallments, setCreditInstallments] = useState(1);
+  const [creditHasInterest, setCreditHasInterest] = useState(false);
 
   const limit = 20;
 
@@ -432,6 +437,8 @@ export function PaymentsPage() {
         amount: finalAmount,
         discountAmount: Math.max(0, payment.amount - finalAmount),
         adjustmentNote: hasAdjustment ? adjustmentNote.trim() : null,
+        installments: selectedLocalMethod === "credito" ? creditInstallments : null,
+        hasInterest: selectedLocalMethod === "credito" ? creditHasInterest : null,
         paidAt: new Date().toISOString(),
       });
       toast.success("Pagamento confirmado.");
@@ -451,6 +458,8 @@ export function PaymentsPage() {
     setDiscountInput(formatCurrency(0));
     setSurchargeInput(formatCurrency(0));
     setAdjustmentNote("");
+    setCreditInstallments(payment.method === "credito" ? payment.installments ?? 1 : 1);
+    setCreditHasInterest(payment.method === "credito" ? payment.hasInterest ?? false : false);
     setLocalPaymentDialog(payment);
   }
 
@@ -507,6 +516,8 @@ export function PaymentsPage() {
       await splitPayment(payment.id, splitParts.map((part) => ({
         method: part.method,
         amount: Number(part.amount.replace(",", ".")),
+        installments: part.method === "credito" ? part.installments ?? 1 : null,
+        hasInterest: part.method === "credito" ? part.hasInterest ?? false : null,
       })), finalAmount, discountAmount, hasAdjustment ? adjustmentNote.trim() : null, new Date().toISOString());
       toast.success("Pagamento dividido confirmado.");
       await loadPayments();
@@ -519,6 +530,8 @@ export function PaymentsPage() {
 
   function openMethodDialog(payment: PaymentWithType) {
     setSelectedPaymentMethod(payment.method);
+    setCreditInstallments(payment.method === "credito" ? payment.installments ?? 1 : 1);
+    setCreditHasInterest(payment.method === "credito" ? payment.hasInterest ?? false : false);
     setMethodPaymentDialog(payment);
   }
 
@@ -532,7 +545,11 @@ export function PaymentsPage() {
     setMethodPaymentDialog(null);
     setUpdatingId(payment.id);
     try {
-      await updatePayment(payment, { method: selectedPaymentMethod });
+      await updatePayment(payment, {
+        method: selectedPaymentMethod,
+        installments: selectedPaymentMethod === "credito" ? creditInstallments : null,
+        hasInterest: selectedPaymentMethod === "credito" ? creditHasInterest : null,
+      });
       toast.success("Método de pagamento atualizado.");
       await loadPayments();
     } catch (err) {
@@ -974,13 +991,17 @@ export function PaymentsPage() {
                     <label className="text-xs text-muted-foreground">Forma</label>
                     <select
                       value={part.method}
-                      onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, method: event.target.value as SplitMethod } : item))}
+                      onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, method: event.target.value as SplitMethod, installments: event.target.value === "credito" ? item.installments ?? 1 : undefined, hasInterest: event.target.value === "credito" ? item.hasInterest ?? false : undefined } : item))}
                       className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                     >
                       <option value="dinheiro">Dinheiro</option><option value="pix">PIX</option>
                       <option value="credito">Crédito</option><option value="debito">Débito</option>
                     </select>
                   </div>
+                  {part.method === "credito" && <div className="col-span-2 grid grid-cols-2 gap-2 rounded-md bg-secondary/50 p-2 text-xs sm:col-span-3">
+                    <label>Parcelas<select value={part.installments ?? 1} onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, installments: Number(event.target.value) } : item))} className="mt-1 h-8 w-full rounded border border-input bg-background px-2"><option value={1}>À vista</option>{Array.from({ length: 11 }, (_, value) => value + 2).map((value) => <option key={value} value={value}>{value}x</option>)}</select></label>
+                    <label>Juros<select value={part.hasInterest ? "com" : "sem"} onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, hasInterest: event.target.value === "com" } : item))} className="mt-1 h-8 w-full rounded border border-input bg-background px-2"><option value="sem">Sem juros</option><option value="com">Com juros</option></select></label>
+                  </div>}
                   <div className="min-w-0 space-y-1">
                     <label className="text-xs text-muted-foreground">Valor</label>
                     <Input
@@ -1006,6 +1027,10 @@ export function PaymentsPage() {
               </div>
             </div>
           )}
+          {splitParts.length === 1 && selectedLocalMethod === "credito" && <div className="grid grid-cols-2 gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+            <label className="space-y-1 text-sm font-medium">Parcelas<select value={creditInstallments} onChange={(event) => setCreditInstallments(Number(event.target.value))} className="h-10 w-full rounded-md border border-input bg-background px-3"><option value={1}>À vista</option>{Array.from({ length: 11 }, (_, value) => value + 2).map((value) => <option key={value} value={value}>{value}x</option>)}</select></label>
+            <label className="space-y-1 text-sm font-medium">Juros<select value={creditHasInterest ? "com" : "sem"} onChange={(event) => setCreditHasInterest(event.target.value === "com")} className="h-10 w-full rounded-md border border-input bg-background px-3"><option value="sem">Sem juros</option><option value="com">Com juros</option></select></label>
+          </div>}
           </div>
           <DialogFooter className="border-t border-border pt-4 flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
             <Button className="w-full sm:w-auto" variant="outline" onClick={() => setLocalPaymentDialog(null)}>
@@ -1054,6 +1079,10 @@ export function PaymentsPage() {
               </button>
             ))}
           </div>
+          {selectedPaymentMethod === "credito" && <div className="grid grid-cols-2 gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+            <label className="space-y-1 text-sm font-medium">Parcelas<select value={creditInstallments} onChange={(event) => setCreditInstallments(Number(event.target.value))} className="h-10 w-full rounded-md border border-input bg-background px-3"><option value={1}>À vista</option>{Array.from({ length: 11 }, (_, value) => value + 2).map((value) => <option key={value} value={value}>{value}x</option>)}</select></label>
+            <label className="space-y-1 text-sm font-medium">Juros<select value={creditHasInterest ? "com" : "sem"} onChange={(event) => setCreditHasInterest(event.target.value === "com")} className="h-10 w-full rounded-md border border-input bg-background px-3"><option value="sem">Sem juros</option><option value="com">Com juros</option></select></label>
+          </div>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setMethodPaymentDialog(null)}>
               Cancelar

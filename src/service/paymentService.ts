@@ -74,6 +74,9 @@ export interface PaymentRecord {
   status: PaymentStatus;
   statusRaw?: string | null;
   adjustmentNote?: string | null;
+  /** Preenchidos somente para pagamentos presenciais no cartão de crédito. */
+  installments?: number | null;
+  hasInterest?: boolean | null;
   paidAt?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -172,7 +175,7 @@ export async function listAllPayments(params: ListPaymentsParams = {}): Promise<
 
 export async function updatePayment(
   payment: Pick<PaymentRecord, "id" | "appointmentId">,
-  data: { status?: PaymentStatus; method?: PaymentMethod; amount?: number; discountAmount?: number | null; adjustmentNote?: string | null; paidAt?: string; noShow?: boolean },
+  data: { status?: PaymentStatus; method?: PaymentMethod; amount?: number; discountAmount?: number | null; adjustmentNote?: string | null; installments?: number | null; hasInterest?: boolean | null; paidAt?: string; noShow?: boolean },
 ) {
   const response = await api.patch<PaymentRecord>(`/payments/${payment.id}`, data);
 
@@ -182,6 +185,8 @@ export async function updatePayment(
 export interface SplitPaymentPart {
   method: Exclude<PaymentMethod, "local" | "subscription">;
   amount: number;
+  installments?: number | null;
+  hasInterest?: boolean | null;
 }
 
 export async function splitPayment(paymentId: string, parts: SplitPaymentPart[], totalAmount: number, discountAmount: number, adjustmentNote?: string | null, paidAt?: string) {

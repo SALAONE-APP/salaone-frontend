@@ -25,6 +25,13 @@ function apiMessage(error: unknown) {
   return typeof value === "string" ? value : "Não foi possível finalizar a compra.";
 }
 
+function paymentDetails(order: ProductOrder) {
+  const payment = order.payment;
+  if (!payment || payment.method !== "credito") return null;
+  const installments = payment.installments ?? 1;
+  return `${installments === 1 ? "Cartão de crédito à vista" : `Cartão de crédito em ${installments}x`} ${payment.hasInterest ? "com juros" : "sem juros"}`;
+}
+
 export function ClientCartPage() {
   const [items, setItems] = useState<CartItem[]>(() => getCart());
   const [checkingOut, setCheckingOut] = useState(false);
@@ -220,6 +227,7 @@ export function ClientCartPage() {
                       </div>
                     ))}
                   </div>
+                  {paid && paymentDetails(order) && <p className="border-t px-4 py-3 text-sm text-muted-foreground">{paymentDetails(order)}</p>}
                   <div className="border-t p-4">
                     <Button
                       variant="outline"
