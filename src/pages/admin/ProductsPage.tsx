@@ -77,6 +77,8 @@ interface ProductFormState {
   description: string;
   category: string;
   price: string;
+  creditInstallments: string;
+  creditHasInterest: boolean;
   subscriberDiscount: string;
   imageUrl: string;
   imagePublicId: string | null;
@@ -89,6 +91,8 @@ const emptyForm: ProductFormState = {
   description: "",
   category: "",
   price: "",
+  creditInstallments: "1",
+  creditHasInterest: false,
   subscriberDiscount: "0",
   imageUrl: "",
   imagePublicId: null,
@@ -152,6 +156,8 @@ function productToForm(product: Product): ProductFormState {
     description: product.description ?? "",
     category: product.category ?? "",
     price: String(product.price ?? ""),
+    creditInstallments: String(product.creditInstallments ?? 1),
+    creditHasInterest: product.creditHasInterest ?? false,
     subscriberDiscount: String(product.subscriberDiscount ?? product.subscriber_discount ?? 0),
     imageUrl: product.imageUrl ?? product.image_url ?? "",
     imagePublicId: product.imagePublicId ?? product.image_public_id ?? null,
@@ -280,9 +286,11 @@ export function ProductsPage() {
   function validateForm() {
     const price = parseCurrencyInput(form.price);
     const subscriberDiscount = Number(form.subscriberDiscount);
+    const creditInstallments = Number(form.creditInstallments);
 
     if (!form.name.trim()) return "Informe o nome do produto.";
     if (!Number.isFinite(price) || price <= 0) return "Informe um preco maior que zero.";
+    if (!Number.isInteger(creditInstallments) || creditInstallments < 1 || creditInstallments > 12) return "Informe entre 1 e 12 parcelas no cartao.";
     if (
       !Number.isInteger(subscriberDiscount) ||
       subscriberDiscount < 0 ||
@@ -311,6 +319,8 @@ export function ProductsPage() {
       description: form.description.trim() || null,
       category: form.category.trim() || null,
       price: parseCurrencyInput(form.price),
+      creditInstallments: Number(form.creditInstallments),
+      creditHasInterest: form.creditHasInterest,
       subscriberDiscount: Number(form.subscriberDiscount),
       imageUrl: form.imageUrl || null,
       imagePublicId: form.imagePublicId,
@@ -629,6 +639,11 @@ export function ProductsPage() {
                   inputMode="decimal"
                   required
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3 md:col-span-2">
+                <p className="col-span-2 text-sm font-medium">Condições no cartão de crédito</p>
+                <label className="space-y-1 text-sm">Parcelas<select value={form.creditInstallments} onChange={(event) => setField("creditInstallments", event.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3"><option value="1">À vista</option>{Array.from({ length: 11 }, (_, value) => value + 2).map((value) => <option key={value} value={String(value)}>{value}x</option>)}</select></label>
+                <label className="space-y-1 text-sm">Juros<select value={form.creditHasInterest ? "com" : "sem"} onChange={(event) => setField("creditHasInterest", event.target.value === "com")} className="h-10 w-full rounded-md border border-input bg-background px-3"><option value="sem">Sem juros</option><option value="com">Com juros</option></select></label>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="product-discount">Desconto assinante (%)</Label>

@@ -25,6 +25,8 @@ export function ProductOrdersPage() {
   const [paymentOrder, setPaymentOrder] = useState<SalonProductOrder | null>(null);
   const [cancelOrder, setCancelOrder] = useState<SalonProductOrder | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<Extract<PaymentMethod, "dinheiro" | "pix" | "debito" | "credito">>("dinheiro");
+  const [installments, setInstallments] = useState(1);
+  const [hasInterest, setHasInterest] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -47,6 +49,8 @@ export function ProductOrdersPage() {
       await updatePayment({ id: order.payment.id, appointmentId: null }, {
         status: "paid",
         method: paymentMethod,
+        installments: paymentMethod === "credito" ? installments : null,
+        hasInterest: paymentMethod === "credito" ? hasInterest : null,
         paidAt: new Date().toISOString(),
       });
       toast.success("Pagamento do pedido confirmado.");
@@ -117,6 +121,8 @@ export function ProductOrdersPage() {
                           disabled={updatingId === order.orderId}
                           onClick={() => {
                             setPaymentMethod("dinheiro");
+                            setInstallments(1);
+                            setHasInterest(false);
                             setPaymentOrder(order);
                           }}
                         >
@@ -174,6 +180,10 @@ export function ProductOrdersPage() {
                 </SelectContent>
               </Select>
             </div>
+            {paymentMethod === "credito" && <div className="grid grid-cols-2 gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+              <div className="space-y-2"><Label>Parcelas</Label><Select value={String(installments)} onValueChange={(value) => setInstallments(Number(value))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1">À vista</SelectItem>{Array.from({ length: 11 }, (_, value) => value + 2).map((value) => <SelectItem key={value} value={String(value)}>{value}x</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-2"><Label>Juros</Label><Select value={hasInterest ? "com" : "sem"} onValueChange={(value) => setHasInterest(value === "com")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="sem">Sem juros</SelectItem><SelectItem value="com">Com juros</SelectItem></SelectContent></Select></div>
+            </div>}
           </div>
           <DialogFooter>
             <Button variant="outline" disabled={Boolean(updatingId)} onClick={() => setPaymentOrder(null)}>Cancelar</Button>
