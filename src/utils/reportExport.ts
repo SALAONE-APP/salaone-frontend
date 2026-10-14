@@ -262,13 +262,22 @@ async function createPdfReportBlob<TRow>(params: {
       if (column.align === "right" || column.align === "center") return Math.min(Math.max(maxValue * 4.2, 58), 82);
       return Math.min(Math.max(maxValue * 4.6, 70), 150);
     });
-    const totalRaw = rawWeights.reduce((sum, value) => sum + value, 0);
-    const scale = contentWidth / totalRaw;
+    const minimumWidths = params.columns.map((column) =>
+      column.align === "left" || !column.align ? 64 : 54,
+    );
+    const availableWidth = contentWidth - minimumWidths.reduce((sum, width) => sum + width, 0);
+    const flexibleWeights = rawWeights.map((width, index) => Math.max(0, width - minimumWidths[index]));
+    const totalFlexibleWeight = flexibleWeights.reduce((sum, width) => sum + width, 0);
 
-    return params.columns.map((column, index) => ({
-      ...column,
-      width: Math.max(column.align === "left" || !column.align ? 64 : 54, rawWeights[index] * scale),
-    }));
+    // As larguras mínimas anteriores eram aplicadas depois da escala, o que
+    // podia fazer a soma das colunas ultrapassar a página e cortar a última.
+    // Reservamos os mínimos antes de dividir o espaço restante.
+    const widths = minimumWidths.map((minimum, index) =>
+      minimum + (totalFlexibleWeight > 0 ? availableWidth * (flexibleWeights[index] / totalFlexibleWeight) : availableWidth / params.columns.length),
+    );
+    widths[widths.length - 1] += contentWidth - widths.reduce((sum, width) => sum + width, 0);
+
+    return params.columns.map((column, index) => ({ ...column, width: widths[index] }));
   }
 
   function drawTableHeader(columns: PdfColumn<TRow>[]) {
