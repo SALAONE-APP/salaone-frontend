@@ -35,6 +35,13 @@ function startOfToday() {
   return new Date(today.getFullYear(), today.getMonth(), today.getDate());
 }
 
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function fmtCurrency(value?: number | null) {
   if (value == null) return "-";
   const n = Number(value);
@@ -112,6 +119,9 @@ export function SuperAdminSubscriptionsPage() {
   const [salons, setSalons] = useState<SuperAdminSalon[]>([]);
   const [plans, setPlans] = useState<PlatformPlan[]>([]);
   const [payments, setPayments] = useState<ManualPlatformSubscriptionPayment[]>([]);
+  const [paymentDate, setPaymentDate] = useState(localDateKey);
+  const [showAllPayments, setShowAllPayments] = useState(false);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const now = new Date();
@@ -137,16 +147,40 @@ export function SuperAdminSubscriptionsPage() {
     isSubmitting: false,
   });
 
+  async function getPaymentHistory(date?: string) {
+    const allPayments: ManualPlatformSubscriptionPayment[] = [];
+    let page = 1;
+
+    while (true) {
+      const result = await listPlatformSubscriptionPayments({ paymentDate: date, page, limit: 100 });
+      const items = Array.isArray(result.items) ? result.items : [];
+      allPayments.push(...items);
+      if (allPayments.length >= result.total || items.length < 100) return allPayments;
+      page += 1;
+    }
+  }
+
+  async function loadPaymentHistory(date = paymentDate, allDates = showAllPayments) {
+    setPaymentsLoading(true);
+    try {
+      setPayments(await getPaymentHistory(allDates ? undefined : date));
+    } catch {
+      toast.error("Nao foi possivel carregar o historico de renovacoes.");
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }
+
   const loadData = async () => {
     setLoading(true);
     try {
       const [plansData, paymentsData] = await Promise.all([
         getPlatformPlans(),
-        listPlatformSubscriptionPayments({ paymentDate: new Date().toISOString().slice(0, 10), limit: 100 }),
+        getPaymentHistory(showAllPayments ? undefined : paymentDate),
       ]);
       const activePlans = plansData.filter((plan) => plan.active !== false);
       setPlans(activePlans);
-      setPayments(Array.isArray(paymentsData.items) ? paymentsData.items : []);
+      setPayments(paymentsData);
 
       const all: SuperAdminSalon[] = [];
       let page = 1;
@@ -496,8 +530,69 @@ export function SuperAdminSubscriptionsPage() {
       </div>
 
       <section className="overflow-hidden rounded-xl border border-border bg-card">
-        <div className="border-b border-border px-5 py-4"><h4 className="font-semibold text-foreground">Renovações registradas hoje</h4><p className="text-xs text-muted-foreground">Inclui lançamentos manuais e confirmações de recorrência no cartão.</p></div>
-        <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground"><th className="px-5 py-3">Salão</th><th className="px-5 py-3">Plano</th><th className="px-5 py-3">Método</th><th className="px-5 py-3">Valor</th><th className="px-5 py-3">Próximo vencimento</th><th className="px-5 py-3">Referência</th></tr></thead><tbody>{payments.length === 0 ? <tr><td colSpan={6} className="p-7 text-center text-muted-foreground">Nenhuma renovação registrada hoje.</td></tr> : payments.map((payment) => <tr key={payment.id} className="border-b border-border last:border-0"><td className="px-5 py-3 font-medium">{payment.salonName}</td><td className="px-5 py-3">{payment.planName}</td><td className="px-5 py-3">{payment.automatic ? "Cartão recorrente" : payment.paymentMethod === "pix" ? "PIX" : "Dinheiro"}</td><td className="px-5 py-3 font-medium">{fmtCurrency(payment.amount)}</td><td className="px-5 py-3 text-muted-foreground">{fmtDate(payment.nextBillingDate)}</td><td className="px-5 py-3 text-muted-foreground">{payment.referenceCode || "-"}</td></tr>)}</tbody></table></div>
+        <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h4 className="font-semibold text-foreground">Renovações registradas</h4>
+            <p className="text-xs text-muted-foreground">Inclui lançamentos manuais e confirmações de recorrência no cartão.</p>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="space-y-1">
+              <span className="block text-xs font-medium text-muted-foreground">Data do pagamento</span>
+              <input
+                type="date"
+                value={paymentDate}
+                disabled={showAllPayments || paymentsLoading}
+                onChange={(event) => {
+                  const nextDate = event.target.value;
+                  setPaymentDate(nextDate);
+                  setShowAllPayments(false);
+                  void loadPaymentHistory(nextDate, false);
+                }}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={paymentsLoading}
+              onClick={() => {
+                const today = localDateKey();
+                setPaymentDate(today);
+                setShowAllPayments(false);
+                void loadPaymentHistory(today, false);
+              }}
+            >
+              Hoje
+            </Button>
+            <Button
+              type="button"
+              variant={showAllPayments ? "default" : "outline"}
+              size="sm"
+              disabled={paymentsLoading}
+              onClick={() => {
+                setShowAllPayments(true);
+                void loadPaymentHistory(paymentDate, true);
+              }}
+            >
+              Todas as datas
+            </Button>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <th className="px-5 py-3">Salão</th><th className="px-5 py-3">Plano</th><th className="px-5 py-3">Método</th><th className="px-5 py-3">Valor</th><th className="px-5 py-3">Próximo vencimento</th><th className="px-5 py-3">Referência</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paymentsLoading ? <tr><td colSpan={6} className="p-7 text-center text-muted-foreground"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>
+                : payments.length === 0 ? <tr><td colSpan={6} className="p-7 text-center text-muted-foreground">Nenhuma renovação registrada {showAllPayments ? "no período." : "nesta data."}</td></tr>
+                  : payments.map((payment) => <tr key={payment.id} className="border-b border-border last:border-0"><td className="px-5 py-3 font-medium">{payment.salonName}</td><td className="px-5 py-3">{payment.planName}</td><td className="px-5 py-3">{payment.automatic ? "Cartão recorrente" : payment.paymentMethod === "pix" ? "PIX" : "Dinheiro"}</td><td className="px-5 py-3 font-medium">{fmtCurrency(payment.amount)}</td><td className="px-5 py-3 text-muted-foreground">{fmtDate(payment.nextBillingDate)}</td><td className="px-5 py-3 text-muted-foreground">{payment.referenceCode || "-"}</td></tr>)}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {paymentTarget && <PlatformPaymentRegistrationModal salonId={paymentTarget.id} salonName={paymentTarget.name} currentPlanId={paymentTarget.platformSubscription?.platform_plans?.id} currentDueDate={paymentTarget.platformSubscription?.next_billing_date} mode={paymentMode} onClose={() => setPaymentTarget(null)} onSuccess={loadData} />}
