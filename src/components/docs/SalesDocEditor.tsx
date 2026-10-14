@@ -101,7 +101,7 @@ function Toolbar({ editor }: { editor: Editor }) {
       <ToolButton icon={Heading2} label="Título 2" active={state.h2} onClick={() => run().toggleHeading({ level: 2 }).run()} />
       <ToolButton icon={Heading3} label="Título 3" active={state.h3} onClick={() => run().toggleHeading({ level: 3 }).run()} />
       <Divider />
-      <ToolButton icon={Bold} label="Negrito" active={state.bold} onClick={() => run().toggleBold().run()} />
+      <ToolButton icon={Bold} label="Negrito" active={state.bold} onClick={() => run().toggleMark("bold").run()} />
       <ToolButton icon={Italic} label="Itálico" active={state.italic} onClick={() => run().toggleItalic().run()} />
       <ToolButton icon={Underline} label="Sublinhado" active={state.underline} onClick={() => run().toggleUnderline().run()} />
       <ToolButton icon={Strikethrough} label="Tachado" active={state.strike} onClick={() => run().toggleStrike().run()} />

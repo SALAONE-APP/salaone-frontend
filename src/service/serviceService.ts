@@ -53,10 +53,6 @@ export interface ServicePayload {
   commissionPercent?: number | null;
   promotionalPrice?: number;
   covered_by_plan?: boolean;
-  creditInstallments?: number;
-  credit_installments?: number;
-  creditHasInterest?: boolean;
-  credit_has_interest?: boolean;
   imageUrl?: string | null;
   imagePublicId?: string | null;
   active?: boolean;
@@ -87,6 +83,10 @@ interface BackendService {
   image_url?: string | null;
   image_public_id?: string | null;
   covered_by_plan?: boolean;
+  creditInstallments?: number;
+  credit_installments?: number;
+  creditHasInterest?: boolean;
+  credit_has_interest?: boolean;
 }
 
 function normalizeService(service: BackendService): Service {
