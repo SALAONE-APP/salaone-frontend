@@ -2,7 +2,6 @@ import { SuperAdminDashboardPage } from "../pages/super_admin/SuperAdminDashboar
 import { SuperAdminSalonsPage } from "../pages/super_admin/SuperAdminSalonsPage";
 import { SuperAdminUsersPage } from "../pages/super_admin/SuperAdminUsersPage";
 import { SuperAdminSubscriptionsPage } from "../pages/super_admin/SuperAdminSubscriptionsPage";
-import { SuperAdminPendingChargesPage } from "../pages/super_admin/SuperAdminPendingChargesPage";
 import { SuperAdminPlansPage } from "../pages/super_admin/SuperAdminPlansPage";
 import { SuperAdminReportsPage } from "../pages/super_admin/SuperAdminReportsPage";
 import { SuperAdminAresChatPage } from "../pages/super_admin/SuperAdminAresChatPage";
@@ -48,12 +47,6 @@ export const superAdminRoutes: AppRoute[] = [
     title: "Financeiro diário",
     breadcrumbs: ["Super Admin", "Financeiro diário"],
     Component: SuperAdminFinancialPage,
-  },
-  {
-    path: "/pending-charges",
-    title: "Cobranças pendentes",
-    breadcrumbs: ["Super Admin", "Cobranças pendentes"],
-    Component: SuperAdminPendingChargesPage,
   },
   {
     path: "/platform-plans",
