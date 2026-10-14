@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Download,
   Loader2,
   Scissors,
   TrendingUp,
@@ -30,6 +31,7 @@ import {
 } from "@/service/employeePayrollService";
 import { getHomeInfo } from "@/service/homeInfoService";
 import type { Professional } from "@/service/professionalService";
+import { downloadCsvReport, downloadPdfReport, type ReportColumn } from "@/utils/reportExport";
 
 /* ─── types ─── */
 
@@ -205,6 +207,25 @@ interface EarningsStats {
   payrollPaymentsTotal: number;
   valesTotal: number;
   totalReceivedPayments: number;
+}
+
+interface CommissionServiceRow {
+  id: string;
+  professionalName: string;
+  period: string;
+  appointmentCode: string;
+  source: string;
+  status: string;
+  date: string;
+  time: string;
+  clientName: string;
+  serviceName: string;
+  quantity: number;
+  serviceValue: number;
+  appointmentValue: number;
+  commissionPercent: number;
+  commissionAmount: number;
+  commissionRule: string;
 }
 
 /* ─── component ─── */
@@ -436,6 +457,112 @@ export function ProfessionalEarningsPage({
     };
   }, [appointments, row, professional]);
 
+  // Um atendimento pode conter serviços com percentuais diferentes. O relatório
+  // é detalhado por serviço para deixar explícita a regra usada em cada comissão.
+  const commissionRows = useMemo<CommissionServiceRow[]>(() =>
+    stats.filteredAppointments.flatMap((appointment) =>
+      appointment.services.map((service) => {
+        const serviceValue = Number(service.totalPrice || 0);
+        const explicitCommission = service.commissionAmount;
+        const registeredPercent = service.commissionPercent ?? appointment.commissionPercent;
+        const derivedPercent = serviceValue > 0 && explicitCommission !== undefined
+          ? (Number(explicitCommission) / serviceValue) * 100
+          : undefined;
+        const commissionPercent = Number(
+          registeredPercent ?? derivedPercent ?? professional?.commissionPercent ?? 0,
+        );
+        const commissionAmount = Number(
+          explicitCommission ?? (serviceValue * commissionPercent) / 100,
+        );
+
+        return {
+          id: `${appointment.id}-${service.id}`,
+          professionalName: professional?.displayName ?? "Profissional",
+          period: `${formatDate(periodStartStr)} a ${formatDate(periodEndStr)}`,
+          appointmentCode: appointment.id.slice(-8).toUpperCase(),
+          source: appointment.id.startsWith("service-tab-") ? "Comanda" : "Agenda",
+          status: appointment.status,
+          date: formatDate(appointment.startAt),
+          time: formatTime(appointment.startAt),
+          clientName: appointment.client?.name ?? appointment.dependent?.name ?? "Cliente",
+          serviceName: service.serviceName || "Serviço",
+          quantity: Number(service.quantity || 1),
+          serviceValue,
+          appointmentValue: calcServicesTotal(appointment),
+          commissionPercent,
+          commissionAmount,
+          commissionRule: service.commissionPercent !== undefined
+            ? "Percentual do serviço"
+            : appointment.commissionPercent !== undefined
+              ? "Percentual registrado no atendimento"
+              : derivedPercent !== undefined
+                ? "Calculado pela comissão registrada"
+                : "Percentual padrão do profissional",
+        };
+      }),
+    ),
+  [periodEndStr, periodStartStr, professional?.commissionPercent, professional?.displayName, stats.filteredAppointments]);
+
+  const commissionReportColumns = useMemo<ReportColumn<CommissionServiceRow>[]>(() => [
+    { header: "Profissional", getValue: (item) => item.professionalName },
+    { header: "Período", getValue: (item) => item.period, align: "center" },
+    { header: "Cód. atendimento", getValue: (item) => item.appointmentCode, align: "center" },
+    { header: "Origem", getValue: (item) => item.source, align: "center" },
+    { header: "Data", getValue: (item) => item.date, align: "center" },
+    { header: "Horario", getValue: (item) => item.time, align: "center" },
+    { header: "Status", getValue: (item) => statusLabel(item.status) },
+    { header: "Cliente", getValue: (item) => item.clientName },
+    { header: "Servico", getValue: (item) => item.serviceName },
+    { header: "Qtd.", getValue: (item) => item.quantity, align: "center" },
+    { header: "Valor", getValue: (item) => formatCurrency(item.serviceValue), align: "right" },
+    { header: "Total atendimento", getValue: (item) => formatCurrency(item.appointmentValue), align: "right" },
+    { header: "Comissao (%)", getValue: (item) => `${item.commissionPercent.toFixed(2)}%`, align: "center" },
+    { header: "Regra de comissão", getValue: (item) => item.commissionRule },
+    { header: "Comissao (R$)", getValue: (item) => formatCurrency(item.commissionAmount), align: "right" },
+  ], []);
+
+  // No PDF, profissional e período já ficam no cabeçalho. A versão reduzida
+  // preserva os dados de auditoria sem comprimir a tabela em excesso.
+  const commissionPdfColumns = useMemo<ReportColumn<CommissionServiceRow>[]>(() => [
+    { header: "Cód.", getValue: (item) => item.appointmentCode, align: "center" },
+    { header: "Origem", getValue: (item) => item.source, align: "center" },
+    { header: "Data", getValue: (item) => `${item.date} ${item.time}`, align: "center" },
+    { header: "Status", getValue: (item) => statusLabel(item.status) },
+    { header: "Cliente", getValue: (item) => item.clientName },
+    { header: "Serviço", getValue: (item) => item.serviceName },
+    { header: "Qtd.", getValue: (item) => item.quantity, align: "center" },
+    { header: "Valor", getValue: (item) => formatCurrency(item.serviceValue), align: "right" },
+    { header: "Comissão", getValue: (item) => `${item.commissionPercent.toFixed(2)}%`, align: "center" },
+    { header: "Regra", getValue: (item) => item.commissionRule },
+    { header: "Comissão R$", getValue: (item) => formatCurrency(item.commissionAmount), align: "right" },
+  ], []);
+
+  function exportCommissionCsv() {
+    downloadCsvReport(
+      `comissoes-${professional?.displayName?.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "funcionario"}-${periodStartStr}-${periodEndStr}.csv`,
+      commissionReportColumns,
+      commissionRows,
+    );
+  }
+
+  function exportCommissionPdf() {
+    downloadPdfReport(
+      `comissoes-${professional?.displayName?.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "funcionario"}-${periodStartStr}-${periodEndStr}.pdf`,
+      {
+        title: "Relatorio de Comissoes por Atendimento",
+        subtitle: `${professional?.displayName ?? "Profissional"} | Periodo: ${formatDate(periodStartStr)} a ${formatDate(periodEndStr)}`,
+        columns: commissionPdfColumns,
+        rows: commissionRows,
+        summary: [
+          ["Atendimentos", String(stats.appointmentsCount)],
+          ["Valor dos servicos", formatCurrency(stats.earnedRevenue)],
+          ["Comissoes", formatCurrency(stats.earnedCommission)],
+          ["Pendente", formatCurrency(stats.pendingPayment)],
+        ],
+      },
+    );
+  }
+
   const hasData =
     stats.filteredAppointments.length > 0 ||
     stats.appointmentsCount > 0 ||
@@ -654,6 +781,14 @@ export function ProfessionalEarningsPage({
               <div className="border-b border-border px-5 py-4">
                 <div className="flex items-center gap-2">
                   <Scissors size={18} className="text-primary" />
+                  <div className="order-last ml-auto flex gap-2">
+                    <Button variant="outline" size="sm" onClick={exportCommissionCsv}>
+                      <Download size={15} className="mr-1.5" /> CSV
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={exportCommissionPdf}>
+                      <Download size={15} className="mr-1.5" /> PDF
+                    </Button>
+                  </div>
                   <h3 className="text-base font-semibold text-foreground">
                     Agendamentos e atendimentos do período
                   </h3>
