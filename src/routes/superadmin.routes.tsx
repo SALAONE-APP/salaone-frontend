@@ -2,12 +2,12 @@ import { SuperAdminDashboardPage } from "../pages/super_admin/SuperAdminDashboar
 import { SuperAdminSalonsPage } from "../pages/super_admin/SuperAdminSalonsPage";
 import { SuperAdminUsersPage } from "../pages/super_admin/SuperAdminUsersPage";
 import { SuperAdminSubscriptionsPage } from "../pages/super_admin/SuperAdminSubscriptionsPage";
-import { SuperAdminPendingChargesPage } from "../pages/super_admin/SuperAdminPendingChargesPage";
 import { SuperAdminPlansPage } from "../pages/super_admin/SuperAdminPlansPage";
 import { SuperAdminReportsPage } from "../pages/super_admin/SuperAdminReportsPage";
 import { SuperAdminAresChatPage } from "../pages/super_admin/SuperAdminAresChatPage";
 import { SuperAdminFeatureUpdatesPage } from "../pages/super_admin/SuperAdminFeatureUpdatesPage";
 import { SuperAdminLandingLeadsPage } from "../pages/super_admin/SuperAdminLandingLeadsPage";
+import { SuperAdminFinancialPage } from "../pages/super_admin/SuperAdminFinancialPage";
 import { SalesCrmDashboardPage } from "../pages/sales_crm/SalesCrmDashboardPage";
 import { RedirectToDefaultProduct } from "../pages/sales_crm/RedirectToDefaultProduct";
 import { keyedByProduct } from "../pages/sales_crm/keyedByProduct";
@@ -43,10 +43,10 @@ export const superAdminRoutes: AppRoute[] = [
     Component: SuperAdminSubscriptionsPage,
   },
   {
-    path: "/pending-charges",
-    title: "Cobranças pendentes",
-    breadcrumbs: ["Super Admin", "Cobranças pendentes"],
-    Component: SuperAdminPendingChargesPage,
+    path: "/financial",
+    title: "Financeiro diário",
+    breadcrumbs: ["Super Admin", "Financeiro diário"],
+    Component: SuperAdminFinancialPage,
   },
   {
     path: "/platform-plans",

@@ -6,6 +6,8 @@ export interface Service {
   category?: string | null;
   description?: string | null;
   basePrice: number;
+  creditInstallments?: number;
+  creditHasInterest?: boolean;
   durationMinutes: number;
   bufferMinutes?: number;
   servicePoints?: number;
@@ -44,11 +46,17 @@ export interface ServicePayload {
   category?: string | null;
   description?: string | null;
   basePrice: number;
+  creditInstallments?: number;
+  creditHasInterest?: boolean;
   durationMinutes: number;
   servicePoints?: number;
   commissionPercent?: number | null;
   promotionalPrice?: number;
   covered_by_plan?: boolean;
+  creditInstallments?: number;
+  credit_installments?: number;
+  creditHasInterest?: boolean;
+  credit_has_interest?: boolean;
   imageUrl?: string | null;
   imagePublicId?: string | null;
   active?: boolean;
@@ -107,6 +115,8 @@ function normalizeService(service: BackendService): Service {
     imagePublicId: service.image_public_id ?? null,
     image_public_id: service.image_public_id ?? null,
     covered_by_plan: service.covered_by_plan ?? false,
+    creditInstallments: Number(service.creditInstallments ?? service.credit_installments ?? 1),
+    creditHasInterest: service.creditHasInterest ?? service.credit_has_interest ?? false,
   };
 }
 
@@ -134,6 +144,7 @@ export async function createService(data: ServicePayload) {
     servicePoints: data.servicePoints, commissionType: "percentage", commissionValue: data.commissionPercent,
     promotionalPrice: data.promotionalPrice, coveredByPlan: data.covered_by_plan,
     imageUrl: data.imageUrl, imagePublicId: data.imagePublicId, active: data.active,
+    creditInstallments: data.creditInstallments, creditHasInterest: data.creditHasInterest,
   });
   return normalizeService(response.data.service);
 }
@@ -154,6 +165,8 @@ export async function updateService(serviceId: string, data: Partial<ServicePayl
     ...(data.imageUrl !== undefined ? { imageUrl: data.imageUrl } : {}),
     ...(data.imagePublicId !== undefined ? { imagePublicId: data.imagePublicId } : {}),
     ...(data.active !== undefined ? { active: data.active } : {}),
+    ...(data.creditInstallments !== undefined ? { creditInstallments: data.creditInstallments } : {}),
+    ...(data.creditHasInterest !== undefined ? { creditHasInterest: data.creditHasInterest } : {}),
   });
   return normalizeService(response.data.service);
 }

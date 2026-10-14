@@ -397,6 +397,11 @@ export async function createSuperAdminSalonUnit(data: {
   return response.data;
 }
 
+export async function updateSuperAdminSalonUnitLimit(salonId: string, maxSalonUnits: number | null): Promise<{ currentUnits: number; maxSalonUnits: number | null; owner: { id: string; name: string; email: string } }> {
+  const response = await api.patch(`/super-admin/salons/${salonId}/unit-limit`, { maxSalonUnits });
+  return response.data;
+}
+
 export async function createPagarmeSubscriptionPaymentLink(
   salonId: string,
   platformPlanId: string,
@@ -427,6 +432,54 @@ export async function activatePixPlatformSubscription(
 export async function confirmManualPixPayment(salonId: string): Promise<SuperAdminPlatformSubscription> {
   const response = await api.post<SuperAdminPlatformSubscription>(
     `/super-admin/salons/${salonId}/platform-subscription/manual-pix/confirm`
+  );
+  return response.data;
+}
+
+export type ManualPlatformPaymentMethod = "pix" | "cash";
+
+export interface ManualPlatformSubscriptionPayment {
+  id: string;
+  salonId: string;
+  salonName: string;
+  subscriptionId: string;
+  platformPlanId: string;
+  planName: string;
+  paymentMethod: ManualPlatformPaymentMethod | "credit_card";
+  amount: number;
+  paidAt: string | null;
+  previousDueDate: string | null;
+  nextBillingDate: string | null;
+  referenceCode: string | null;
+  automatic: boolean;
+  createdAt: string;
+}
+
+export async function registerManualPlatformSubscriptionPayment(
+  salonId: string,
+  payload: {
+    platformPlanId: string;
+    paymentMethod: ManualPlatformPaymentMethod;
+    amount: number;
+    paidAt?: string;
+    nextBillingDate?: string;
+    referenceCode?: string;
+    idempotencyKey: string;
+  },
+): Promise<{ subscription: SuperAdminPlatformSubscription; payment: ManualPlatformSubscriptionPayment; duplicated: boolean }> {
+  const response = await api.post(`/super-admin/salons/${salonId}/platform-subscription/payments`, payload);
+  return response.data;
+}
+
+export async function listPlatformSubscriptionPayments(params: {
+  salonId?: string;
+  paymentDate?: string;
+  page?: number;
+  limit?: number;
+} = {}): Promise<PaginatedResponse<ManualPlatformSubscriptionPayment>> {
+  const response = await api.get<PaginatedResponse<ManualPlatformSubscriptionPayment>>(
+    "/super-admin/platform-subscription-payments",
+    { params },
   );
   return response.data;
 }

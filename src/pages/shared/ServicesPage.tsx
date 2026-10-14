@@ -83,6 +83,8 @@ interface ServiceFormState {
   category: string;
   description: string;
   basePrice: string;
+  creditInstallments: string;
+  creditHasInterest: boolean;
   durationMinutes: string;
   servicePoints: string;
   commissionPercent: string;
@@ -97,6 +99,8 @@ const emptyForm: ServiceFormState = {
   category: "",
   description: "",
   basePrice: "",
+  creditInstallments: "1",
+  creditHasInterest: false,
   durationMinutes: "30",
   servicePoints: "1",
   commissionPercent: "",
@@ -152,6 +156,8 @@ function serviceToForm(service: Service): ServiceFormState {
     category: service.category ?? "",
     description: service.description ?? "",
     basePrice: String(service.basePrice ?? ""),
+    creditInstallments: String(service.creditInstallments ?? 1),
+    creditHasInterest: service.creditHasInterest ?? false,
     durationMinutes: String(service.durationMinutes ?? 30),
     servicePoints: String(service.servicePoints ?? service.service_points ?? 1),
     commissionPercent: getCommission(service) == null ? "" : String(getCommission(service)),
@@ -303,6 +309,7 @@ export function ServicesPage() {
       ? Number(form.commissionPercent)
       : null;
     const promotionalPrice = parseCurrencyInput(form.promotionalPrice || "0");
+    const creditInstallments = Number(form.creditInstallments);
 
     if (!form.name.trim()) return "Informe o nome do serviço.";
     if (!Number.isFinite(basePrice) || basePrice < 0) return "Informe um preco valido, igual ou maior que zero.";
@@ -321,6 +328,7 @@ export function ServicesPage() {
     if (!Number.isFinite(promotionalPrice) || promotionalPrice < 0) {
       return "Informe um preco promocional valido.";
     }
+    if (!Number.isInteger(creditInstallments) || creditInstallments < 1 || creditInstallments > 12) return "Informe entre 1 e 12 parcelas no cartao.";
 
     return null;
   }
@@ -343,6 +351,8 @@ export function ServicesPage() {
       category: form.category.trim() || null,
       description: form.description.trim() || null,
       basePrice: parseCurrencyInput(form.basePrice),
+      creditInstallments: Number(form.creditInstallments),
+      creditHasInterest: form.creditHasInterest,
       durationMinutes: Number(form.durationMinutes),
       servicePoints: Number(form.servicePoints),
       commissionPercent,
@@ -750,6 +760,11 @@ export function ServicesPage() {
                   placeholder="0"
                   inputMode="decimal"
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3 md:col-span-2">
+                <p className="col-span-2 text-sm font-medium">Condições no cartão de crédito</p>
+                <label className="space-y-1 text-sm">Parcelas<select value={form.creditInstallments} onChange={(event) => setField("creditInstallments", event.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3"><option value="1">À vista</option>{Array.from({ length: 11 }, (_, value) => value + 2).map((value) => <option key={value} value={String(value)}>{value}x</option>)}</select></label>
+                <label className="space-y-1 text-sm">Juros<select value={form.creditHasInterest ? "com" : "sem"} onChange={(event) => setField("creditHasInterest", event.target.value === "com")} className="h-10 w-full rounded-md border border-input bg-background px-3"><option value="sem">Sem juros</option><option value="com">Com juros</option></select></label>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="service-duration">Duracao em minutos</Label>

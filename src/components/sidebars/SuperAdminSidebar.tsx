@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Banknote,
   Building2,
   ContactRound,
   CreditCard,
@@ -23,7 +24,6 @@ const sections: SidebarSection[] = [
       { icon: Building2, label: "Salões", href: "/salons" },
       { icon: Users, label: "Usuarios", href: "/users" },
       { icon: CreditCard, label: "Assinaturas", href: "/subscriptions" },
-      { icon: CreditCard, label: "Cobranças pendentes", href: "/pending-charges" },
       { icon: FileText, label: "Planos Landing", href: "/platform-plans" },
       { icon: MessageSquareMore, label: "AresChat", href: "/areschat" },
       { icon: ContactRound, label: "Contatos interessados", href: "/landing-leads" },
@@ -34,6 +34,7 @@ const sections: SidebarSection[] = [
         label: "CRM Comercial",
         children: salesCrmProductItems,
       },
+      { icon: Banknote, label: "Financeiro diário", href: "/financial" },
       docsMenuItem,
     ],
   },

@@ -10,6 +10,7 @@ import {
   updateSuperAdminSalonStatus,
   deleteSuperAdminSalon,
   createSuperAdminSalonUnit,
+  updateSuperAdminSalonUnitLimit,
   getPlatformPlans,
   resetSuperAdminUserPassword,
   type SalonStatus,
@@ -117,6 +118,7 @@ export function SuperAdminSalonsPage() {
     open: false, submitting: false, name: "", phone: "", ownerName: "", ownerEmail: "", ownerPassword: "", maxUnits: "1", unlimited: false,
     billingMode: "free" as "free" | "manual_pix" | "card", negotiatedAmount: "", billingInterval: "month" as "month" | "year", dueDate: "", platformPlanId: "",
   });
+  const [unitLimitModal, setUnitLimitModal] = useState({ open: false, salonId: "", salonName: "", maxUnits: "1", unlimited: false, submitting: false });
 
   const loadSalons = useCallback(async () => {
     const result = await listSuperAdminSalons({
@@ -274,6 +276,21 @@ export function SuperAdminSalonsPage() {
     }
   };
 
+  const submitUnitLimit = async () => {
+    const maxSalonUnits = unitLimitModal.unlimited ? null : Number(unitLimitModal.maxUnits);
+    if (maxSalonUnits !== null && (!Number.isInteger(maxSalonUnits) || maxSalonUnits < 1)) { toast.error("Informe um limite de unidades válido."); return; }
+    setUnitLimitModal((value) => ({ ...value, submitting: true }));
+    try {
+      const result = await updateSuperAdminSalonUnitLimit(unitLimitModal.salonId, maxSalonUnits);
+      toast.success(result.maxSalonUnits === null ? "Unidades ilimitadas liberadas." : `Limite atualizado para ${result.maxSalonUnits} unidade(s).`);
+      setUnitLimitModal({ open: false, salonId: "", salonName: "", maxUnits: "1", unlimited: false, submitting: false });
+      await loadSalons();
+    } catch (error) {
+      toast.error((error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Não foi possível atualizar o limite de unidades.");
+      setUnitLimitModal((value) => ({ ...value, submitting: false }));
+    }
+  };
+
   const subscriptionsByShop: Record<string, { planName: string | null; price: number | null }> = {};
   for (const shop of salons) {
     const platformSub = shop.platformSubscription;
@@ -370,6 +387,7 @@ export function SuperAdminSalonsPage() {
                       <button type="button" onClick={() => void accessSalon(shop)} disabled={accessingSalonId !== null} className="inline-flex items-center gap-1 rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
                         {accessingSalonId === shop.id ? <Loader2 size={12} className="animate-spin" /> : <LogIn size={12} />} Acessar
                       </button>
+                      <button type="button" onClick={() => setUnitLimitModal({ open: true, salonId: shop.id, salonName: shop.name, maxUnits: "1", unlimited: false, submitting: false })} className="rounded border border-primary/30 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10">Unidades</button>
                       <button type="button" onClick={() => void handleStatusUpdate(shop.id, "active")} className="rounded bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-500/20">Ativar</button>
                       <button type="button" onClick={() => void handleStatusUpdate(shop.id, "inactive")} className="rounded bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-500/20">Inativar</button>
                       <button type="button" onClick={() => void handleStatusUpdate(shop.id, "blocked")} className="rounded bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/20">Bloquear</button>
@@ -415,6 +433,17 @@ export function SuperAdminSalonsPage() {
             <div className={`mt-4 rounded-lg border p-4 ${createUnitModal.billingMode === "manual_pix" ? "border-amber-500/30 bg-amber-500/5" : createUnitModal.billingMode === "card" ? "border-primary/20 bg-primary/5" : "border-border bg-secondary/30"}`}><label className="block space-y-1 text-sm text-muted-foreground">{createUnitModal.billingMode === "free" ? "Plano liberado sem cobrança" : createUnitModal.billingMode === "card" ? "Plano da assinatura recorrente" : "Plano da assinatura"}<select value={createUnitModal.platformPlanId} onChange={(e) => setCreateUnitModal((p) => ({ ...p, platformPlanId: e.target.value }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground"><option value="">Selecione um plano</option>{platformPlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} — {fmtCurrency(plan.price)}</option>)}</select></label>{createUnitModal.billingMode === "free" && <p className="mt-2 text-xs text-muted-foreground">O plano fica ativo sem cobrança, liberando somente os recursos incluídos nele.</p>}{createUnitModal.billingMode === "card" && <p className="mt-2 text-xs text-muted-foreground">O link de pagamento poderá ser gerado na tela de Assinaturas quando o período de teste terminar.</p>}</div>
             {createUnitModal.billingMode === "manual_pix" && <div className="mt-4 grid gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 sm:grid-cols-2"><label className="space-y-1 text-sm text-muted-foreground">Valor negociado<input inputMode="decimal" placeholder="Ex.: 99,90" value={createUnitModal.negotiatedAmount} onChange={(e) => setCreateUnitModal((p) => ({ ...p, negotiatedAmount: e.target.value }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground" /></label><label className="space-y-1 text-sm text-muted-foreground">Periodicidade<select value={createUnitModal.billingInterval} onChange={(e) => setCreateUnitModal((p) => ({ ...p, billingInterval: e.target.value as "month" | "year" }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground"><option value="month">Mensal</option><option value="year">Anual</option></select></label><label className="space-y-1 text-sm text-muted-foreground sm:col-span-2">Vencimento<input type="date" value={createUnitModal.dueDate} onChange={(e) => setCreateUnitModal((p) => ({ ...p, dueDate: e.target.value }))} className="h-9 w-full rounded-lg border border-border bg-background px-3 text-foreground" /></label><p className="text-xs text-amber-800 sm:col-span-2">A unidade será criada com o status “Aguardando pagamento”.</p></div>}
             <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={closeCreateUnitModal} className="rounded border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-secondary">Cancelar</button><button type="button" onClick={() => void submitCreateUnit()} disabled={createUnitModal.submitting} className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{createUnitModal.submitting ? "Criando..." : "Criar unidade"}</button></div>
+          </div>
+        </div>
+      )}
+
+      {unitLimitModal.open && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => !unitLimitModal.submitting && setUnitLimitModal((value) => ({ ...value, open: false }))}>
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-foreground">Gerenciar unidades</h3><p className="mt-1 text-sm text-muted-foreground">{unitLimitModal.salonName}. Este limite vale para todas as unidades do mesmo responsável.</p>
+            <div className="mt-5 space-y-4"><label className="block text-sm font-medium text-foreground">Quantidade máxima de unidades<input type="number" min="1" disabled={unitLimitModal.unlimited} value={unitLimitModal.maxUnits} onChange={(event) => setUnitLimitModal((value) => ({ ...value, maxUnits: event.target.value }))} className="mt-1 h-10 w-full rounded-lg border border-border bg-background px-3 disabled:opacity-50" /></label><label className="flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={unitLimitModal.unlimited} onChange={(event) => setUnitLimitModal((value) => ({ ...value, unlimited: event.target.checked }))} /> Liberar unidades ilimitadas</label></div>
+            <p className="mt-4 rounded-lg bg-secondary/50 p-3 text-xs text-muted-foreground">Não é possível definir um limite menor que a quantidade de unidades já vinculadas.</p>
+            <div className="mt-5 flex justify-end gap-2"><button type="button" disabled={unitLimitModal.submitting} onClick={() => setUnitLimitModal((value) => ({ ...value, open: false }))} className="rounded border border-border px-4 py-2 text-sm">Cancelar</button><button type="button" disabled={unitLimitModal.submitting} onClick={() => void submitUnitLimit()} className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{unitLimitModal.submitting ? "Salvando..." : "Salvar limite"}</button></div>
           </div>
         </div>
       )}

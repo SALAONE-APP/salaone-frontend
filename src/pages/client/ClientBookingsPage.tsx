@@ -151,6 +151,9 @@ function getPaymentDisplay(payment?: PaymentRecord) {
   const isPaid = payment.status === "paid" || payment.status === "approved";
   const isLocal = payment.method === "local" || payment.method === "dinheiro";
   const method = paymentMethodLabels[payment.method] ?? payment.method;
+  const creditDetails = payment.method === "credito" && payment.installments
+    ? ` — ${payment.installments === 1 ? "à vista" : `${payment.installments}x`} ${payment.hasInterest ? "com juros" : "sem juros"}`
+    : "";
 
   if (isLocal) {
     return isPaid
@@ -166,7 +169,7 @@ function getPaymentDisplay(payment?: PaymentRecord) {
 
   if (isPaid) {
     return {
-      label: method,
+      label: `${method}${creditDetails}`,
       className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
     };
   }

@@ -11,13 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cancelAppointment } from "@/service/appointmentService";
 import {
   checkPagarmeOrderStatus,
@@ -100,7 +93,6 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
   const pixPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const method = data.paymentMethod;
-
   useEffect(() => {
     if (!isOpen) {
       clearPixPolling();
@@ -149,7 +141,8 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
     return {
       amount: data.amount,
       paymentMethod: pm,
-      installments: Number(cardForm.installments || 1),
+      // Installments and interest are recorded only for in-person payments.
+      installments: pm === "card" ? 1 : undefined,
       customer: {
         id: data.userId,
         name: cardForm.holderName || data.userName,
@@ -198,7 +191,7 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
     setScreen("processing");
 
     try {
-      const cardToken = await createPagarmeCardToken(cardForm);
+      const cardToken = await createPagarmeCardToken({ ...cardForm, installments: 1 });
       const result = await createPagarmeOrder({ ...buildOrderPayload("card"), cardToken });
 
       if (isPaidOrder(result)) {
@@ -438,23 +431,6 @@ export function PaymentModal({ isOpen, onClose, onAbort, data, onSuccess }: Paym
                   onChange={(e) => updateCard("phone", e.target.value)}
                 />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Parcelamento</Label>
-              <Select
-                value={String(cardForm.installments)}
-                onValueChange={(v) => updateCard("installments", Number(v))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1x sem parcelamento</SelectItem>
-                  <SelectItem value="2">2x</SelectItem>
-                  <SelectItem value="3">3x</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="flex gap-2 pt-2">
