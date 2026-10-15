@@ -1,3 +1,5 @@
+import { SubscriptionPriceChangeDialog } from "@/components/SubscriptionPriceChangeDialog";
+import type { PriceTarget } from "@/service/subscriptionPriceChangeService";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -72,6 +74,8 @@ const FORM_FIELDS: { label: string; id: string; key: keyof PlanForm; type?: stri
 ];
 
 export function SuperAdminPlansPage() {
+  const [priceTarget, setPriceTarget] = useState<PriceTarget | null>(null);
+  const [applyExisting, setApplyExisting] = useState(false);
   const [plans, setPlans] = useState<PlatformPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -155,6 +159,7 @@ export function SuperAdminPlansPage() {
   };
 
   const openEditPlan = (plan: PlatformPlan) => {
+    setApplyExisting(false);
     setEditingPlan(plan);
     const pm = Array.isArray(plan.paymentMethods) && plan.paymentMethods.length ? plan.paymentMethods
       : Array.isArray(plan.payment_methods) && plan.payment_methods!.length ? plan.payment_methods! : ["credit_card"];
@@ -189,6 +194,7 @@ export function SuperAdminPlansPage() {
     }
     setSavingPlanId(editingPlan.id);
     try {
+      const saveCatalog = async () => {
       await updatePlatformPlan(editingPlan.id, {
         name: editForm.name.trim(), description: editForm.description.trim() || null,
         price: cents / 100,
@@ -206,6 +212,11 @@ export function SuperAdminPlansPage() {
         : "Plano atualizado apenas no banco.");
       setEditingPlan(null);
       await loadPlans();
+      };
+      if (applyExisting) {
+        setPriceTarget({ planId: editingPlan.id, price: cents / 100, saveCatalog });
+        setEditingPlan(null);
+      } else await saveCatalog();
     } catch (error: unknown) {
       const failure = error as { response?: { data?: { message?: string } } };
       toast.error(failure.response?.data?.message || "Nao foi possivel atualizar o plano no Pagar.me.");
@@ -249,6 +260,7 @@ export function SuperAdminPlansPage() {
 
   return (
     <div className="space-y-6">
+      {priceTarget && <SubscriptionPriceChangeDialog scope="platform" target={priceTarget} onClose={() => setPriceTarget(null)} onUpdated={() => void loadPlans()} />}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-foreground">Planos da Plataforma</h3>
@@ -376,6 +388,7 @@ export function SuperAdminPlansPage() {
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex flex-wrap gap-1">
+                        <button type="button" disabled={isBusy || Number(plan.price) <= 0} onClick={() => setPriceTarget({ planId: plan.id, price: Number(plan.price) })} className="rounded border border-border px-2 py-1 text-xs">Reaplicar preço / histórico</button>
                         <button type="button" disabled={isBusy} onClick={() => openEditPlan(plan)} className="rounded bg-secondary px-2 py-1 text-xs font-medium text-foreground hover:bg-secondary/80 disabled:opacity-40">Editar</button>
                         <button type="button" disabled={isBusy} onClick={() => void handleTogglePublic(plan)} className="rounded border border-border px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-secondary disabled:opacity-40">{isPublic ? "Ocultar" : "Publicar"}</button>
                         <button type="button" disabled={isBusy} onClick={() => void handleToggleActive(plan)}
@@ -404,6 +417,12 @@ export function SuperAdminPlansPage() {
               <button type="button" onClick={() => setEditingPlan(null)} className="rounded border border-border px-3 py-1 text-sm text-muted-foreground hover:bg-secondary">Fechar</button>
             </div>
             <form onSubmit={handleEditSubmit} className="space-y-4">
+              <label className="block space-y-1 text-sm">Aplicação do preço
+                <select className={inputCls} value={applyExisting ? "existing" : "new"} onChange={e => setApplyExisting(e.target.value === "existing")}>
+                  <option value="new">Somente novas assinaturas (padrão)</option>
+                  <option value="existing">Também assinaturas existentes elegíveis — revisar prévia</option>
+                </select>
+              </label>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="col-span-full space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">Nome do plano</label>

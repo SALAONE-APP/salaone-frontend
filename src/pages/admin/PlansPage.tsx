@@ -1,3 +1,5 @@
+import { SubscriptionPriceChangeDialog } from "@/components/SubscriptionPriceChangeDialog";
+import type { PriceTarget } from "@/service/subscriptionPriceChangeService";
 import {
   useCallback,
   useEffect,
@@ -174,6 +176,8 @@ function planToForm(plan: Plan): PlanFormState {
 }
 
 export function PlansPage() {
+  const [priceTarget, setPriceTarget] = useState<PriceTarget | null>(null);
+  const [applyExisting, setApplyExisting] = useState(false);
   const { user } = useAuth();
   const isAdmin = user?.isAdmin === true || user?.role === "admin";
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -300,6 +304,7 @@ export function PlansPage() {
   }
 
   function openEditDialog(plan: Plan) {
+    setApplyExisting(false);
     setEditingPlan(plan);
     setForm(planToForm(plan));
     setDialogOpen(true);
@@ -356,6 +361,16 @@ export function PlansPage() {
       features: form.features,
     };
 
+    if (editingPlan && applyExisting) {
+      const selectedPlan = editingPlan;
+      setPriceTarget({ planId: selectedPlan.id, price: payload.price, saveCatalog: async () => {
+        await updatePlan(selectedPlan.id, payload);
+        toast.success("Catálogo atualizado. As assinaturas terão resultado individual.");
+        await loadPlans();
+      } });
+      setDialogOpen(false);
+      return;
+    }
     setSaving(true);
 
     try {
@@ -405,6 +420,7 @@ export function PlansPage() {
 
   return (
     <div className="space-y-6">
+      {priceTarget && <SubscriptionPriceChangeDialog scope="client" target={priceTarget} onClose={() => setPriceTarget(null)} onUpdated={() => { void loadPlans(); void loadSubscriptions(); }} />}
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
         <div className="rounded-xl border border-border bg-card p-5">
@@ -603,6 +619,7 @@ export function PlansPage() {
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setPriceTarget({ planId: plan.id, price: plan.price })}>Reaplicar preço / histórico</DropdownMenuItem>
                               <DropdownMenuItem onClick={() => openEditDialog(plan)}>
                                 <Edit size={14} />
                                 Editar
@@ -797,6 +814,7 @@ export function PlansPage() {
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            {sub.hasPagarmeSubscription && <DropdownMenuItem onClick={() => setPriceTarget({ planId: sub.planId, price: sub.plan?.price ?? sub.amount, subscriptionId: sub.id })}>Atualizar preço no Pagar.me</DropdownMenuItem>}
                             <DropdownMenuItem
                               disabled={
                                 togglingSubId === sub.id ||
@@ -838,6 +856,12 @@ export function PlansPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <form onSubmit={handleSubmit} className="space-y-5">
+            {editingPlan && <label className="block space-y-1 text-sm">Aplicação do preço
+              <select className="w-full rounded border border-border bg-background p-2" value={applyExisting ? "existing" : "new"} onChange={e => setApplyExisting(e.target.value === "existing")}>
+                <option value="new">Somente novas assinaturas (padrão)</option>
+                <option value="existing">Também assinaturas existentes elegíveis — revisar prévia</option>
+              </select>
+            </label>}
             <DialogHeader>
               <DialogTitle>
                 {editingPlan ? "Editar Plano" : "Adicionar Plano"}

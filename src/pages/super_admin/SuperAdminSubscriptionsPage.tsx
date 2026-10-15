@@ -1,3 +1,5 @@
+import { SubscriptionPriceChangeDialog } from "@/components/SubscriptionPriceChangeDialog";
+import type { PriceTarget } from "@/service/subscriptionPriceChangeService";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -116,6 +118,7 @@ function onlyBillingSalons(salons: SuperAdminSalon[]) {
 }
 
 export function SuperAdminSubscriptionsPage() {
+  const [priceTarget, setPriceTarget] = useState<PriceTarget | null>(null);
   const [salons, setSalons] = useState<SuperAdminSalon[]>([]);
   const [plans, setPlans] = useState<PlatformPlan[]>([]);
   const [payments, setPayments] = useState<ManualPlatformSubscriptionPayment[]>([]);
@@ -370,6 +373,7 @@ export function SuperAdminSubscriptionsPage() {
 
   return (
     <div className="space-y-4">
+      {priceTarget && <SubscriptionPriceChangeDialog scope="platform" target={priceTarget} onClose={() => setPriceTarget(null)} onUpdated={() => void loadData()} />}
       <div>
         <h3 className="text-base font-semibold text-foreground">Gestao de Assinaturas</h3>
         <p className="text-sm text-muted-foreground">Renove ciclos PIX manualmente e acompanhe a recorrencia automatica dos cartoes.</p>
@@ -498,6 +502,7 @@ export function SuperAdminSubscriptionsPage() {
                   <td className="px-5 py-3 font-medium text-foreground">{fmtCurrency(row.price)}</td>
                   <td className="px-5 py-3">
                     <div className="flex flex-wrap gap-2">
+                    {row.shop.platformSubscription?.platform_plans && <button type="button" className="rounded border border-border px-3 py-1 text-xs" onClick={() => setPriceTarget({ planId: row.shop.platformSubscription!.platform_plans!.id, price: Number(row.shop.platformSubscription!.platform_plans!.price), subscriptionId: row.shop.platformSubscription!.id })}>Atualizar preço no Pagar.me</button>}
                     <button type="button" onClick={() => { setPaymentMode("payment"); setPaymentTarget(row.shop); }} className="rounded bg-primary/10 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/20">Registrar pagamento</button>
                     <button type="button" onClick={() => { setPaymentMode("upgrade"); setPaymentTarget(row.shop); }} className="rounded border border-primary/30 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/10">Fazer upgrade</button>
                     {row.paymentMethod === "credit_card" ? (
