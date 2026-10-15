@@ -1,3 +1,5 @@
+import { SubscriptionPriceChangeDialog } from "@/components/SubscriptionPriceChangeDialog";
+import type { PriceTarget } from "@/service/subscriptionPriceChangeService";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarClock,
@@ -113,6 +115,7 @@ function statusClass(status: Subscription["status"]) {
 }
 
 export function AdminSubscriptionsPage() {
+  const [priceTarget, setPriceTarget] = useState<PriceTarget | null>(null);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -292,6 +295,7 @@ export function AdminSubscriptionsPage() {
 
   return (
     <div className="space-y-6">
+      {priceTarget && <SubscriptionPriceChangeDialog scope="client" target={priceTarget} onClose={() => setPriceTarget(null)} onUpdated={() => void loadSubscriptions()} />}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-sm text-muted-foreground">Assinaturas listadas</p>
@@ -557,6 +561,7 @@ export function AdminSubscriptionsPage() {
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            {subscription.hasPagarmeSubscription && <DropdownMenuItem onClick={() => setPriceTarget({ planId: subscription.planId, price: subscription.plan?.price ?? subscription.amount, subscriptionId: subscription.id })}>Atualizar preço no Pagar.me</DropdownMenuItem>}
                             {subscription.status !== "active" ? (
                               <DropdownMenuItem disabled={busyId === subscription.id} onClick={() => runAction(subscription, "activate")}>
                                 <Play size={14} />
