@@ -82,6 +82,17 @@ export interface PaymentRecord {
   updatedAt: string;
 }
 
+export async function registerServiceTabPayment(tabId: string, data: {
+  amount: number;
+  method: Exclude<PaymentMethod, "local" | "subscription">;
+  paidAt?: string;
+  installments?: number | null;
+  hasInterest?: boolean | null;
+}) {
+  const response = await api.post<PaymentRecord>(`/service-tabs/${tabId}/payments`, data);
+  return response.data;
+}
+
 export interface ListPaymentsParams {
   userId?: string;
   status?: PaymentStatus;

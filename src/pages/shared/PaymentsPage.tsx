@@ -42,6 +42,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useTableSelection } from "@/hooks/useTableSelection";
 import {
   listAllPayments,
+  registerServiceTabPayment,
   splitPayment,
   updatePayment,
   type PaymentMethod,
@@ -120,10 +121,6 @@ function paymentMethodDisplay(payment: PaymentWithType) {
 }
 
 function paymentTotalAmount(payment: PaymentWithType) {
-  if (payment.paymentType === "service_tab" && payment.serviceTab) {
-    return payment.serviceTab.total
-      ?? payment.serviceTab.items.reduce((total, item) => total + Number(item.total || 0), 0);
-  }
   return payment.amount;
 }
 
@@ -423,7 +420,12 @@ export function PaymentsPage() {
       return;
     }
     const payment = localPaymentDialog;
-    const hasAdjustment = parseCurrencyInput(discountInput) > 0 || parseCurrencyInput(surchargeInput) > 0;
+    const isServiceTabPayment = payment.paymentType === "service_tab" && Boolean(payment.serviceTab?.id);
+    if (isServiceTabPayment && finalAmount - payment.amount > 0.005) {
+      toast.error("O valor não pode ser maior que o saldo pendente da comanda.");
+      return;
+    }
+    const hasAdjustment = !isServiceTabPayment && (parseCurrencyInput(discountInput) > 0 || parseCurrencyInput(surchargeInput) > 0);
     if (hasAdjustment && !adjustmentNote.trim()) {
       toast.error("Informe a observacao do desconto ou acrescimo.");
       return;
@@ -431,17 +433,28 @@ export function PaymentsPage() {
     setLocalPaymentDialog(null);
     setUpdatingId(payment.id);
     try {
-      await updatePayment(payment, {
-        status: "paid",
-        method: selectedLocalMethod,
-        amount: finalAmount,
-        discountAmount: Math.max(0, payment.amount - finalAmount),
-        adjustmentNote: hasAdjustment ? adjustmentNote.trim() : null,
-        installments: selectedLocalMethod === "credito" ? creditInstallments : null,
-        hasInterest: selectedLocalMethod === "credito" ? creditHasInterest : null,
-        paidAt: new Date().toISOString(),
-      });
-      toast.success("Pagamento confirmado.");
+      if (isServiceTabPayment) {
+        await registerServiceTabPayment(payment.serviceTab!.id, {
+          amount: finalAmount,
+          method: selectedLocalMethod as SplitMethod,
+          paidAt: new Date().toISOString(),
+          installments: selectedLocalMethod === "credito" ? creditInstallments : null,
+          hasInterest: selectedLocalMethod === "credito" ? creditHasInterest : null,
+        });
+        toast.success(finalAmount + 0.005 >= payment.amount ? "Comanda quitada." : "Pagamento parcial registrado.");
+      } else {
+        await updatePayment(payment, {
+          status: "paid",
+          method: selectedLocalMethod,
+          amount: finalAmount,
+          discountAmount: Math.max(0, payment.amount - finalAmount),
+          adjustmentNote: hasAdjustment ? adjustmentNote.trim() : null,
+          installments: selectedLocalMethod === "credito" ? creditInstallments : null,
+          hasInterest: selectedLocalMethod === "credito" ? creditHasInterest : null,
+          paidAt: new Date().toISOString(),
+        });
+        toast.success("Pagamento confirmado.");
+      }
       await loadPayments();
     } catch (err) {
       toast.error(getApiMessage(err));
@@ -467,10 +480,11 @@ export function PaymentsPage() {
   const finalAmount = parseCurrencyInput(adjustedAmount);
   const discountAmount = Math.max(0, (localPaymentDialog?.amount ?? 0) - finalAmount);
   const splitDifference = finalAmount - splitTotal;
+  const isServiceTabPayment = localPaymentDialog?.paymentType === "service_tab";
   function changeFinalAmount(value: string, syncDiscount = true) {
     const nextTotal = parseCurrencyInput(value);
     setAdjustedAmount(formatCurrency(nextTotal));
-    if (syncDiscount && localPaymentDialog) setDiscountInput(formatCurrency(Math.max(0, localPaymentDialog.amount - nextTotal)));
+    if (syncDiscount && localPaymentDialog && localPaymentDialog.paymentType !== "service_tab") setDiscountInput(formatCurrency(Math.max(0, localPaymentDialog.amount - nextTotal)));
     setSplitParts((parts) => {
       if (parts.length === 1) return [{ ...parts[0], amount: nextTotal.toFixed(2) }];
       const previousTotal = parts.slice(0, -1).reduce((sum, part) => sum + (Number(part.amount.replace(",", ".")) || 0), 0);
@@ -919,7 +933,7 @@ export function PaymentsPage() {
           <DialogHeader>
             <DialogTitle>Confirmar pagamento presencial</DialogTitle>
             <DialogDescription>
-              Ajuste o valor, aplique desconto ou acrescimo e confirme a forma de pagamento de{" "}
+              {isServiceTabPayment ? "Registre uma parcela de até o saldo pendente da comanda de " : "Ajuste o valor, aplique desconto ou acrescimo e confirme a forma de pagamento de "}
               <span className="font-medium text-foreground">
                 {localPaymentDialog?.user?.name ?? "este cliente"}
               </span>
@@ -929,10 +943,11 @@ export function PaymentsPage() {
           <div className="space-y-4">
             <div className="rounded-lg border border-border bg-secondary/30 p-4">
             <div className="mb-3 flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Valor original</span>
+              <span className="text-muted-foreground">{isServiceTabPayment ? "Saldo pendente" : "Valor original"}</span>
               <span className="font-medium">{formatCurrency(localPaymentDialog?.amount ?? 0)}</span>
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className={`grid grid-cols-1 gap-3 ${isServiceTabPayment ? "sm:grid-cols-1" : "sm:grid-cols-3"}`}>
+              {!isServiceTabPayment && <>
               <div className="min-w-0 space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Desconto</label>
                 <Input className="min-w-0 w-full" inputMode="numeric" value={discountInput} onChange={(event) => changeDiscount(event.target.value)} />
@@ -941,13 +956,14 @@ export function PaymentsPage() {
                 <label className="text-xs font-medium text-muted-foreground">Acréscimo</label>
                 <Input className="min-w-0 w-full" inputMode="numeric" value={surchargeInput} onChange={(event) => changeSurcharge(event.target.value)} />
               </div>
+              </>}
               <div className="min-w-0 space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Valor final</label>
-                <Input className="min-w-0 w-full" inputMode="numeric" value={adjustedAmount} readOnly />
+                <label className="text-xs font-medium text-muted-foreground">{isServiceTabPayment ? "Valor desta parcela" : "Valor final"}</label>
+                <Input className="min-w-0 w-full" inputMode="numeric" value={adjustedAmount} onChange={(event) => changeFinalAmount(event.target.value)} readOnly={!isServiceTabPayment} />
               </div>
             </div>
           </div>
-          {(parseCurrencyInput(discountInput) > 0 || parseCurrencyInput(surchargeInput) > 0) && (
+          {!isServiceTabPayment && (parseCurrencyInput(discountInput) > 0 || parseCurrencyInput(surchargeInput) > 0) && (
             <div className="space-y-1.5">
               <label htmlFor="payment-adjustment-note" className="text-xs font-medium text-muted-foreground">
                 Observacao do ajuste
@@ -1036,7 +1052,7 @@ export function PaymentsPage() {
             <Button className="w-full sm:w-auto" variant="outline" onClick={() => setLocalPaymentDialog(null)}>
               Cancelar
             </Button>
-            {splitParts.length === 1 && (
+            {!isServiceTabPayment && splitParts.length === 1 && (
               <Button className="w-full sm:w-auto" variant="outline" onClick={() => {
                 const half = finalAmount / 2;
                 setSplitParts([{ method: selectedLocalMethod as SplitMethod, amount: half.toFixed(2) }, { method: "pix", amount: (finalAmount - half).toFixed(2) }]);
