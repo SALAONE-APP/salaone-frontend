@@ -22,12 +22,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   SALES_PIPELINE_TEMPLATES,
   SALES_PRODUCT_LABELS,
+  SALES_STAGE_MILESTONE_LABELS,
   createSalesPipeline,
   deleteSalesPipeline,
   updateSalesPipeline,
   type SalesPipeline,
   type SalesProduct,
   type SalesStageDefinition,
+  type SalesStageMilestone,
   type SalesTerminalOutcome,
   type StageHasLeadsDetail,
 } from "@/service/salesCrmService";
@@ -147,7 +149,7 @@ export function SalesPipelineManagerDialog({ product, open, onClose, pipelines, 
     setStages((prev) =>
       prev.map((stage) =>
         stage.draftId === draftId
-          ? { ...stage, isTerminal, terminalOutcome: isTerminal ? stage.terminalOutcome ?? "ganho" : null }
+          ? { ...stage, isTerminal, terminalOutcome: isTerminal ? stage.terminalOutcome ?? "ganho" : null, milestone: isTerminal ? null : stage.milestone }
           : stage,
       ),
     );
@@ -175,6 +177,11 @@ export function SalesPipelineManagerDialog({ product, open, onClose, pipelines, 
     if (!stages.some((stage) => !stage.isTerminal)) return "O funil precisa de pelo menos uma etapa em andamento.";
     if (!stages.some((stage) => stage.terminalOutcome === "ganho")) return "Marque uma etapa final como venda ganha.";
     if (!stages.some((stage) => stage.terminalOutcome === "perdido")) return "Marque uma etapa final como lead perdido.";
+    for (const milestone of Object.keys(SALES_STAGE_MILESTONE_LABELS) as SalesStageMilestone[]) {
+      if (stages.filter((stage) => stage.milestone === milestone).length > 1) {
+        return `Só uma etapa pode ser marcada como "${SALES_STAGE_MILESTONE_LABELS[milestone]}".`;
+      }
+    }
     return null;
   }
 
@@ -192,6 +199,7 @@ export function SalesPipelineManagerDialog({ product, open, onClose, pipelines, 
       sortOrder: index,
       isTerminal: stage.isTerminal,
       terminalOutcome: stage.isTerminal ? stage.terminalOutcome : null,
+      milestone: stage.isTerminal ? null : stage.milestone ?? null,
     }));
 
     setSaving(true);
@@ -403,6 +411,26 @@ export function SalesPipelineManagerDialog({ product, open, onClose, pipelines, 
                           </SelectContent>
                         </Select>
                       )}
+                      {!stage.isTerminal && (
+                        <Select
+                          value={stage.milestone ?? "none"}
+                          onValueChange={(value) =>
+                            updateStage(stage.draftId, { milestone: value === "none" ? null : (value as SalesStageMilestone) })
+                          }
+                        >
+                          <SelectTrigger className="h-7 w-44 text-xs" title="Usado no dashboard para contar reuniões">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Sem marco no dashboard</SelectItem>
+                            {(Object.keys(SALES_STAGE_MILESTONE_LABELS) as SalesStageMilestone[]).map((milestone) => (
+                              <SelectItem key={milestone} value={milestone}>
+                                Marco: {SALES_STAGE_MILESTONE_LABELS[milestone]}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -412,7 +440,8 @@ export function SalesPipelineManagerDialog({ product, open, onClose, pipelines, 
                 </Button>
                 <p className="text-xs text-muted-foreground">
                   O funil precisa de ao menos uma etapa em andamento, uma final de venda ganha e uma final de lead perdido. Se
-                  você remover uma etapa que tem leads, vamos pedir para qual etapa movê-los.
+                  você remover uma etapa que tem leads, vamos pedir para qual etapa movê-los. Marque qual etapa é a "Reunião
+                  marcada" e a "Reunião realizada" para o dashboard contar as reuniões.
                 </p>
               </div>
 
