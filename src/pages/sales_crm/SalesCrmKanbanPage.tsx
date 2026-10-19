@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { AlertTriangle, Filter, Instagram, Loader2, MessageCircle, Plus, Search, Settings2, UserCog } from "lucide-react";
+import { AlertTriangle, CircleDot, Filter, Instagram, Loader2, MessageCircle, Plus, Search, Settings2, UserCog } from "lucide-react";
 import { toast } from "sonner";
 
 import { SalesLeadCreateDialog } from "@/components/SalesLeadCreateDialog";
@@ -29,13 +29,16 @@ import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import {
   SALES_CHANNELS,
+  SALES_CONTACT_STATUSES,
   SALES_LOST_REASONS,
   listSalesLeads,
   SALES_PRODUCT_BUSINESS_LABELS,
   SALES_PRODUCT_LABELS,
   salesChannelLabel,
+  salesContactStatusLabel,
   salesLostReasonLabel,
   updateSalesLead,
+  type SalesContactStatus,
   type SalesLead,
   type UpdateSalesLeadInput,
 } from "@/service/salesCrmService";
@@ -57,6 +60,16 @@ function isOverdue(lead: SalesLead) {
   if (lead.resolvedAt) return false;
   return new Date(lead.nextActionAt).getTime() < Date.now();
 }
+
+const CONTACT_STATUS_BADGE_CLASSES: Record<SalesContactStatus, string> = {
+  aguardando_resposta: "border-transparent bg-[hsl(var(--warning)/0.15)] text-[hsl(var(--warning))]",
+  respondeu: "border-transparent bg-[hsl(var(--success)/0.15)] text-[hsl(var(--success))]",
+  nao_respondeu: "border-transparent bg-destructive/15 text-destructive",
+};
+
+// No toque, o card so vira arraste depois de segurado parado; antes disso o gesto e rolagem da tela.
+const TOUCH_DRAG_HOLD_MS = 300;
+const TOUCH_SCROLL_TOLERANCE_PX = 8;
 
 interface PendingLostReasonDrag {
   stageKey: string;
@@ -92,6 +105,7 @@ export function SalesCrmKanbanPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [channelFilter, setChannelFilter] = useState("all");
+  const [contactStatusFilter, setContactStatusFilter] = useState("all");
   const [responsibleFilter, setResponsibleFilter] = useState("all");
   const [responsibleOptions, setResponsibleOptions] = useState<SuperAdminUser[]>([]);
 
@@ -153,10 +167,12 @@ export function SalesCrmKanbanPage() {
         if (!haystack.includes(query)) return false;
       }
       if (channelFilter !== "all" && lead.channel !== channelFilter) return false;
+      if (contactStatusFilter === "none" && lead.contactStatus) return false;
+      if (contactStatusFilter !== "all" && contactStatusFilter !== "none" && lead.contactStatus !== contactStatusFilter) return false;
       if (isSuperAdmin && responsibleFilter !== "all" && lead.responsibleId !== responsibleFilter) return false;
       return true;
     });
-  }, [leads, search, channelFilter, responsibleFilter, isSuperAdmin]);
+  }, [leads, search, channelFilter, contactStatusFilter, responsibleFilter, isSuperAdmin]);
 
   const columns = useMemo(
     () =>
@@ -216,21 +232,58 @@ export function SalesCrmKanbanPage() {
     startX: number;
     startY: number;
     moved: boolean;
+    // Mouse/caneta: armado de cara. Toque: so depois de segurar TOUCH_DRAG_HOLD_MS sem mexer.
+    armed: boolean;
+    holdTimer: number | null;
     ghost: HTMLDivElement | null;
   } | null>(null);
   const justDraggedRef = useRef(false);
+  const [armedCardId, setArmedCardId] = useState<string | null>(null);
+
+  // Com o card armado, bloqueia a rolagem nativa para o dedo arrastar o card em vez da tela.
+  // Precisa ser listener nao-passivo: preventDefault em pointermove nao impede o scroll.
+  useEffect(() => {
+    function blockScrollWhileDragging(event: TouchEvent) {
+      if (dragStateRef.current?.armed) event.preventDefault();
+    }
+    document.addEventListener("touchmove", blockScrollWhileDragging, { passive: false });
+    return () => document.removeEventListener("touchmove", blockScrollWhileDragging);
+  }, []);
+
+  function clearDragState() {
+    const state = dragStateRef.current;
+    if (state?.holdTimer) window.clearTimeout(state.holdTimer);
+    state?.ghost?.remove();
+    dragStateRef.current = null;
+    setArmedCardId(null);
+    setDragOverStage(null);
+    setDragOverCardId(null);
+  }
 
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>, lead: SalesLead) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    dragStateRef.current = {
+    const isTouch = event.pointerType === "touch";
+    if (!isTouch) event.currentTarget.setPointerCapture(event.pointerId);
+    const state = {
       cardId: lead.id,
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
       moved: false,
+      armed: !isTouch,
+      holdTimer: null as number | null,
       ghost: null,
     };
+    if (isTouch) {
+      state.holdTimer = window.setTimeout(() => {
+        if (dragStateRef.current !== state) return;
+        state.armed = true;
+        state.holdTimer = null;
+        setArmedCardId(lead.id);
+        navigator.vibrate?.(15);
+      }, TOUCH_DRAG_HOLD_MS);
+    }
+    dragStateRef.current = state;
   }
 
   function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
@@ -239,6 +292,12 @@ export function SalesCrmKanbanPage() {
 
     const dx = event.clientX - state.startX;
     const dy = event.clientY - state.startY;
+
+    if (!state.armed) {
+      // Dedo andou antes de completar o "segurar": e rolagem, larga o card.
+      if (Math.hypot(dx, dy) > TOUCH_SCROLL_TOLERANCE_PX) clearDragState();
+      return;
+    }
 
     if (!state.moved) {
       if (Math.hypot(dx, dy) < 6) return;
@@ -268,16 +327,13 @@ export function SalesCrmKanbanPage() {
   async function handlePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
     const state = dragStateRef.current;
     if (!state || event.pointerId !== state.pointerId) return;
-    dragStateRef.current = null;
-    state.ghost?.remove();
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
 
     const stageKey = dragOverStage;
     const targetCardId = dragOverCardId;
-    setDragOverStage(null);
-    setDragOverCardId(null);
+    clearDragState();
 
     if (!state.moved || !stageKey) return;
     justDraggedRef.current = true;
@@ -305,10 +361,7 @@ export function SalesCrmKanbanPage() {
   function handlePointerCancel(event: ReactPointerEvent<HTMLDivElement>) {
     const state = dragStateRef.current;
     if (!state || event.pointerId !== state.pointerId) return;
-    dragStateRef.current = null;
-    state.ghost?.remove();
-    setDragOverStage(null);
-    setDragOverCardId(null);
+    clearDragState();
   }
 
   function handleCardClick(leadId: string) {
@@ -396,6 +449,25 @@ export function SalesCrmKanbanPage() {
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <CircleDot size={14} />
+                Status
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuRadioGroup value={contactStatusFilter} onValueChange={setContactStatusFilter}>
+                <DropdownMenuRadioItem value="all">Todos</DropdownMenuRadioItem>
+                {SALES_CONTACT_STATUSES.map((option) => (
+                  <DropdownMenuRadioItem key={option} value={option}>
+                    {salesContactStatusLabel(option)}
+                  </DropdownMenuRadioItem>
+                ))}
+                <DropdownMenuRadioItem value="none">Sem status</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {isSuperAdmin && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -469,10 +541,12 @@ export function SalesCrmKanbanPage() {
                         onPointerMove={handlePointerMove}
                         onPointerUp={handlePointerUp}
                         onPointerCancel={handlePointerCancel}
+                        onContextMenu={(event) => event.preventDefault()}
                         onClick={() => handleCardClick(lead.id)}
                         className={cn(
-                          "touch-none cursor-grab select-none rounded-xl border border-border bg-card p-3 shadow-card transition-shadow hover:shadow-card-hover active:cursor-grabbing",
+                          "cursor-grab select-none rounded-xl border border-border bg-card p-3 shadow-card transition-shadow [-webkit-touch-callout:none] hover:shadow-card-hover active:cursor-grabbing",
                           dragOverCardId === lead.id && "border-t-2 border-t-primary",
+                          armedCardId === lead.id && "scale-[1.02] shadow-card-hover ring-2 ring-primary",
                         )}
                       >
                         <div className="flex items-center justify-between gap-2">
@@ -494,6 +568,11 @@ export function SalesCrmKanbanPage() {
 
                         <div className="mt-2 flex flex-wrap gap-1">
                           <Badge className="text-[11px]">{salesChannelLabel(lead.channel)}</Badge>
+                          {lead.contactStatus && (
+                            <Badge variant="outline" className={cn("text-[11px]", CONTACT_STATUS_BADGE_CLASSES[lead.contactStatus])}>
+                              {salesContactStatusLabel(lead.contactStatus)}
+                            </Badge>
+                          )}
                           {lead.lostReason && (
                             <Badge variant="outline" className="text-[11px]">
                               {salesLostReasonLabel(lead.lostReason)}

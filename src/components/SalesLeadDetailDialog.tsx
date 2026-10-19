@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import {
   SALES_CHANNELS,
+  SALES_CONTACT_STATUSES,
   SALES_CONTACT_TYPES,
   SALES_LOST_REASONS,
   deleteSalesLead,
@@ -32,10 +33,12 @@ import {
   listSalesScripts,
   salesActivityTypeLabel,
   salesChannelLabel,
+  salesContactStatusLabel,
   salesContactTypeLabel,
   salesLeadStageLabel,
   salesLostReasonLabel,
   updateSalesLead,
+  type SalesContactStatus,
   type SalesLead,
   type SalesPipeline,
   type SalesLeadActivity,
@@ -93,6 +96,7 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
   const [stage, setStage] = useState("");
   const [pipeline, setPipeline] = useState<SalesPipeline | null>(null);
   const [lostReason, setLostReason] = useState("");
+  const [contactStatus, setContactStatus] = useState<SalesContactStatus | "none">("none");
   const [nextAction, setNextAction] = useState("");
   const [nextActionAt, setNextActionAt] = useState("");
   const [notes, setNotes] = useState("");
@@ -121,6 +125,7 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
       setScriptId(leadData.scriptId ?? "none");
       setStage(leadData.stage);
       setLostReason(leadData.lostReason ?? "");
+      setContactStatus(leadData.contactStatus ?? "none");
       setNextAction(leadData.nextAction ?? "");
       setNextActionAt(toDateTimeLocalInput(leadData.nextActionAt));
       setNotes(leadData.notes ?? "");
@@ -169,6 +174,7 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
         channel,
         responsibleId,
         scriptId: scriptId === "none" ? null : scriptId,
+        contactStatus: contactStatus === "none" ? null : contactStatus,
         notes: notes.trim() || null,
         nextAction: nextAction.trim() || null,
         nextActionAt: nextActionAt ? new Date(nextActionAt).toISOString() : null,
@@ -317,6 +323,23 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
                   </Select>
                 </div>
               )}
+
+              <div>
+                <Label>Status do cliente</Label>
+                <Select value={contactStatus} onValueChange={(value) => setContactStatus(value as SalesContactStatus | "none")}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem status</SelectItem>
+                    {SALES_CONTACT_STATUSES.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {salesContactStatusLabel(option)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div>
                 <Label>Vendedor responsável</Label>
