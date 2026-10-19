@@ -168,6 +168,10 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
       toast.error("Informe qual foi o canal de origem.");
       return;
     }
+    if (scriptId === "none" && scriptOptions.length > 0) {
+      toast.error("Selecione o script utilizado.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -379,12 +383,12 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
 
               <div>
                 <Label>Script utilizado</Label>
-                <Select value={scriptId} onValueChange={setScriptId}>
+                <Select value={scriptId === "none" && scriptOptions.length > 0 ? "" : scriptId} onValueChange={setScriptId}>
                   <SelectTrigger className="mt-1.5">
                     <SelectValue placeholder="Selecione um script" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Nenhum</SelectItem>
+                    {scriptOptions.length === 0 && <SelectItem value="none">Nenhum</SelectItem>}
                     {scriptOptions.map((script) => (
                       <SelectItem key={script.id} value={script.id}>
                         {script.name} ({script.version})
@@ -463,6 +467,9 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
                           <p className="mt-1 text-muted-foreground">
                             {salesLeadStageLabel(activity.fromStage, pipeline)} → {salesLeadStageLabel(activity.toStage, pipeline)}
                           </p>
+                        )}
+                        {activity.activityType === "contact_status_changed" && (
+                          <p className="mt-1 text-muted-foreground">{activity.outcome ? salesContactStatusLabel(activity.outcome) : "Sem status"}</p>
                         )}
                         {activity.contactType && (
                           <p className="mt-1 text-muted-foreground">

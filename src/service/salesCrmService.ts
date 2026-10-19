@@ -52,6 +52,7 @@ export const SALES_ACTIVITY_TYPES = [
   "note_added",
   "responsible_changed",
   "next_action_changed",
+  "contact_status_changed",
 ] as const;
 export type SalesActivityTypeValue = (typeof SALES_ACTIVITY_TYPES)[number];
 
@@ -88,6 +89,7 @@ export const SALES_ACTIVITY_TYPE_LABELS: Record<SalesActivityTypeValue, string> 
   note_added: "Observação adicionada",
   responsible_changed: "Responsável alterado",
   next_action_changed: "Próxima ação alterada",
+  contact_status_changed: "Status do cliente alterado",
 };
 
 export function salesChannelLabel(channel: string) {
@@ -126,12 +128,21 @@ export function salesActivityTypeLabel(activityType: string) {
 
 export type SalesTerminalOutcome = "ganho" | "perdido";
 
+export type SalesStageMilestone = "reuniao_marcada" | "reuniao_realizada";
+
+export const SALES_STAGE_MILESTONE_LABELS: Record<SalesStageMilestone, string> = {
+  reuniao_marcada: "Reunião marcada",
+  reuniao_realizada: "Reunião realizada",
+};
+
 export interface SalesStageDefinition {
   key: string;
   label: string;
   sortOrder: number;
   isTerminal: boolean;
   terminalOutcome: SalesTerminalOutcome | null;
+  // Marco comercial que o dashboard usa para contar reuniões.
+  milestone?: SalesStageMilestone | null;
 }
 
 export interface SalesPipeline {
@@ -218,52 +229,51 @@ export interface SalesScript {
   attachments: SalesScriptAttachment[];
 }
 
-export interface SalesDashboardFunnelStage {
-  stage: string;
-  label: string;
-  isTerminal: boolean;
-  terminalOutcome: SalesTerminalOutcome | null;
-  count: number;
-}
-
-export interface SalesDashboardChannel {
-  channel: string;
-  count: number;
-}
-
-export interface SalesDashboardLostReason {
-  reason: string | null;
-  count: number;
-}
-
-export interface SalesDashboardMonth {
-  month: string;
-  closed: number;
+export interface SalesDashboardSummary {
+  newLeads: number;
+  approached: number;
+  responded: number;
+  contacts: number;
+  meetingsScheduled: number;
+  meetingsHeld: number;
+  won: number;
   lost: number;
-}
-
-export interface SalesDashboardResponsiblePerformance {
-  responsibleId: string;
-  responsibleName: string;
-  closedCount: number;
   avgDaysToClose: number | null;
 }
 
-export interface SalesDashboardTotals {
-  total: number;
+// Coorte: leads criados no período, com o resultado que têm hoje.
+export interface SalesDashboardCohortStats {
+  leads: number;
+  approached: number;
+  responded: number;
+  meetingsScheduled: number;
+  meetingsHeld: number;
   won: number;
   lost: number;
-  open: number;
+}
+
+export interface SalesDashboardResponsibleRow extends SalesDashboardSummary {
+  responsibleId: string;
+  responsibleName: string;
 }
 
 export interface SalesDashboard {
-  pipelineId: string | null;
-  totals: SalesDashboardTotals;
-  funnel: SalesDashboardFunnelStage[];
-  byChannel: SalesDashboardChannel[];
-  lostReasons: SalesDashboardLostReason[];
-  monthlyTrend: SalesDashboardMonth[];
-  responsiblePerformance?: SalesDashboardResponsiblePerformance[];
+  period: { from: string; to: string; previousFrom: string; previousTo: string };
+  milestones: { meetingScheduled: boolean; meetingHeld: boolean };
+  summary: SalesDashboardSummary;
+  previousSummary: SalesDashboardSummary;
+  funnel: { created: number; approached: number; responded: number; meetingsScheduled: number; meetingsHeld: number; won: number };
+  byScript: Array<SalesDashboardCohortStats & { scriptId: string | null; scriptName: string | null }>;
+  byChannel: Array<SalesDashboardCohortStats & { channel: string }>;
+  byResponsible?: SalesDashboardResponsibleRow[];
+  trend: Array<{ month: string; newLeads: number; meetingsScheduled: number; meetingsHeld: number; won: number }>;
+  health: {
+    open: number;
+    overdue: number;
+    stale: number;
+    contactStatus: Record<SalesContactStatus | "sem_status", number>;
+  };
+  lostReasons: Array<{ reason: string | null; count: number }>;
 }
 
 export interface PaginatedSalesLeads {
@@ -414,7 +424,14 @@ export async function deleteSalesScriptAttachment(scriptId: string, attachmentId
   await api.delete(`/sales-crm/scripts/${scriptId}/attachments/${attachmentId}`);
 }
 
-export async function getSalesDashboard(filters: { product: SalesProduct; pipelineId?: string; trendMonths?: number }) {
+export async function getSalesDashboard(filters: {
+  product: SalesProduct;
+  pipelineId?: string;
+  responsibleId?: string;
+  // AAAA-MM, inclusivos
+  from?: string;
+  to?: string;
+}) {
   const response = await api.get<SalesDashboard>("/sales-crm/dashboard", { params: filters });
   return response.data;
 }

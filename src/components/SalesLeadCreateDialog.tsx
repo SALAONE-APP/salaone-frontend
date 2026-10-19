@@ -111,6 +111,10 @@ export function SalesLeadCreateDialog({ product, pipelineId, open, onClose, onCr
       toast.error("Selecione o vendedor responsável.");
       return;
     }
+    if (scriptId === "none" && scriptOptions.length > 0) {
+      toast.error("Selecione o script de abordagem.");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -236,12 +240,12 @@ export function SalesLeadCreateDialog({ product, pipelineId, open, onClose, onCr
 
         <div>
           <Label>Script de abordagem</Label>
-          <Select value={scriptId} onValueChange={setScriptId}>
+          <Select value={scriptId === "none" && scriptOptions.length > 0 ? "" : scriptId} onValueChange={setScriptId}>
             <SelectTrigger className="mt-1.5">
               <SelectValue placeholder="Selecione um script" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">Nenhum</SelectItem>
+              {scriptOptions.length === 0 && <SelectItem value="none">Nenhum</SelectItem>}
               {scriptOptions.map((script) => (
                 <SelectItem key={script.id} value={script.id}>
                   {script.name} ({script.version})
