@@ -10,9 +10,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import {
   SALES_CHANNELS,
+  SALES_CONTACT_STATUSES,
   createSalesLead,
   listSalesScripts,
   salesChannelLabel,
+  salesContactStatusLabel,
+  type SalesContactStatus,
   type SalesLead,
   type SalesScript,
   type SalesProduct,
@@ -35,6 +38,9 @@ function extractErrorMessage(error: unknown, fallback: string) {
 export function SalesLeadCreateDialog({ product, pipelineId, open, onClose, onCreated }: Props) {
   const { user } = useAuth();
   const isSalesRep = user?.role === "sales_rep";
+  // O AuthContext troca o objeto user a cada foco da janela (refetch de /auth/me);
+  // depender do objeto inteiro reexecutava o efeito abaixo e zerava o vendedor escolhido.
+  const userId = user?.id;
 
   const [contactName, setContactName] = useState("");
   const [salonName, setSalonName] = useState("");
@@ -44,6 +50,7 @@ export function SalesLeadCreateDialog({ product, pipelineId, open, onClose, onCr
   const [channel, setChannel] = useState("");
   const [responsibleId, setResponsibleId] = useState("");
   const [scriptId, setScriptId] = useState("none");
+  const [contactStatus, setContactStatus] = useState<SalesContactStatus | "none">("none");
   const [notes, setNotes] = useState("");
 
   const [responsibleOptions, setResponsibleOptions] = useState<SuperAdminUser[]>([]);
@@ -58,13 +65,14 @@ export function SalesLeadCreateDialog({ product, pipelineId, open, onClose, onCr
       setInstagramHandle("");
       setEmail("");
       setChannel("");
-      setResponsibleId(isSalesRep && user ? user.id : "");
+      setResponsibleId(isSalesRep && userId ? userId : "");
       setScriptId("none");
+      setContactStatus("none");
       setNotes("");
       return;
     }
 
-    setResponsibleId(isSalesRep && user ? user.id : "");
+    setResponsibleId(isSalesRep && userId ? userId : "");
 
     listSalesScripts({ product, active: true })
       .then(setScriptOptions)
@@ -78,7 +86,7 @@ export function SalesLeadCreateDialog({ product, pipelineId, open, onClose, onCr
         .then(([reps, admins]) => setResponsibleOptions([...reps.items, ...admins.items]))
         .catch(() => null);
     }
-  }, [open, isSalesRep, user, product]);
+  }, [open, isSalesRep, userId, product]);
 
   async function handleSubmit() {
     if (!contactName.trim()) {
@@ -111,6 +119,7 @@ export function SalesLeadCreateDialog({ product, pipelineId, open, onClose, onCr
         channel,
         responsibleId,
         scriptId: scriptId === "none" ? null : scriptId,
+        contactStatus: contactStatus === "none" ? null : contactStatus,
         notes: notes.trim() || null,
       });
       toast.success("Lead criado.");
@@ -190,6 +199,23 @@ export function SalesLeadCreateDialog({ product, pipelineId, open, onClose, onCr
               </SelectContent>
             </Select>
           )}
+        </div>
+
+        <div>
+          <Label>Status do cliente</Label>
+          <Select value={contactStatus} onValueChange={(value) => setContactStatus(value as SalesContactStatus | "none")}>
+            <SelectTrigger className="mt-1.5">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Sem status</SelectItem>
+              {SALES_CONTACT_STATUSES.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {salesContactStatusLabel(option)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div>
