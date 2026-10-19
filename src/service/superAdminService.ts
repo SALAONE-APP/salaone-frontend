@@ -618,6 +618,7 @@ export async function updatePlatformPlan(
     name: string;
     description: string | null;
     price: number;
+    trialPeriodDays: number;
     features: string[];
     isPublic: boolean;
     isRecommended: boolean;

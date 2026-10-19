@@ -206,6 +206,7 @@ export function SuperAdminPlansPage() {
         maxReceptionists: editForm.maxReceptionists ? Number(editForm.maxReceptionists) : null,
         statementDescriptor: editForm.statementDescriptor.trim(),
         paymentMethods: editForm.paymentMethods,
+        trialPeriodDays: Number(editForm.trialPeriodDays || 0),
       });
       toast.success(editingPlan.pagarmePlanId || editingPlan.pagarme_plan_id
         ? "Plano atualizado e valor sincronizado com Pagar.me."
@@ -431,6 +432,10 @@ export function SuperAdminPlansPage() {
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">Valor (R$)</label>
                   <input type="text" value={editForm.price} onChange={(e) => setEditForm((p) => ({ ...p, price: e.target.value }))} placeholder="Ex.: 99,90 ou vazio para sob consulta" className={inputCls} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Dias grátis (teste)</label>
+                  <input type="number" min="0" value={editForm.trialPeriodDays} onChange={(e) => setEditForm((p) => ({ ...p, trialPeriodDays: e.target.value }))} placeholder="0" className={inputCls} />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">Ordem na landing</label>
