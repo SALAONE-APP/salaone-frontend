@@ -229,13 +229,14 @@ function normalizeCancelledAppointmentPayment(payment: ApiPaymentWithType): ApiP
 }
 
 function downloadCsv(payments: PaymentWithType[]) {
-  const header = ["ID", "Cliente", "Tipo", "Descricao", "Valor", "Metodo", "Status", "Data"];
+  const header = ["ID", "Cliente", "Tipo", "Descricao", "Valor total", "Juros do parcelamento", "Metodo", "Status", "Data"];
   const rows = payments.map((payment) => [
     payment.id,
     payment.user?.name || "",
     typeLabels[payment.paymentType],
     getPaymentDescription(payment),
     String(payment.amount).replace(".", ","),
+    String(payment.interestAmount ?? 0).replace(".", ","),
     methodLabels[payment.method] || payment.method,
     statusLabels[payment.status] || payment.status,
     formatDateTime(paymentDisplayDate(payment)),
@@ -281,6 +282,7 @@ export function PaymentsPage() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>("dinheiro");
   const [creditInstallments, setCreditInstallments] = useState(1);
   const [creditHasInterest, setCreditHasInterest] = useState(false);
+  const [interestInput, setInterestInput] = useState("");
 
   const limit = 20;
 
@@ -368,6 +370,7 @@ export function PaymentsPage() {
         today: summary.today,
         pending: summary.pending,
         refunded: summary.refunded,
+        interest: summary.interest ?? 0,
       };
     }
 
@@ -389,6 +392,9 @@ export function PaymentsPage() {
       refunded: payments
         .filter((p) => p.status === "refunded")
         .reduce((sum, p) => sum + p.amount, 0),
+      interest: payments
+        .filter((p) => p.status === "paid" || p.status === "approved")
+        .reduce((sum, p) => sum + Number(p.interestAmount ?? 0), 0),
     };
   }, [summary, payments]);
 
@@ -421,7 +427,13 @@ export function PaymentsPage() {
     }
     const payment = localPaymentDialog;
     const isServiceTabPayment = payment.paymentType === "service_tab" && Boolean(payment.serviceTab?.id);
-    if (isServiceTabPayment && finalAmount - payment.amount > 0.005) {
+    const interestAmount = selectedLocalMethod === "credito" && creditHasInterest
+      ? parseCurrencyInput(interestInput)
+      : 0;
+    // O saldo da comanda representa somente os itens. Juros compõem o valor
+    // pago pelo cliente, mas não podem impedir a quitação da parcela.
+    const serviceAmount = finalAmount - interestAmount;
+    if (isServiceTabPayment && serviceAmount - payment.amount > 0.005) {
       toast.error("O valor não pode ser maior que o saldo pendente da comanda.");
       return;
     }
@@ -440,8 +452,9 @@ export function PaymentsPage() {
           paidAt: new Date().toISOString(),
           installments: selectedLocalMethod === "credito" ? creditInstallments : null,
           hasInterest: selectedLocalMethod === "credito" ? creditHasInterest : null,
+          interestAmount,
         });
-        toast.success(finalAmount + 0.005 >= payment.amount ? "Comanda quitada." : "Pagamento parcial registrado.");
+        toast.success(serviceAmount + 0.005 >= payment.amount ? "Comanda quitada." : "Pagamento parcial registrado.");
       } else {
         await updatePayment(payment, {
           status: "paid",
@@ -451,6 +464,7 @@ export function PaymentsPage() {
           adjustmentNote: hasAdjustment ? adjustmentNote.trim() : null,
           installments: selectedLocalMethod === "credito" ? creditInstallments : null,
           hasInterest: selectedLocalMethod === "credito" ? creditHasInterest : null,
+          interestAmount,
           paidAt: new Date().toISOString(),
         });
         toast.success("Pagamento confirmado.");
@@ -473,6 +487,7 @@ export function PaymentsPage() {
     setAdjustmentNote("");
     setCreditInstallments(payment.method === "credito" ? payment.installments ?? 1 : 1);
     setCreditHasInterest(payment.method === "credito" ? payment.hasInterest ?? false : false);
+    setInterestInput(formatCurrency(payment.interestAmount ?? 0));
     setLocalPaymentDialog(payment);
   }
 
@@ -532,6 +547,7 @@ export function PaymentsPage() {
         amount: Number(part.amount.replace(",", ".")),
         installments: part.method === "credito" ? part.installments ?? 1 : null,
         hasInterest: part.method === "credito" ? part.hasInterest ?? false : null,
+        interestAmount: 0,
       })), finalAmount, discountAmount, hasAdjustment ? adjustmentNote.trim() : null, new Date().toISOString());
       toast.success("Pagamento dividido confirmado.");
       await loadPayments();
@@ -546,6 +562,7 @@ export function PaymentsPage() {
     setSelectedPaymentMethod(payment.method);
     setCreditInstallments(payment.method === "credito" ? payment.installments ?? 1 : 1);
     setCreditHasInterest(payment.method === "credito" ? payment.hasInterest ?? false : false);
+    setInterestInput(formatCurrency(payment.interestAmount ?? 0));
     setMethodPaymentDialog(payment);
   }
 
@@ -563,6 +580,7 @@ export function PaymentsPage() {
         method: selectedPaymentMethod,
         installments: selectedPaymentMethod === "credito" ? creditInstallments : null,
         hasInterest: selectedPaymentMethod === "credito" ? creditHasInterest : null,
+        interestAmount: selectedPaymentMethod === "credito" && creditHasInterest ? parseCurrencyInput(interestInput) : 0,
       });
       toast.success("Método de pagamento atualizado.");
       await loadPayments();
@@ -575,7 +593,7 @@ export function PaymentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="mb-1 text-sm text-muted-foreground">Recebido</p>
           <h3 className="text-2xl font-semibold text-foreground">{formatCurrency(stats.paid)}</h3>
@@ -591,6 +609,10 @@ export function PaymentsPage() {
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="mb-1 text-sm text-muted-foreground">Reembolsado</p>
           <h3 className="text-2xl font-semibold text-foreground">{formatCurrency(stats.refunded)}</h3>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="mb-1 text-sm text-muted-foreground">Juros de parcelamento</p>
+          <h3 className="text-2xl font-semibold text-foreground">{formatCurrency(stats.interest)}</h3>
         </div>
       </div>
 
@@ -734,6 +756,9 @@ export function PaymentsPage() {
                     Valor total
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Juros
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Data
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -748,14 +773,14 @@ export function PaymentsPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-sm text-muted-foreground">
+                    <td colSpan={10} className="p-8 text-center text-sm text-muted-foreground">
                       <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
                       Carregando pagamentos...
                     </td>
                   </tr>
                 ) : filteredPayments.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-sm text-muted-foreground">
+                    <td colSpan={10} className="p-8 text-center text-sm text-muted-foreground">
                       Nenhum pagamento encontrado.
                     </td>
                   </tr>
@@ -821,6 +846,11 @@ export function PaymentsPage() {
                       </td>
                       <td className="px-4 py-3 text-sm font-medium text-foreground">
                         {formatCurrency(paymentTotalAmount(payment))}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                        {Number(payment.interestAmount ?? 0) > 0
+                          ? formatCurrency(Number(payment.interestAmount))
+                          : "—"}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -1046,6 +1076,7 @@ export function PaymentsPage() {
           {splitParts.length === 1 && selectedLocalMethod === "credito" && <div className="grid grid-cols-2 gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
             <label className="space-y-1 text-sm font-medium">Parcelas<select value={creditInstallments} onChange={(event) => setCreditInstallments(Number(event.target.value))} className="h-10 w-full rounded-md border border-input bg-background px-3"><option value={1}>À vista</option>{Array.from({ length: 11 }, (_, value) => value + 2).map((value) => <option key={value} value={value}>{value}x</option>)}</select></label>
             <label className="space-y-1 text-sm font-medium">Juros<select value={creditHasInterest ? "com" : "sem"} onChange={(event) => setCreditHasInterest(event.target.value === "com")} className="h-10 w-full rounded-md border border-input bg-background px-3"><option value="sem">Sem juros</option><option value="com">Com juros</option></select></label>
+            {creditHasInterest && creditInstallments > 1 && <label className="col-span-2 space-y-1 text-sm font-medium">Juros do parcelamento (R$)<Input inputMode="numeric" value={interestInput} onChange={(event) => { const value = parseCurrencyInput(event.target.value); setInterestInput(formatCurrency(value)); if (localPaymentDialog) changeFinalAmount((localPaymentDialog.amount + parseCurrencyInput(surchargeInput) - parseCurrencyInput(discountInput) + value).toFixed(2), false); }} /><span className="block text-xs font-normal text-muted-foreground">Valor que fica com o salao. Nao entra no calculo de comissao.</span></label>}
           </div>}
           </div>
           <DialogFooter className="border-t border-border pt-4 flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
