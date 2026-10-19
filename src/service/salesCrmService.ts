@@ -52,6 +52,7 @@ export const SALES_ACTIVITY_TYPES = [
   "note_added",
   "responsible_changed",
   "next_action_changed",
+  "contact_status_changed",
 ] as const;
 export type SalesActivityTypeValue = (typeof SALES_ACTIVITY_TYPES)[number];
 
@@ -88,6 +89,7 @@ export const SALES_ACTIVITY_TYPE_LABELS: Record<SalesActivityTypeValue, string> 
   note_added: "Observação adicionada",
   responsible_changed: "Responsável alterado",
   next_action_changed: "Próxima ação alterada",
+  contact_status_changed: "Status do cliente alterado",
 };
 
 export function salesChannelLabel(channel: string) {
@@ -229,16 +231,21 @@ export interface SalesScript {
 
 export interface SalesDashboardSummary {
   newLeads: number;
+  approached: number;
+  responded: number;
   contacts: number;
   meetingsScheduled: number;
   meetingsHeld: number;
   won: number;
   lost: number;
+  avgDaysToClose: number | null;
 }
 
 // Coorte: leads criados no período, com o resultado que têm hoje.
 export interface SalesDashboardCohortStats {
   leads: number;
+  approached: number;
+  responded: number;
   meetingsScheduled: number;
   meetingsHeld: number;
   won: number;
@@ -248,7 +255,6 @@ export interface SalesDashboardCohortStats {
 export interface SalesDashboardResponsibleRow extends SalesDashboardSummary {
   responsibleId: string;
   responsibleName: string;
-  avgDaysToClose: number | null;
 }
 
 export interface SalesDashboard {
@@ -256,7 +262,7 @@ export interface SalesDashboard {
   milestones: { meetingScheduled: boolean; meetingHeld: boolean };
   summary: SalesDashboardSummary;
   previousSummary: SalesDashboardSummary;
-  funnel: { created: number; contacted: number; meetingsScheduled: number; meetingsHeld: number; won: number };
+  funnel: { created: number; approached: number; responded: number; meetingsScheduled: number; meetingsHeld: number; won: number };
   byScript: Array<SalesDashboardCohortStats & { scriptId: string | null; scriptName: string | null }>;
   byChannel: Array<SalesDashboardCohortStats & { channel: string }>;
   byResponsible?: SalesDashboardResponsibleRow[];
