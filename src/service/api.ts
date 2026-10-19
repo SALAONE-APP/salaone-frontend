@@ -1,6 +1,15 @@
 import axios from "axios";
 import { env } from "../config/env";
 
+export type SalonAccessCode = "SALON_BLOCKED" | "TRIAL_EXPIRED";
+
+export function clearSession() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("user");
+  localStorage.removeItem("salon");
+}
+
 const api = axios.create({
   baseURL: env.API_URL,
 });
@@ -46,11 +55,19 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    const accessCode = error?.response?.data?.code as SalonAccessCode | undefined;
+    if (error?.response?.status === 403 && accessCode && window.location.pathname !== "/login") {
+      if (accessCode === "SALON_BLOCKED") {
+        clearSession();
+        if (window.location.pathname !== "/access-suspended") window.location.replace("/access-suspended");
+      }
+      if (accessCode === "TRIAL_EXPIRED" && window.location.pathname !== "/trial-expired") {
+        window.location.replace("/trial-expired");
+      }
+    }
+
     if (error?.response?.status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("refreshToken");
-      localStorage.removeItem("user");
-      localStorage.removeItem("salon");
+      clearSession();
 
       if (window.location.pathname !== "/login") {
         window.location.replace("/login");
