@@ -95,6 +95,13 @@ export async function registerServiceTabPayment(tabId: string, data: {
   return response.data;
 }
 
+export async function registerServiceTabSplitPayment(tabId: string, data: {
+  parts: Array<{ method: Exclude<PaymentMethod, "local" | "subscription">; amount: number; installments?: number | null; hasInterest?: boolean | null; interestAmount?: number }>;
+}) {
+  const response = await api.post<PaymentRecord>(`/service-tabs/${tabId}/payments/split`, data);
+  return response.data;
+}
+
 export interface ListPaymentsParams {
   userId?: string;
   status?: PaymentStatus;
@@ -189,7 +196,7 @@ export async function listAllPayments(params: ListPaymentsParams = {}): Promise<
 
 export async function updatePayment(
   payment: Pick<PaymentRecord, "id" | "appointmentId">,
-  data: { status?: PaymentStatus; method?: PaymentMethod; amount?: number; discountAmount?: number | null; adjustmentNote?: string | null; installments?: number | null; hasInterest?: boolean | null; interestAmount?: number; paidAt?: string; noShow?: boolean },
+  data: { status?: PaymentStatus; method?: PaymentMethod; amount?: number; discountAmount?: number | null; adjustmentNote?: string | null; installments?: number | null; isInstallment?: boolean; hasInterest?: boolean | null; interestAmount?: number; paidAt?: string; noShow?: boolean },
 ) {
   const response = await api.patch<PaymentRecord>(`/payments/${payment.id}`, data);
 
@@ -200,6 +207,7 @@ export interface SplitPaymentPart {
   method: Exclude<PaymentMethod, "local" | "subscription">;
   amount: number;
   installments?: number | null;
+  isInstallment?: boolean;
   hasInterest?: boolean | null;
   interestAmount?: number;
 }
