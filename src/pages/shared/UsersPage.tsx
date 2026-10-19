@@ -76,6 +76,7 @@ import {
   type Professional,
 } from "@/service/professionalService";
 import { listServices, type Service } from "@/service/serviceService";
+import { cacheServiceCommissionRule, getCachedServiceCommissionRule, getSettings, hasCachedServiceCommissionRule, type ServiceCommissionRule } from "@/service/settingsService";
 
 type UserRole = NonNullable<ListUsersParams["role"]>;
 type ManagedUserRole = Exclude<UserRole, "client">;
@@ -143,6 +144,7 @@ interface UserFormState {
   salary: string;
   commissionPercent: string;
   serviceIds: string[];
+  serviceCommissions: Record<string, string>;
 }
 
 const emptyForm: UserFormState = {
@@ -158,6 +160,7 @@ const emptyForm: UserFormState = {
   salary: "",
   commissionPercent: "",
   serviceIds: [],
+  serviceCommissions: {},
 };
 
 const roleLabels: Record<UserRole, string> = {
@@ -309,6 +312,7 @@ function userToForm(user: UserProfile, professional?: Professional | null): User
     salary: user.salary != null ? maskCurrency(String(Math.round(user.salary * 100))) : "",
     commissionPercent: professional?.commissionPercent != null ? String(professional.commissionPercent) : "",
     serviceIds: professional?.serviceIds ?? [],
+    serviceCommissions: Object.fromEntries(Object.entries(professional?.serviceCommissions ?? {}).map(([serviceId, value]) => [serviceId, value == null ? "" : String(value)])),
   };
 }
 
@@ -320,9 +324,21 @@ export function UsersPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [serviceCommissionRule, setServiceCommissionRule] = useState<ServiceCommissionRule>(getCachedServiceCommissionRule);
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  useEffect(() => {
+    // A escolha feita na tela de Configurações é persistida imediatamente.
+    // Não a substitua por uma resposta antiga enquanto o PUT ainda conclui.
+    if (hasCachedServiceCommissionRule()) return;
+    getSettings().then((settings) => {
+      const rule = settings.serviceCommissionRule ?? 'SERVICE_DEFAULT';
+      setServiceCommissionRule(rule);
+      cacheServiceCommissionRule(rule);
+    }).catch(() => undefined);
+  }, []);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [form, setForm] = useState<UserFormState>(emptyForm);
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
@@ -513,12 +529,17 @@ export function UsersPage() {
     const commissionValue = form.commissionPercent !== ""
       ? Math.min(100, Math.max(0, parseInt(form.commissionPercent, 10)))
       : null;
+    const serviceCommissions = form.serviceIds.map((serviceId) => {
+      const raw = form.serviceCommissions[serviceId] ?? "";
+      const parsed = raw === "" ? null : Math.min(100, Math.max(0, Number(raw)));
+      return { serviceId, commissionPercent: Number.isFinite(parsed as number) ? parsed : null };
+    });
 
     setSaving(true);
 
     try {
       if (editingUser) {
-        await updateUser(editingUser.id, {
+        const updateUserRequest = updateUser(editingUser.id, {
           ...payload,
           resetPassword: form.resetPassword,
           newPassword: form.resetPassword ? form.password.trim() : undefined,
@@ -529,12 +550,19 @@ export function UsersPage() {
             displayName: form.name.trim(),
             commissionPercent: commissionValue,
             serviceIds: form.serviceIds,
+            serviceCommissions,
           };
           if (editingProfessional) {
-            await updateProfessional(editingProfessional.id, professionalData);
+            await Promise.all([
+              updateUserRequest,
+              updateProfessional(editingProfessional.id, professionalData),
+            ]);
           } else {
+            await updateUserRequest;
             await createProfessional({ ...professionalData, userId: editingUser.platformUserId ?? editingUser.id });
           }
+        } else {
+          await updateUserRequest;
         }
 
         toast.success("Funcionario atualizado.");
@@ -549,6 +577,7 @@ export function UsersPage() {
             displayName: form.name.trim(),
             commissionPercent: commissionValue,
             serviceIds: form.serviceIds,
+            serviceCommissions,
             userId: created.platformUserId ?? created.id,
           });
         }
@@ -557,7 +586,9 @@ export function UsersPage() {
       }
 
       setDialogOpen(false);
-      await loadUsers();
+      // A lista não precisa bloquear o fechamento do modal: a alteração já foi
+      // confirmada pelas APIs acima. Atualizamos os dados em segundo plano.
+      void loadUsers();
     } catch (err) {
       toast.error(getApiMessage(err));
     } finally {
@@ -1087,6 +1118,13 @@ export function UsersPage() {
                                     ? [...form.serviceIds, service.id]
                                     : form.serviceIds.filter((id) => id !== service.id),
                                 );
+                                if (!checked) {
+                                  setForm((current) => {
+                                    const serviceCommissions = { ...current.serviceCommissions };
+                                    delete serviceCommissions[service.id];
+                                    return { ...current, serviceCommissions };
+                                  });
+                                }
                               }}
                             />
                             <div className="min-w-0">
@@ -1097,6 +1135,30 @@ export function UsersPage() {
                                 </p>
                               )}
                             </div>
+                            {serviceCommissionRule === 'EMPLOYEE_SERVICE' && form.serviceIds.includes(service.id) && (
+                              <div className="ml-auto flex items-center gap-1" onClick={(event) => event.preventDefault()}>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="0.01"
+                                  value={form.serviceCommissions[service.id] ?? ''}
+                                  onChange={(event) => {
+                                    const value = event.target.value;
+                                    if (value === '' || (Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 100)) {
+                                      setForm((current) => ({
+                                        ...current,
+                                        serviceCommissions: { ...current.serviceCommissions, [service.id]: value },
+                                      }));
+                                    }
+                                  }}
+                                  placeholder="%"
+                                  className="h-8 w-20"
+                                  aria-label={`Comissão de ${service.name}`}
+                                />
+                                <span className="text-xs text-muted-foreground">%</span>
+                              </div>
+                            )}
                           </label>
                         ))}
                       </div>
