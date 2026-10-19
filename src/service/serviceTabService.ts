@@ -108,3 +108,10 @@ export async function registerServiceTabPayment(tabId: string, data: {
   const response = await api.post<ServiceTab>(`/service-tabs/${tabId}/payments`, data);
   return response.data;
 }
+
+export async function registerServiceTabSplitPayment(tabId: string, data: {
+  parts: Array<{ method: "pix" | "debito" | "credito" | "dinheiro"; amount: number; installments?: number; hasInterest?: boolean; interestAmount?: number }>;
+}) {
+  const response = await api.post<ServiceTab>(`/service-tabs/${tabId}/payments/split`, data);
+  return response.data;
+}

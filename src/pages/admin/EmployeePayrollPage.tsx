@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import type { DateRange } from "react-day-picker";
 import {
   Banknote,
   Calendar,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
   Download,
   Eye,
   Filter,
@@ -38,6 +39,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   createEmployeePayment,
   createEmployeeVale,
@@ -85,6 +93,48 @@ function monthRange() {
     start: toDateInput(start),
     end: toDateInput(end),
   };
+}
+
+function getPeriodEnd(start: Date, frequency: PaymentFrequency): Date {
+  if (frequency === "weekly") return new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+  if (frequency === "biweekly") {
+    return start.getDate() === 1
+      ? new Date(start.getFullYear(), start.getMonth(), 15)
+      : new Date(start.getFullYear(), start.getMonth() + 1, 0);
+  }
+  return new Date(start.getFullYear(), start.getMonth() + 1, 0);
+}
+
+function getInitialPeriodStart(frequency: PaymentFrequency): Date {
+  const now = new Date();
+  if (frequency === "weekly") {
+    const mondayOffset = (now.getDay() + 6) % 7;
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset);
+  }
+  if (frequency === "biweekly") return new Date(now.getFullYear(), now.getMonth(), now.getDate() <= 15 ? 1 : 16);
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+function goPreviousPeriod(start: Date, frequency: PaymentFrequency): Date {
+  if (frequency === "weekly") return new Date(start.getFullYear(), start.getMonth(), start.getDate() - 7);
+  if (frequency === "biweekly") return start.getDate() === 1
+    ? new Date(start.getFullYear(), start.getMonth() - 1, 16)
+    : new Date(start.getFullYear(), start.getMonth(), 1);
+  return new Date(start.getFullYear(), start.getMonth() - 1, 1);
+}
+
+function goNextPeriod(start: Date, frequency: PaymentFrequency): Date {
+  if (frequency === "weekly") return new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
+  if (frequency === "biweekly") return start.getDate() === 1
+    ? new Date(start.getFullYear(), start.getMonth(), 16)
+    : new Date(start.getFullYear(), start.getMonth() + 1, 1);
+  return new Date(start.getFullYear(), start.getMonth() + 1, 1);
+}
+
+function formatPeriodLabel(start: Date, end: Date, frequency: PaymentFrequency): string {
+  if (frequency === "monthly") return start.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const formatDay = (date: Date) => date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+  return `${formatDay(start)} a ${formatDay(end)}`;
 }
 
 function toDateInput(date: Date) {
@@ -199,6 +249,8 @@ export function EmployeePayrollPage() {
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [periodStart, setPeriodStart] = useState(initialRange.start);
   const [periodEnd, setPeriodEnd] = useState(initialRange.end);
+  const [periodFrequency, setPeriodFrequency] = useState<PaymentFrequency>("monthly");
+  const [monthCalendarOpen, setMonthCalendarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -222,17 +274,18 @@ export function EmployeePayrollPage() {
       .then(setPaymentFrequency)
       .catch(() => {});
   }, []);
-  const periodStartDate = dateStringToDate(periodStart);
-  const periodEndDate = dateStringToDate(periodEnd);
+  const periodStartDate = dateStringToDate(periodStart) ?? getInitialPeriodStart(periodFrequency);
+  const periodEndDate = dateStringToDate(periodEnd) ?? getPeriodEnd(periodStartDate, periodFrequency);
 
-  function handlePeriodRangeChange(range?: DateRange) {
-    if (range?.from) {
-      setPeriodStart(toDateInput(range.from));
-    }
+  function setPayrollPeriod(start: Date, frequency = periodFrequency) {
+    setPeriodStart(toDateInput(start));
+    setPeriodEnd(toDateInput(getPeriodEnd(start, frequency)));
+  }
 
-    if (range?.to) {
-      setPeriodEnd(toDateInput(range.to));
-    }
+  function handlePeriodFrequencyChange(frequency: PaymentFrequency) {
+    setPeriodFrequency(frequency);
+    setPayrollPeriod(getInitialPeriodStart(frequency), frequency);
+    setMonthCalendarOpen(frequency === "monthly");
   }
 
   const loadPayroll = useCallback(async () => {
@@ -488,14 +541,42 @@ export function EmployeePayrollPage() {
                 className="h-9 w-full bg-secondary pl-9 text-sm lg:w-56"
               />
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <AppCalendar
-                mode="range"
-                rangeValue={{ from: periodStartDate, to: periodEndDate }}
-                onRangeChange={handlePeriodRangeChange}
-                placeholder="Periodo"
-                className="h-9 rounded-md text-sm sm:w-64"
-              />
+            <div className="flex items-center gap-1.5 rounded-md border border-border bg-background p-1">
+              {periodFrequency === "monthly" ? (
+                <AppCalendar
+                  value={periodStartDate}
+                  onChange={(date) => {
+                    if (date) setPayrollPeriod(new Date(date.getFullYear(), date.getMonth(), 1));
+                  }}
+                  open={monthCalendarOpen}
+                  onOpenChange={setMonthCalendarOpen}
+                  placeholder="Escolher mês"
+                  className="h-8 w-[142px] rounded-md border-0 bg-transparent px-2 text-xs shadow-none"
+                />
+              ) : (
+                <div className="min-w-[132px] px-2">
+                  <p className="text-[11px] leading-4 text-muted-foreground">Período</p>
+                  <p className="truncate text-xs font-medium text-foreground" title={`${formatDate(periodStart)} a ${formatDate(periodEnd)}`}>
+                    {formatPeriodLabel(periodStartDate, periodEndDate, periodFrequency)}
+                  </p>
+                </div>
+              )}
+              <Select value={periodFrequency} onValueChange={(value) => handlePeriodFrequencyChange(value as PaymentFrequency)}>
+                <SelectTrigger className="h-8 w-[105px] border-0 bg-transparent text-xs shadow-none focus:ring-0" aria-label="Filtrar pagamentos por período">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="weekly">Semana</SelectItem>
+                  <SelectItem value="biweekly">Quinzena</SelectItem>
+                  <SelectItem value="monthly">Mês</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPayrollPeriod(goPreviousPeriod(periodStartDate, periodFrequency))} aria-label="Período anterior">
+                <ChevronLeft size={16} />
+              </Button>
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPayrollPeriod(goNextPeriod(periodStartDate, periodFrequency))} aria-label="Próximo período">
+                <ChevronRight size={16} />
+              </Button>
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

@@ -43,6 +43,7 @@ import { useTableSelection } from "@/hooks/useTableSelection";
 import {
   listAllPayments,
   registerServiceTabPayment,
+  registerServiceTabSplitPayment,
   splitPayment,
   updatePayment,
   type PaymentMethod,
@@ -57,7 +58,7 @@ type ApiPaymentWithType = PaymentRecord & { paymentType: PaymentType | "extra" }
 type StatusFilter = "all" | "confirmed" | PaymentStatus;
 type TypeFilter = "all" | PaymentType;
 type SplitMethod = "pix" | "debito" | "credito" | "dinheiro";
-type SplitPart = { method: SplitMethod; amount: string; installments?: number; hasInterest?: boolean };
+type SplitPart = { method: SplitMethod; amount: string; installments?: number; hasInterest?: boolean; interestAmount?: string };
 const MAX_ADJUSTMENT_NOTE_LENGTH = 200;
 // Os meios abaixo são exclusivos do recebimento presencial no painel.
 // Eles não dependem dos meios habilitados para o checkout online.
@@ -438,10 +439,6 @@ export function PaymentsPage() {
       return;
     }
     const hasAdjustment = !isServiceTabPayment && (parseCurrencyInput(discountInput) > 0 || parseCurrencyInput(surchargeInput) > 0);
-    if (hasAdjustment && !adjustmentNote.trim()) {
-      toast.error("Informe a observacao do desconto ou acrescimo.");
-      return;
-    }
     setLocalPaymentDialog(null);
     setUpdatingId(payment.id);
     try {
@@ -463,6 +460,7 @@ export function PaymentsPage() {
           discountAmount: Math.max(0, payment.amount - finalAmount),
           adjustmentNote: hasAdjustment ? adjustmentNote.trim() : null,
           installments: selectedLocalMethod === "credito" ? creditInstallments : null,
+          isInstallment: selectedLocalMethod === "credito" && creditInstallments > 1,
           hasInterest: selectedLocalMethod === "credito" ? creditHasInterest : null,
           interestAmount,
           paidAt: new Date().toISOString(),
@@ -533,23 +531,35 @@ export function PaymentsPage() {
       toast.error("A soma das partes deve ser igual ao valor do pagamento.");
       return;
     }
-    const hasAdjustment = parseCurrencyInput(discountInput) > 0 || parseCurrencyInput(surchargeInput) > 0;
-    if (hasAdjustment && !adjustmentNote.trim()) {
-      toast.error("Informe a observacao do desconto ou acrescimo.");
+    const hasInvalidInterest = splitParts.some((part) => {
+      const interest = parseCurrencyInput(part.interestAmount ?? "");
+      const amount = Number(part.amount.replace(",", ".")) || 0;
+      return interest > amount || (interest > 0 && (part.method !== "credito" || (part.installments ?? 1) <= 1 || !part.hasInterest));
+    });
+    if (hasInvalidInterest) {
+      toast.error("Informe juros válidos somente na parcela de crédito com juros.");
       return;
     }
+    const hasAdjustment = parseCurrencyInput(discountInput) > 0 || parseCurrencyInput(surchargeInput) > 0;
     const payment = localPaymentDialog;
     setLocalPaymentDialog(null);
     setUpdatingId(payment.id);
     try {
-      await splitPayment(payment.id, splitParts.map((part) => ({
+      const parts = splitParts.map((part) => ({
         method: part.method,
         amount: Number(part.amount.replace(",", ".")),
         installments: part.method === "credito" ? part.installments ?? 1 : null,
+        isInstallment: part.method === "credito" && (part.installments ?? 1) > 1,
         hasInterest: part.method === "credito" ? part.hasInterest ?? false : null,
-        interestAmount: 0,
-      })), finalAmount, discountAmount, hasAdjustment ? adjustmentNote.trim() : null, new Date().toISOString());
-      toast.success("Pagamento dividido confirmado.");
+        interestAmount: parseCurrencyInput(part.interestAmount ?? ""),
+      }));
+      if (isServiceTabPayment) {
+        await registerServiceTabSplitPayment(payment.serviceTab!.id, { parts });
+        toast.success("Pagamento dividido da comanda confirmado.");
+      } else {
+        await splitPayment(payment.id, parts, finalAmount, discountAmount, hasAdjustment ? adjustmentNote.trim() : null, new Date().toISOString());
+        toast.success("Pagamento dividido confirmado.");
+      }
       await loadPayments();
     } catch (err) {
       toast.error(getApiMessage(err));
@@ -993,7 +1003,7 @@ export function PaymentsPage() {
               </div>
             </div>
           </div>
-          {!isServiceTabPayment && (parseCurrencyInput(discountInput) > 0 || parseCurrencyInput(surchargeInput) > 0) && (
+          {!isServiceTabPayment && (
             <div className="space-y-1.5">
               <label htmlFor="payment-adjustment-note" className="text-xs font-medium text-muted-foreground">
                 Observacao do ajuste
@@ -1006,8 +1016,9 @@ export function PaymentsPage() {
                 rows={3}
                 placeholder="Explique o motivo do desconto ou acrescimo."
               />
-              <p className="text-right text-xs text-muted-foreground">
-                {adjustmentNote.length}/{MAX_ADJUSTMENT_NOTE_LENGTH}
+              <p className="text-xs text-muted-foreground">
+                Opcional. Use para registrar o motivo do desconto ou acrescimo.
+                <span className="float-right">{adjustmentNote.length}/{MAX_ADJUSTMENT_NOTE_LENGTH}</span>
               </p>
             </div>
           )}
@@ -1037,7 +1048,7 @@ export function PaymentsPage() {
                     <label className="text-xs text-muted-foreground">Forma</label>
                     <select
                       value={part.method}
-                      onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, method: event.target.value as SplitMethod, installments: event.target.value === "credito" ? item.installments ?? 1 : undefined, hasInterest: event.target.value === "credito" ? item.hasInterest ?? false : undefined } : item))}
+                      onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, method: event.target.value as SplitMethod, installments: event.target.value === "credito" ? item.installments ?? 1 : undefined, hasInterest: event.target.value === "credito" ? item.hasInterest ?? false : undefined, interestAmount: event.target.value === "credito" ? item.interestAmount ?? "" : undefined } : item))}
                       className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                     >
                       <option value="dinheiro">Dinheiro</option><option value="pix">PIX</option>
@@ -1045,8 +1056,9 @@ export function PaymentsPage() {
                     </select>
                   </div>
                   {part.method === "credito" && <div className="col-span-2 grid grid-cols-2 gap-2 rounded-md bg-secondary/50 p-2 text-xs sm:col-span-3">
-                    <label>Parcelas<select value={part.installments ?? 1} onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, installments: Number(event.target.value) } : item))} className="mt-1 h-8 w-full rounded border border-input bg-background px-2"><option value={1}>À vista</option>{Array.from({ length: 11 }, (_, value) => value + 2).map((value) => <option key={value} value={value}>{value}x</option>)}</select></label>
+                    <label>Parcelas<select value={part.installments ?? 1} onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, installments: Number(event.target.value), hasInterest: Number(event.target.value) > 1 ? item.hasInterest : false, interestAmount: Number(event.target.value) > 1 ? item.interestAmount : "" } : item))} className="mt-1 h-8 w-full rounded border border-input bg-background px-2"><option value={1}>À vista</option>{Array.from({ length: 11 }, (_, value) => value + 2).map((value) => <option key={value} value={value}>{value}x</option>)}</select></label>
                     <label>Juros<select value={part.hasInterest ? "com" : "sem"} onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, hasInterest: event.target.value === "com" } : item))} className="mt-1 h-8 w-full rounded border border-input bg-background px-2"><option value="sem">Sem juros</option><option value="com">Com juros</option></select></label>
+                    {part.hasInterest && (part.installments ?? 1) > 1 && <label className="col-span-2 text-xs sm:col-span-3">Juros do parcelamento (R$)<Input className="mt-1 h-8" inputMode="decimal" value={part.interestAmount ?? ""} onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, interestAmount: formatCurrency(parseCurrencyInput(event.target.value)) } : item))} /><span className="mt-1 block text-[11px] text-muted-foreground">Fica com o salão e não entra na comissão.</span></label>}
                   </div>}
                   <div className="min-w-0 space-y-1">
                     <label className="text-xs text-muted-foreground">Valor</label>
@@ -1083,7 +1095,7 @@ export function PaymentsPage() {
             <Button className="w-full sm:w-auto" variant="outline" onClick={() => setLocalPaymentDialog(null)}>
               Cancelar
             </Button>
-            {!isServiceTabPayment && splitParts.length === 1 && (
+            {splitParts.length === 1 && (
               <Button className="w-full sm:w-auto" variant="outline" onClick={() => {
                 const half = finalAmount / 2;
                 setSplitParts([{ method: selectedLocalMethod as SplitMethod, amount: half.toFixed(2) }, { method: "pix", amount: (finalAmount - half).toFixed(2) }]);

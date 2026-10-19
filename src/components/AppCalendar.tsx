@@ -28,6 +28,8 @@ interface AppCalendarProps {
   rangeStart?: Date;
   rangeEnd?: Date;
   popoverPortal?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 const months = [
@@ -66,15 +68,18 @@ export function AppCalendar({
   rangeStart,
   rangeEnd,
   popoverPortal = true,
+  open,
+  onOpenChange,
 }: AppCalendarProps) {
   const today = new Date();
 
   const [month, setMonth] = useState<Date>(today);
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const [openMonth, setOpenMonth] = useState(false);
   const [openYear, setOpenYear] = useState(false);
   const [draftRange, setDraftRange] = useState<DateRange | undefined>(undefined);
   const isRangeMode = mode === "range";
+  const isOpen = open ?? uncontrolledOpen;
   const selectedRange = rangeValue ?? { from: rangeStart, to: rangeEnd };
   const displayValue =
     isRangeMode && selectedRange.from
@@ -129,8 +134,13 @@ export function AppCalendar({
     (month.getFullYear() === today.getFullYear() && month.getMonth() >= today.getMonth())
   );
 
+  function setCalendarOpen(nextOpen: boolean) {
+    setUncontrolledOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+  }
+
   function handleOpenChange(nextOpen: boolean) {
-    setOpen(nextOpen);
+    setCalendarOpen(nextOpen);
     setOpenMonth(false);
     setOpenYear(false);
     if (nextOpen) {
@@ -144,7 +154,7 @@ export function AppCalendar({
     onChange?.(date);
     if (date) {
       setMonth(date);
-      setOpen(false);
+      setCalendarOpen(false);
     }
   }
 
@@ -153,7 +163,7 @@ export function AppCalendar({
     if (range?.from) setMonth(range.from);
     if (range?.from && range?.to) {
       onRangeChange?.(range);
-      setOpen(false);
+      setCalendarOpen(false);
     }
   }
 
@@ -191,7 +201,7 @@ export function AppCalendar({
   }
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
+    <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -429,3 +439,4 @@ export function AppCalendar({
     </Popover>
   );
 }
+
