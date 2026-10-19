@@ -4,6 +4,31 @@ export type BookingPaymentMethod = "cartao" | "pix" | "local";
 export type PaymentFrequency = "weekly" | "biweekly" | "monthly";
 export type SubscriptionProfessionalRule = "fixed" | "free_choice";
 export type CommissionRuleType = "FIXED_PROFESSIONAL" | "FREE_PROFESSIONAL";
+export type ServiceCommissionRule = "SERVICE_DEFAULT" | "EMPLOYEE_SERVICE";
+
+function serviceCommissionRuleCacheKey() {
+  try {
+    const salon = JSON.parse(localStorage.getItem("salon") ?? "{}") as { id?: string };
+    return `salaone:service-commission-rule:${salon.id ?? "current"}`;
+  } catch {
+    return "salaone:service-commission-rule:current";
+  }
+}
+
+export function getCachedServiceCommissionRule(): ServiceCommissionRule {
+  return localStorage.getItem(serviceCommissionRuleCacheKey()) === "EMPLOYEE_SERVICE"
+    ? "EMPLOYEE_SERVICE"
+    : "SERVICE_DEFAULT";
+}
+
+export function hasCachedServiceCommissionRule() {
+  const value = localStorage.getItem(serviceCommissionRuleCacheKey());
+  return value === "SERVICE_DEFAULT" || value === "EMPLOYEE_SERVICE";
+}
+
+export function cacheServiceCommissionRule(rule: ServiceCommissionRule) {
+  localStorage.setItem(serviceCommissionRuleCacheKey(), rule);
+}
 
 export interface Settings {
   pixKey: string;
@@ -15,6 +40,7 @@ export interface Settings {
   commission_rule_type?: CommissionRuleType;
   commissionPoolPercent?: number;
   commission_pool_percent?: number;
+  serviceCommissionRule?: ServiceCommissionRule;
 }
 
 export interface UpdateSettingsPayload {
@@ -24,6 +50,7 @@ export interface UpdateSettingsPayload {
   hiddenBookingPaymentMethods: BookingPaymentMethod[];
   subscriptionProfessionalRule?: SubscriptionProfessionalRule;
   commissionPoolPercent?: number;
+  serviceCommissionRule?: ServiceCommissionRule;
 }
 
 interface HomeInfoSettingsResponse {
@@ -66,8 +93,17 @@ export async function updateSettings(data: UpdateSettingsPayload) {
     hiddenBookingPaymentMethods: data.hiddenBookingPaymentMethods,
     subscriptionProfessionalRule: data.subscriptionProfessionalRule ?? "fixed",
     commissionPoolPercent: data.commissionPoolPercent,
+    serviceCommissionRule: data.serviceCommissionRule,
   });
 
+  return response.data;
+}
+
+export async function updateServiceCommissionRule(serviceCommissionRule: ServiceCommissionRule) {
+  const response = await api.patch<{ serviceCommissionRule: ServiceCommissionRule }>(
+    "/settings/service-commission-rule",
+    { serviceCommissionRule },
+  );
   return response.data;
 }
 

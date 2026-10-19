@@ -55,12 +55,16 @@ import {
 } from '../../service/uploadService';
 import {
   getPaymentFrequencySettings,
+  cacheServiceCommissionRule,
+  getCachedServiceCommissionRule,
   getSettings,
   type BookingPaymentMethod,
   type PaymentFrequency,
   type Settings,
   type SubscriptionProfessionalRule,
+  type ServiceCommissionRule,
   updatePaymentFrequencySettings,
+  updateServiceCommissionRule,
   updateSettings,
 } from '../../service/settingsService';
 import { changePassword, updateProfilePhoto } from '../../service/userService';
@@ -275,6 +279,9 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   const [isLoadingPaymentSettings, setIsLoadingPaymentSettings] = useState(false);
   const [isSavingPaymentSettings, setIsSavingPaymentSettings] = useState(false);
   const [subscriptionProfessionalRule, setSubscriptionProfessionalRule] = useState<SubscriptionProfessionalRule>('fixed');
+  const [serviceCommissionRule, setServiceCommissionRule] = useState<ServiceCommissionRule>(getCachedServiceCommissionRule);
+  const [isSavingServiceCommissionRule, setIsSavingServiceCommissionRule] = useState(false);
+  const serviceCommissionRuleRequestRef = useRef(0);
   const [hasLoadedProfessionalRule, setHasLoadedProfessionalRule] = useState(false);
   const salon = useMemo(() => getStoredSalon(), []);
   const isSuperAdminAccess = user?.role === 'super_admin' && Boolean(salonAccess);
@@ -502,6 +509,12 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
         const settingsData = await getSettings();
         if (!isMounted) return;
         setSubscriptionProfessionalRule(settingsData.subscriptionProfessionalRule ?? 'fixed');
+        // Do not let a slow initial request overwrite a choice already made by the user.
+        if (serviceCommissionRuleRequestRef.current === 0) {
+          const loadedRule = settingsData.serviceCommissionRule ?? 'SERVICE_DEFAULT';
+          setServiceCommissionRule(loadedRule);
+          cacheServiceCommissionRule(loadedRule);
+        }
         setSettings(settingsData);
         setHasLoadedProfessionalRule(true);
       } catch {
@@ -962,6 +975,11 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   }
 
   function updatePaymentMethod(method: BookingPaymentMethod, enabled: boolean) {
+    const onlineMethod = method === 'cartao' || method === 'pix';
+    if (enabled && onlineMethod && pagarmeRecipientStatus?.toLowerCase() !== 'active') {
+      toast.error('Para ativar pagamentos online, conclua seu cadastro no Pagar.me.');
+      return;
+    }
     setPaymentMethods((current) => ({
       ...current,
       [method]: enabled,
@@ -972,6 +990,30 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
     return (Object.entries(paymentMethods) as Array<[BookingPaymentMethod, boolean]>)
       .filter(([, enabled]) => !enabled)
       .map(([method]) => method);
+  }
+
+  async function saveServiceCommissionRule(nextRule: ServiceCommissionRule) {
+    if (nextRule === serviceCommissionRule || isSavingServiceCommissionRule) return;
+    const requestId = ++serviceCommissionRuleRequestRef.current;
+    const previousRule = serviceCommissionRule;
+    setServiceCommissionRule(nextRule);
+    cacheServiceCommissionRule(nextRule);
+    setIsSavingServiceCommissionRule(true);
+    try {
+      const updated = await updateServiceCommissionRule(nextRule);
+      if (requestId !== serviceCommissionRuleRequestRef.current) return;
+      const savedRule = updated.serviceCommissionRule;
+      setServiceCommissionRule(savedRule);
+      cacheServiceCommissionRule(savedRule);
+      toast.success('Regra de comissão atualizada. Ela será aplicada aos novos atendimentos.');
+    } catch (error) {
+      if (requestId !== serviceCommissionRuleRequestRef.current) return;
+      setServiceCommissionRule(previousRule);
+      cacheServiceCommissionRule(previousRule);
+      toast.error(getApiErrorMessage(error) || 'Não foi possível atualizar a regra de comissão.');
+    } finally {
+      if (requestId === serviceCommissionRuleRequestRef.current) setIsSavingServiceCommissionRule(false);
+    }
   }
 
   function updateRecipientField<K extends keyof typeof recipientForm>(field: K, value: typeof recipientForm[K]) {
@@ -1536,6 +1578,34 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
 
         {/* General Settings */}
         <TabsContent value="general" className="space-y-6">
+          <div className="bg-card rounded-xl border border-border p-6">
+            <h3 className="text-lg font-medium text-foreground">Regra de comissão de serviços</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Escolha como a comissão dos novos atendimentos será definida. Atendimentos já realizados não são alterados.
+            </p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <button
+                type="button"
+                aria-pressed={serviceCommissionRule === 'SERVICE_DEFAULT'}
+                disabled={isSavingServiceCommissionRule}
+                onClick={() => saveServiceCommissionRule('SERVICE_DEFAULT')}
+                className={`rounded-lg border p-4 text-left transition-colors disabled:cursor-wait disabled:opacity-70 ${serviceCommissionRule === 'SERVICE_DEFAULT' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/60'}`}
+              >
+                <p className="font-medium text-foreground">Comissão padrão</p>
+                <p className="mt-1 text-xs text-muted-foreground">Usa a comissão do serviço; sem ela, usa a comissão padrão do profissional.</p>
+              </button>
+              <button
+                type="button"
+                aria-pressed={serviceCommissionRule === 'EMPLOYEE_SERVICE'}
+                disabled={isSavingServiceCommissionRule}
+                onClick={() => saveServiceCommissionRule('EMPLOYEE_SERVICE')}
+                className={`rounded-lg border p-4 text-left transition-colors disabled:cursor-wait disabled:opacity-70 ${serviceCommissionRule === 'EMPLOYEE_SERVICE' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/60'}`}
+              >
+                <p className="font-medium text-foreground">Por profissional e serviço</p>
+                <p className="mt-1 text-xs text-muted-foreground">Permite informar um percentual diferente para cada serviço executado pelo profissional.</p>
+              </button>
+            </div>
+          </div>
           {canShareRegistrationLink && (
             <div className="bg-card rounded-xl border border-border p-6">
               <div className="mb-4 flex items-start gap-3">
@@ -2307,6 +2377,19 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
 
         {/* Payments */}
         <TabsContent value="payments" className="space-y-6">
+          {pagarmeRecipientStatus?.toLowerCase() !== 'active' && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+              <p className="font-medium">Pagamentos online indisponíveis</p>
+              <p className="mt-1">
+                {pagarmeRecipientId
+                  ? `Cadastro no Pagar.me: ${pagarmeRecipientStatus || 'em análise'}.`
+                  : 'Para ativar pagamentos online, conclua seu cadastro no Pagar.me.'}
+              </p>
+              <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setActiveTab('security')}>
+                Fazer cadastro
+              </Button>
+            </div>
+          )}
           <div className="bg-card rounded-xl border border-border p-6">
             <h3 className="text-lg font-medium text-foreground mb-4">Métodos de pagamento online</h3>
             <p className="mb-4 text-sm text-muted-foreground">
@@ -2347,7 +2430,7 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
                   <Switch
                     checked={paymentMethods[method.id]}
                     onCheckedChange={(checked) => updatePaymentMethod(method.id, checked)}
-                    disabled={isLoadingPaymentSettings || isSavingPaymentSettings}
+                    disabled={isLoadingPaymentSettings || isSavingPaymentSettings || ((method.id === 'cartao' || method.id === 'pix') && pagarmeRecipientStatus?.toLowerCase() !== 'active')}
                   />
                 </div>
                 );

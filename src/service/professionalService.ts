@@ -7,6 +7,7 @@ export interface Professional {
   photoUrl?: string | null;
   userId?: string | null;
   serviceIds?: string[];
+  serviceCommissions?: Record<string, number | null>;
   salarioFixo?: number | null;
   commissionPercent?: number | null;
 }
@@ -21,7 +22,7 @@ interface BackendEmployee {
   is_active?: boolean;
   platform_user_id?: string | null;
   commission_percent?: number | null;
-  employee_services?: Array<{ service_id: string }>;
+  employee_services?: Array<{ service_id: string; commission_percent?: number | null }>;
 }
 
 export interface ListProfessionalsResponse {
@@ -37,6 +38,7 @@ function normalizeProfessional(employee: BackendEmployee): Professional {
     displayName: employee.name,
     specialty: employee.job_title ?? null,
     serviceIds: employee.employee_services?.map((item) => item.service_id) ?? [],
+    serviceCommissions: Object.fromEntries((employee.employee_services ?? []).map((item) => [item.service_id, item.commission_percent ?? null])),
     userId: employee.platform_user_id ?? null,
     commissionPercent: employee.commission_percent ?? null,
   };
@@ -80,6 +82,7 @@ export interface CreateProfessionalPayload {
   displayName: string;
   commissionPercent?: number | null;
   serviceIds?: string[];
+  serviceCommissions?: Array<{ serviceId: string; commissionPercent?: number | null }>;
   userId: string;
   salarioFixo?: number | null;
 }
@@ -96,6 +99,7 @@ export async function createProfessional(data: CreateProfessionalPayload) {
   if (data.serviceIds) {
     await api.post(`/employees/${response.data.employee.id}/services`, {
       serviceIds: data.serviceIds,
+      serviceCommissions: data.serviceCommissions,
     });
   }
 
@@ -106,6 +110,7 @@ export interface UpdateProfessionalPayload {
   displayName?: string;
   commissionPercent?: number | null;
   serviceIds?: string[];
+  serviceCommissions?: Array<{ serviceId: string; commissionPercent?: number | null }>;
   salarioFixo?: number | null;
 }
 
@@ -116,7 +121,7 @@ export async function updateProfessional(id: string, data: UpdateProfessionalPay
   });
 
   if (data.serviceIds) {
-    await api.post(`/employees/${id}/services`, { serviceIds: data.serviceIds });
+    await api.post(`/employees/${id}/services`, { serviceIds: data.serviceIds, serviceCommissions: data.serviceCommissions });
   }
 
   return normalizeProfessional(response.data.employee);

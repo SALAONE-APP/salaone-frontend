@@ -1466,8 +1466,8 @@ export function ClientBookingsPage() {
         onClose={() => setChoiceOpen(false)}
         onChoose={handlePaymentChoice}
         summary={choiceSummary}
-        canPayCard={!allSelectedServicesCoveredByPlan && !hiddenPaymentMethods.includes("cartao")}
-        canPayPix={!allSelectedServicesCoveredByPlan && !hiddenPaymentMethods.includes("pix")}
+        canPayCard={!allSelectedServicesCoveredByPlan && salonProfile?.pagarmeRecipientStatus?.toLowerCase() === "active" && !hiddenPaymentMethods.includes("cartao")}
+        canPayPix={!allSelectedServicesCoveredByPlan && salonProfile?.pagarmeRecipientStatus?.toLowerCase() === "active" && !hiddenPaymentMethods.includes("pix")}
         canPayLocal={!allSelectedServicesCoveredByPlan && !hiddenPaymentMethods.includes("local")}
         canPaySubscription={allSelectedServicesCoveredByPlan}
       />
