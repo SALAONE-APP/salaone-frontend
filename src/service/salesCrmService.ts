@@ -20,7 +20,7 @@ export function isSalesProduct(value: string): value is SalesProduct {
 
 // Listas fechadas espelhando salesCrmSchemas.ts (backend) - validadas via Joi
 // contra string, não enum de banco, para poder evoluir sem migration.
-export const SALES_CHANNELS = ["instagram", "indicacao", "youtube", "google_meu_negocio", "outro"] as const;
+export const SALES_CHANNELS = ["instagram", "tiktok", "indicacao", "youtube", "google_meu_negocio", "outro"] as const;
 export type SalesChannel = (typeof SALES_CHANNELS)[number];
 
 export const SALES_LOST_REASONS = [
@@ -57,6 +57,7 @@ export type SalesActivityTypeValue = (typeof SALES_ACTIVITY_TYPES)[number];
 
 export const SALES_CHANNEL_LABELS: Record<SalesChannel, string> = {
   instagram: "Instagram",
+  tiktok: "TikTok",
   indicacao: "Indicação",
   youtube: "YouTube",
   google_meu_negocio: "Google Meu Negócio",
@@ -91,6 +92,11 @@ export const SALES_ACTIVITY_TYPE_LABELS: Record<SalesActivityTypeValue, string> 
 
 export function salesChannelLabel(channel: string) {
   return SALES_CHANNEL_LABELS[channel as SalesChannel] ?? channel;
+}
+
+// No card, um lead de canal "outro" mostra o canal que o vendedor descreveu.
+export function salesLeadChannelLabel(lead: Pick<SalesLead, "channel" | "channelOther">) {
+  return lead.channel === "outro" && lead.channelOther ? lead.channelOther : salesChannelLabel(lead.channel);
 }
 
 export function salesLostReasonLabel(reason: string) {
@@ -150,6 +156,7 @@ export interface SalesLead {
   instagramHandle: string | null;
   email: string | null;
   channel: string;
+  channelOther: string | null;
   stage: string;
   responsibleId: string;
   responsibleName: string | null;
@@ -287,6 +294,7 @@ export interface CreateSalesLeadInput {
   instagramHandle?: string | null;
   email?: string | null;
   channel: string;
+  channelOther?: string | null;
   responsibleId: string;
   scriptId?: string | null;
   contactStatus?: SalesContactStatus | null;
@@ -302,6 +310,7 @@ export interface UpdateSalesLeadInput {
   instagramHandle?: string | null;
   email?: string | null;
   channel?: string;
+  channelOther?: string | null;
   responsibleId?: string;
   scriptId?: string | null;
   contactStatus?: SalesContactStatus | null;
