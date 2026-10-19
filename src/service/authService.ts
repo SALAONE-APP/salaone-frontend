@@ -1,4 +1,4 @@
-import api from "./api";
+import api, { clearSession } from "./api";
 
 export const SUPER_ADMIN_ACCESS_STORAGE_KEY = "superAdminSalonAccess";
 
@@ -38,6 +38,7 @@ export interface AuthResponse {
   message?: string;
   requiresProfileCompletion?: boolean;
   created?: boolean;
+  accessStatus?: "ACTIVE" | "TRIAL_EXPIRED";
   user: {
     id: string;
     name: string;
@@ -60,6 +61,7 @@ interface BackendAuthResponse {
   token: string;
   user: AuthResponse["user"];
   memberships: SalonMembership[];
+  accessStatus?: AuthResponse["accessStatus"];
 }
 
 interface BackendSalon {
@@ -127,6 +129,7 @@ export async function login(data: LoginPayload): Promise<AuthResponse> {
     user,
     memberships: response.data.memberships,
     salon,
+    accessStatus: response.data.accessStatus,
   };
 }
 
@@ -161,10 +164,7 @@ export async function register(_data: RegisterPayload) {
 }
 
 export function logout() {
-  localStorage.removeItem("token");
-  localStorage.removeItem("refreshToken");
-  localStorage.removeItem("user");
-  localStorage.removeItem("salon");
+  clearSession();
   localStorage.removeItem(SUPER_ADMIN_ACCESS_STORAGE_KEY);
 }
 

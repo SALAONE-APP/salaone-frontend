@@ -31,10 +31,17 @@ export interface PlatformSubscription {
   accessBlockedAt?: string | null;
 }
 
+export function hasExpiredPlatformTrial(subscription: PlatformSubscription | null, now = new Date()): boolean {
+  if (!subscription?.trialEndsAt) return false;
+  const trialEndsAt = new Date(subscription.trialEndsAt);
+  return !Number.isNaN(trialEndsAt.getTime()) && trialEndsAt <= now;
+}
+
 export function hasActivePlatformSubscription(
   subscription: PlatformSubscription | null,
 ): boolean {
   if (!subscription) return false;
+  if (hasExpiredPlatformTrial(subscription)) return false;
 
   const status = String(subscription.status || '')
     .trim()

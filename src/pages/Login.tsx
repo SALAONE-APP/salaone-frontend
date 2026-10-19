@@ -46,7 +46,7 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [subscriptionBlocked, setSubscriptionBlocked] = useState(false);
+  const [accessBlocked, setAccessBlocked] = useState<"SALON_BLOCKED" | "TRIAL_EXPIRED" | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,14 +59,17 @@ export function Login() {
     try {
       setLoading(true);
       setErrorMessage("");
-      setSubscriptionBlocked(false);
+      setAccessBlocked(null);
       const loggedUser = await login(email.trim(), password);
+      if (loggedUser.accessStatus === "TRIAL_EXPIRED") {
+        navigate("/trial-expired", { replace: true });
+        return;
+      }
       navigate(getDefaultRouteForRole(loggedUser.role), { replace: true });
     } catch (error) {
       const apiError = error as ApiErrorResponse;
-      if (apiError.response?.data?.code === "SALON_SUBSCRIPTION_OVERDUE") {
-        setSubscriptionBlocked(true);
-      }
+      const code = apiError.response?.data?.code;
+      if (code === "SALON_BLOCKED" || code === "TRIAL_EXPIRED") setAccessBlocked(code);
       setErrorMessage(getErrorMessage(error));
     } finally {
       setLoading(false);
@@ -174,16 +177,21 @@ export function Login() {
           </p>
         </form>
       </main>
-      <Dialog open={subscriptionBlocked} onOpenChange={setSubscriptionBlocked}>
+      <Dialog open={accessBlocked !== null} onOpenChange={(open) => !open && setAccessBlocked(null)}>
         <DialogContent className="sm:max-w-md" showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle>Acesso bloqueado</DialogTitle>
-            <DialogDescription>
+            <DialogTitle>{accessBlocked === "SALON_BLOCKED" ? "Acesso suspenso" : "Periodo de teste encerrado"}</DialogTitle>
+            <DialogDescription className="hidden">
               O pagamento deste salão está em atraso há mais de 5 dias. O acesso foi bloqueado até que a assinatura seja regularizada.
+            </DialogDescription>
+            <DialogDescription>
+              {accessBlocked === "SALON_BLOCKED"
+                ? "Seu acesso esta suspenso. Entre em contato com a administracao da SalaOne para regularizar."
+                : "Seu periodo de teste terminou. Para continuar usando a SalaOne, escolha um plano."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button className="w-full sm:w-auto" onClick={() => setSubscriptionBlocked(false)}>
+            <Button className="w-full sm:w-auto" onClick={() => setAccessBlocked(null)}>
               Entendi
             </Button>
           </DialogFooter>
