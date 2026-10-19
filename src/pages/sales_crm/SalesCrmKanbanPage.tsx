@@ -36,6 +36,7 @@ import {
   SALES_PRODUCT_LABELS,
   salesChannelLabel,
   salesContactStatusLabel,
+  salesLeadChannelLabel,
   salesLostReasonLabel,
   updateSalesLead,
   type SalesContactStatus,
@@ -161,7 +162,7 @@ export function SalesCrmKanbanPage() {
     const query = search.trim().toLocaleLowerCase("pt-BR");
     return leads.filter((lead) => {
       if (query) {
-        const haystack = [lead.contactName, lead.salonName ?? "", lead.phone, lead.instagramHandle ?? "", lead.responsibleName ?? ""]
+        const haystack = [lead.contactName, lead.salonName ?? "", lead.phone, lead.instagramHandle ?? "", lead.responsibleName ?? "", lead.channelOther ?? ""]
           .join(" ")
           .toLocaleLowerCase("pt-BR");
         if (!haystack.includes(query)) return false;
@@ -567,7 +568,7 @@ export function SalesCrmKanbanPage() {
                         </div>
 
                         <div className="mt-2 flex flex-wrap gap-1">
-                          <Badge className="text-[11px]">{salesChannelLabel(lead.channel)}</Badge>
+                          <Badge className="text-[11px]">{salesLeadChannelLabel(lead)}</Badge>
                           {lead.contactStatus && (
                             <Badge variant="outline" className={cn("text-[11px]", CONTACT_STATUS_BADGE_CLASSES[lead.contactStatus])}>
                               {salesContactStatusLabel(lead.contactStatus)}

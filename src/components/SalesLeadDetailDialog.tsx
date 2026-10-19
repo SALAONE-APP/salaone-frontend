@@ -91,6 +91,7 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
   const [instagramHandle, setInstagramHandle] = useState("");
   const [email, setEmail] = useState("");
   const [channel, setChannel] = useState("");
+  const [channelOther, setChannelOther] = useState("");
   const [responsibleId, setResponsibleId] = useState("");
   const [scriptId, setScriptId] = useState("none");
   const [stage, setStage] = useState("");
@@ -121,6 +122,7 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
       setInstagramHandle(leadData.instagramHandle ?? "");
       setEmail(leadData.email ?? "");
       setChannel(leadData.channel);
+      setChannelOther(leadData.channelOther ?? "");
       setResponsibleId(leadData.responsibleId);
       setScriptId(leadData.scriptId ?? "none");
       setStage(leadData.stage);
@@ -162,6 +164,10 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
       toast.error("Selecione o motivo da perda antes de salvar.");
       return;
     }
+    if (channel === "outro" && !channelOther.trim()) {
+      toast.error("Informe qual foi o canal de origem.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -172,6 +178,7 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
         instagramHandle: instagramHandle.trim() || null,
         email: email.trim() || null,
         channel,
+        channelOther: channel === "outro" ? channelOther.trim() : null,
         responsibleId,
         scriptId: scriptId === "none" ? null : scriptId,
         contactStatus: contactStatus === "none" ? null : contactStatus,
@@ -287,6 +294,15 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
                       ))}
                     </SelectContent>
                   </Select>
+                  {channel === "outro" && (
+                    <Input
+                      className="mt-2"
+                      value={channelOther}
+                      onChange={(e) => setChannelOther(e.target.value)}
+                      placeholder="Qual canal? Ex.: Facebook, evento, panfleto"
+                      maxLength={100}
+                    />
+                  )}
                 </div>
               </div>
 

@@ -48,6 +48,7 @@ export function SalesLeadCreateDialog({ product, pipelineId, open, onClose, onCr
   const [instagramHandle, setInstagramHandle] = useState("");
   const [email, setEmail] = useState("");
   const [channel, setChannel] = useState("");
+  const [channelOther, setChannelOther] = useState("");
   const [responsibleId, setResponsibleId] = useState("");
   const [scriptId, setScriptId] = useState("none");
   const [contactStatus, setContactStatus] = useState<SalesContactStatus | "none">("none");
@@ -65,6 +66,7 @@ export function SalesLeadCreateDialog({ product, pipelineId, open, onClose, onCr
       setInstagramHandle("");
       setEmail("");
       setChannel("");
+      setChannelOther("");
       setResponsibleId(isSalesRep && userId ? userId : "");
       setScriptId("none");
       setContactStatus("none");
@@ -101,6 +103,10 @@ export function SalesLeadCreateDialog({ product, pipelineId, open, onClose, onCr
       toast.error("Selecione o canal de origem.");
       return;
     }
+    if (channel === "outro" && !channelOther.trim()) {
+      toast.error("Informe qual foi o canal de origem.");
+      return;
+    }
     if (!responsibleId) {
       toast.error("Selecione o vendedor responsável.");
       return;
@@ -117,6 +123,7 @@ export function SalesLeadCreateDialog({ product, pipelineId, open, onClose, onCr
         instagramHandle: instagramHandle.trim() || null,
         email: email.trim() || null,
         channel,
+        channelOther: channel === "outro" ? channelOther.trim() : null,
         responsibleId,
         scriptId: scriptId === "none" ? null : scriptId,
         contactStatus: contactStatus === "none" ? null : contactStatus,
@@ -179,6 +186,15 @@ export function SalesLeadCreateDialog({ product, pipelineId, open, onClose, onCr
               ))}
             </SelectContent>
           </Select>
+          {channel === "outro" && (
+            <Input
+              className="mt-2"
+              value={channelOther}
+              onChange={(e) => setChannelOther(e.target.value)}
+              placeholder="Qual canal? Ex.: Facebook, evento, panfleto"
+              maxLength={100}
+            />
+          )}
         </div>
 
         <div>
