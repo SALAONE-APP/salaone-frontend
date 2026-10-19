@@ -124,6 +124,7 @@ function CountWithRate({ count, total }: { count: number; total: number }) {
   );
 }
 
+// Base das taxas = leads abordados (os "enviados"): é o que mede se a mensagem funciona.
 function CohortTable({
   rows,
   nameHeader,
@@ -135,12 +136,14 @@ function CohortTable({
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[420px] text-sm">
+      <table className="w-full min-w-[560px] text-sm">
         <thead>
           <tr className="border-b border-border text-left text-xs text-muted-foreground">
             <th className="py-2 pr-3 font-medium">{nameHeader}</th>
             <th className="py-2 pr-3 text-right font-medium">Leads</th>
-            {showMeetings && <th className="py-2 pr-3 text-right font-medium">Reunião marcada</th>}
+            <th className="py-2 pr-3 text-right font-medium">Abordados</th>
+            <th className="py-2 pr-3 text-right font-medium">Respostas</th>
+            {showMeetings && <th className="py-2 pr-3 text-right font-medium">Reuniões</th>}
             <th className="py-2 text-right font-medium">Fechados</th>
           </tr>
         </thead>
@@ -150,21 +153,25 @@ function CohortTable({
               <td className="py-2 pr-3 text-foreground">
                 <span className="flex flex-wrap items-center gap-1.5">
                   {row.name}
-                  {row.leads < SMALL_SAMPLE && (
-                    <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground" title="Poucos leads: a taxa ainda não é confiável">
+                  {row.approached < SMALL_SAMPLE && (
+                    <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground" title="Poucos leads abordados: a taxa ainda não é confiável">
                       amostra pequena
                     </Badge>
                   )}
                 </span>
               </td>
-              <td className="py-2 pr-3 text-right tabular-nums text-foreground">{row.leads}</td>
+              <td className="py-2 pr-3 text-right tabular-nums text-muted-foreground">{row.leads}</td>
+              <td className="py-2 pr-3 text-right tabular-nums text-foreground">{row.approached}</td>
+              <td className="py-2 pr-3 text-right text-foreground">
+                <CountWithRate count={row.responded} total={row.approached} />
+              </td>
               {showMeetings && (
                 <td className="py-2 pr-3 text-right text-foreground">
-                  <CountWithRate count={row.meetingsScheduled} total={row.leads} />
+                  <CountWithRate count={row.meetingsScheduled} total={row.approached} />
                 </td>
               )}
               <td className="py-2 text-right text-foreground">
-                <CountWithRate count={row.won} total={row.leads} />
+                <CountWithRate count={row.won} total={row.approached} />
               </td>
             </tr>
           ))}
@@ -231,8 +238,9 @@ export function SalesCrmDashboardPage() {
     // Reunião → fechamento usa as realizadas quando o funil marca essa etapa; senão, as marcadas.
     const meetingBase = (s: SalesDashboardSummary) => (milestones.meetingHeld ? s.meetingsHeld : s.meetingsScheduled);
     return {
-      leadToMeeting: rate(summary.meetingsScheduled, summary.newLeads),
-      leadToMeetingPrev: rate(previousSummary.meetingsScheduled, previousSummary.newLeads),
+      responseRate: rate(summary.responded, summary.approached),
+      responseRatePrev: rate(previousSummary.responded, previousSummary.approached),
+      leadToMeeting: rate(summary.meetingsScheduled, summary.approached),
       meetingToWon: rate(summary.won, meetingBase(summary)),
       meetingToWonPrev: rate(previousSummary.won, meetingBase(previousSummary)),
       attendance: rate(summary.meetingsHeld, summary.meetingsScheduled),
@@ -247,7 +255,8 @@ export function SalesCrmDashboardPage() {
     const { funnel, milestones } = dashboard;
     return [
       { label: "Leads criados", value: funnel.created },
-      { label: "Houve contato", value: funnel.contacted },
+      { label: "Abordados", value: funnel.approached },
+      { label: "Responderam", value: funnel.responded },
       ...(milestones.meetingScheduled ? [{ label: "Reunião marcada", value: funnel.meetingsScheduled }] : []),
       ...(milestones.meetingHeld ? [{ label: "Reunião realizada", value: funnel.meetingsHeld }] : []),
       { label: "Fechado", value: funnel.won },
@@ -336,27 +345,51 @@ export function SalesCrmDashboardPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatTile label="Leads novos" value={String(dashboard.summary.newLeads)}>
               <Delta current={dashboard.summary.newLeads} previous={dashboard.previousSummary.newLeads} />
             </StatTile>
-            <StatTile label="Reuniões marcadas" value={meetingsConfigured ? String(dashboard.summary.meetingsScheduled) : "—"}>
+            <StatTile label="Leads abordados" value={String(dashboard.summary.approached)}>
+              <Delta current={dashboard.summary.approached} previous={dashboard.previousSummary.approached} />
+            </StatTile>
+            <StatTile label="Taxa de resposta" value={formatPercent(view.responseRate)} hint={`${dashboard.summary.responded} responderam`}>
+              <Delta current={view.responseRate} previous={view.responseRatePrev} isRate />
+            </StatTile>
+            <StatTile
+              label="Reuniões marcadas"
+              value={meetingsConfigured ? String(dashboard.summary.meetingsScheduled) : "—"}
+              hint={meetingsConfigured ? `${formatPercent(view.leadToMeeting)} dos abordados` : undefined}
+            >
               {meetingsConfigured && <Delta current={dashboard.summary.meetingsScheduled} previous={dashboard.previousSummary.meetingsScheduled} />}
             </StatTile>
             <StatTile
-              label="Reuniões realizadas"
-              value={dashboard.milestones.meetingHeld ? String(dashboard.summary.meetingsHeld) : "—"}
-              hint={dashboard.milestones.meetingHeld ? `Comparecimento: ${formatPercent(view.attendance)}` : "Etapa não marcada no funil"}
+              label="Taxa de comparecimento"
+              value={dashboard.milestones.meetingHeld ? formatPercent(view.attendance) : "—"}
+              hint={
+                dashboard.milestones.meetingHeld
+                  ? `${dashboard.summary.meetingsHeld} reuniões realizadas`
+                  : "Marque a etapa \"Reunião realizada\" no funil"
+              }
             />
             <StatTile label="Fechamentos" value={String(dashboard.summary.won)}>
               <Delta current={dashboard.summary.won} previous={dashboard.previousSummary.won} />
             </StatTile>
-            <StatTile label="Lead → reunião" value={meetingsConfigured ? formatPercent(view.leadToMeeting) : "—"}>
-              {meetingsConfigured && <Delta current={view.leadToMeeting} previous={view.leadToMeetingPrev} isRate />}
-            </StatTile>
-            <StatTile label="Reunião → fechamento" value={meetingsConfigured ? formatPercent(view.meetingToWon) : "—"}>
+            <StatTile
+              label="Taxa de fechamento"
+              value={meetingsConfigured ? formatPercent(view.meetingToWon) : "—"}
+              hint={meetingsConfigured ? `Fechamentos ÷ reuniões ${dashboard.milestones.meetingHeld ? "realizadas" : "marcadas"}` : undefined}
+            >
               {meetingsConfigured && <Delta current={view.meetingToWon} previous={view.meetingToWonPrev} isRate />}
             </StatTile>
+            <StatTile
+              label="Tempo médio até a venda"
+              value={dashboard.summary.avgDaysToClose !== null ? `${Math.round(dashboard.summary.avgDaysToClose)} dias` : "—"}
+              hint={
+                dashboard.previousSummary.avgDaysToClose !== null
+                  ? `Do cadastro ao fechamento · antes: ${Math.round(dashboard.previousSummary.avgDaysToClose)} dias`
+                  : "Do cadastro do lead ao fechamento"
+              }
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -419,14 +452,14 @@ export function SalesCrmDashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Panel title="Efetividade por script" subtitle="Leads criados no período, pelo script usado na abordagem">
+            <Panel title="Efetividade por script" subtitle="Leads criados no período, pelo script usado. Taxas sobre os abordados.">
               {view.scripts.length === 0 ? (
                 <EmptyPanel message="Nenhum lead criado no período." />
               ) : (
                 <CohortTable rows={view.scripts} nameHeader="Script" showMeetings={meetingsConfigured} />
               )}
             </Panel>
-            <Panel title="Resultado por canal" subtitle="De onde vieram os leads do período e quanto cada canal converte">
+            <Panel title="Resultado por canal" subtitle="De onde vieram os leads do período. Taxas sobre os abordados.">
               {view.channels.length === 0 ? (
                 <EmptyPanel message="Nenhum lead criado no período." />
               ) : (
@@ -441,11 +474,13 @@ export function SalesCrmDashboardPage() {
                 <EmptyPanel message="Nenhuma movimentação no período." />
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-sm">
+                  <table className="w-full min-w-[820px] text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-xs text-muted-foreground">
                         <th className="py-2 pr-3 font-medium">Vendedor</th>
                         <th className="py-2 pr-3 text-right font-medium">Leads novos</th>
+                        <th className="py-2 pr-3 text-right font-medium">Abordados</th>
+                        <th className="py-2 pr-3 text-right font-medium">Respostas</th>
                         <th className="py-2 pr-3 text-right font-medium">Contatos registrados</th>
                         {meetingsConfigured && <th className="py-2 pr-3 text-right font-medium">Reuniões marcadas</th>}
                         {dashboard.milestones.meetingHeld && <th className="py-2 pr-3 text-right font-medium">Realizadas</th>}
@@ -458,6 +493,10 @@ export function SalesCrmDashboardPage() {
                         <tr key={row.responsibleId} className="border-b border-border/60 last:border-0 tabular-nums">
                           <td className="py-2 pr-3 text-foreground">{row.responsibleName}</td>
                           <td className="py-2 pr-3 text-right text-foreground">{row.newLeads}</td>
+                          <td className="py-2 pr-3 text-right text-foreground">{row.approached}</td>
+                          <td className="py-2 pr-3 text-right text-foreground">
+                            <CountWithRate count={row.responded} total={row.approached} />
+                          </td>
                           <td className="py-2 pr-3 text-right text-foreground">{row.contacts}</td>
                           {meetingsConfigured && <td className="py-2 pr-3 text-right text-foreground">{row.meetingsScheduled}</td>}
                           {dashboard.milestones.meetingHeld && <td className="py-2 pr-3 text-right text-foreground">{row.meetingsHeld}</td>}

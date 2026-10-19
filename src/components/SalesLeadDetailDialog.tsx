@@ -468,6 +468,9 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
                             {salesLeadStageLabel(activity.fromStage, pipeline)} → {salesLeadStageLabel(activity.toStage, pipeline)}
                           </p>
                         )}
+                        {activity.activityType === "contact_status_changed" && (
+                          <p className="mt-1 text-muted-foreground">{activity.outcome ? salesContactStatusLabel(activity.outcome) : "Sem status"}</p>
+                        )}
                         {activity.contactType && (
                           <p className="mt-1 text-muted-foreground">
                             {salesContactTypeLabel(activity.contactType)}
