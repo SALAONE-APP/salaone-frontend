@@ -33,6 +33,16 @@ export const SALES_LOST_REASONS = [
 ] as const;
 export type SalesLostReason = (typeof SALES_LOST_REASONS)[number];
 
+// Momento do cliente na conversa - lista fixa, independente da etapa do funil.
+export const SALES_CONTACT_STATUSES = ["aguardando_resposta", "respondeu", "nao_respondeu"] as const;
+export type SalesContactStatus = (typeof SALES_CONTACT_STATUSES)[number];
+
+export const SALES_CONTACT_STATUS_LABELS: Record<SalesContactStatus, string> = {
+  aguardando_resposta: "Aguardando resposta",
+  respondeu: "Respondeu",
+  nao_respondeu: "Não respondeu",
+};
+
 export const SALES_CONTACT_TYPES = ["whatsapp", "instagram_dm", "ligacao", "email", "presencial", "reuniao"] as const;
 export type SalesContactType = (typeof SALES_CONTACT_TYPES)[number];
 
@@ -85,6 +95,10 @@ export function salesChannelLabel(channel: string) {
 
 export function salesLostReasonLabel(reason: string) {
   return SALES_LOST_REASON_LABELS[reason as SalesLostReason] ?? reason;
+}
+
+export function salesContactStatusLabel(status: string) {
+  return SALES_CONTACT_STATUS_LABELS[status as SalesContactStatus] ?? status;
 }
 
 export function salesContactTypeLabel(contactType: string) {
@@ -146,6 +160,7 @@ export interface SalesLead {
   scriptName: string | null;
   scriptVersion: string | null;
   lostReason: string | null;
+  contactStatus: SalesContactStatus | null;
   nextAction: string | null;
   nextActionAt: string | null;
   notes: string | null;
@@ -274,6 +289,7 @@ export interface CreateSalesLeadInput {
   channel: string;
   responsibleId: string;
   scriptId?: string | null;
+  contactStatus?: SalesContactStatus | null;
   notes?: string | null;
   nextAction?: string | null;
   nextActionAt?: string | null;
@@ -288,6 +304,7 @@ export interface UpdateSalesLeadInput {
   channel?: string;
   responsibleId?: string;
   scriptId?: string | null;
+  contactStatus?: SalesContactStatus | null;
   notes?: string | null;
   nextAction?: string | null;
   nextActionAt?: string | null;

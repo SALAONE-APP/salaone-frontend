@@ -232,7 +232,6 @@ export function ServiceTabsPage() {
       const paymentsPath = user?.role === "professional" ? "/financial-payments" : "/payments";
       const params = new URLSearchParams({
         serviceTabId: tab.id,
-        date: dateKey(tab.appointment.startAt),
       });
       navigate(`${paymentsPath}?${params.toString()}`);
     } catch (error) {
@@ -313,6 +312,19 @@ export function ServiceTabsPage() {
             </div>
           ))}
         </div>
+        {tab.payments.length > 0 && (
+          <div className="border-t border-border p-4">
+            <p className="mb-2 text-sm font-medium text-foreground">Histórico de pagamentos</p>
+            <div className="space-y-2">
+              {tab.payments.map((payment) => (
+                <div key={payment.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-emerald-500/5 px-3 py-2 text-sm">
+                  <span className="font-medium text-emerald-700">{money(payment.amount)} · {payment.method === "credito" ? "Cartão de crédito" : payment.method === "debito" ? "Cartão de débito" : payment.method === "dinheiro" ? "Dinheiro" : "PIX"}</span>
+                  <span className="text-xs text-muted-foreground">{new Date(payment.paidAt).toLocaleString("pt-BR")}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {!readOnly && (
           <div className="flex flex-col gap-2 border-t border-border p-4 sm:flex-row sm:justify-end">
             <Button variant="destructive" onClick={() => setCancelTab(tab)} disabled={busy}><XCircle className="mr-2 h-4 w-4" /> Cancelar comanda</Button>
