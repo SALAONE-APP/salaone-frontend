@@ -14,42 +14,6 @@ interface TrialInfo {
 
 interface OverdueInfo { daysOverdue: number; blockedAt: Date; }
 
-const trialCachePrefix = "platformTrial:";
-
-function getTrialCacheKey() {
-  try {
-    const salon = JSON.parse(localStorage.getItem("salon") || "null") as { id?: string } | null;
-    return `${trialCachePrefix}${salon?.id || "current"}`;
-  } catch {
-    return `${trialCachePrefix}current`;
-  }
-}
-
-function getCachedTrialInfo(): TrialInfo | null {
-  try {
-    const cached = JSON.parse(sessionStorage.getItem(getTrialCacheKey()) || "null") as { endsAt?: string } | null;
-    if (!cached?.endsAt) return null;
-    const endsAt = new Date(cached.endsAt);
-    const daysLeft = getDaysLeft(endsAt);
-    return daysLeft > 0 ? { daysLeft, endsAt } : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveTrialInfo(info: TrialInfo | null) {
-  try {
-    const key = getTrialCacheKey();
-    if (!info) {
-      sessionStorage.removeItem(key);
-      return;
-    }
-    sessionStorage.setItem(key, JSON.stringify({ endsAt: info.endsAt.toISOString() }));
-  } catch {
-    // A ausência de storage não impede a exibição do aviso.
-  }
-}
-
 function getDaysLeft(endsAt: Date) {
   return Math.max(0, Math.ceil((endsAt.getTime() - Date.now()) / DAY_IN_MS));
 }
@@ -57,28 +21,11 @@ function getDaysLeft(endsAt: Date) {
 function getTrialInfoFromSubscription(subscription: PlatformSubscription | null): TrialInfo | null {
   if (!subscription) return null;
 
-  const status = subscription.status?.trim().toLowerCase();
-  const isExplicitTrial = status === "trialing";
-  const hasRecordedTrialEnd = Boolean(subscription.trialEndsAt);
-  const trialDays = Number(subscription.plan?.trialPeriodDays ?? 0);
-  const startedAt = new Date(subscription.startDate ?? subscription.createdAt ?? "");
-  const expectedTrialEnd = new Date(startedAt.getTime() + trialDays * DAY_IN_MS);
-  const nextBillingAt = subscription.nextBillingDate ? new Date(subscription.nextBillingDate) : null;
-  // Assinaturas em teste podem chegar como "active" enquanto a cobranca
-  // inicial ainda está agendada. Nesse caso, nextBillingDate é o fim real.
-  const isLegacyActiveTrial = status === "active"
-    && trialDays > 0
-    && nextBillingAt
-    && !Number.isNaN(expectedTrialEnd.getTime())
-    && Date.now() < expectedTrialEnd.getTime();
+  // nextBillingDate also exists for paid subscriptions, so it cannot prove a trial.
+  const trialEndsAt = subscription.trialEndsAt;
+  if (!trialEndsAt) return null;
 
-  if (!isExplicitTrial && !hasRecordedTrialEnd && !isLegacyActiveTrial) return null;
-
-  const endsAt = subscription.trialEndsAt
-    ? new Date(subscription.trialEndsAt)
-    : subscription.nextBillingDate
-      ? new Date(subscription.nextBillingDate)
-      : expectedTrialEnd;
+  const endsAt = new Date(trialEndsAt);
   if (Number.isNaN(endsAt.getTime())) return null;
 
   const daysLeft = getDaysLeft(endsAt);
@@ -97,9 +44,8 @@ function getFallbackTrialInfo(createdAt: string | null | undefined): TrialInfo |
 }
 
 export function PlatformTrialBanner() {
-  const cachedTrialInfo = getCachedTrialInfo();
-  const [trialInfo, setTrialInfo] = useState<TrialInfo | null>(cachedTrialInfo);
-  const [checkingTrial, setCheckingTrial] = useState(!cachedTrialInfo);
+  const [trialInfo, setTrialInfo] = useState<TrialInfo | null>(null);
+  const [checkingTrial, setCheckingTrial] = useState(true);
   const [overdueInfo, setOverdueInfo] = useState<OverdueInfo | null>(null);
 
   useEffect(() => {
@@ -107,7 +53,6 @@ export function PlatformTrialBanner() {
     const profileRequest = getSalonProfile();
     const updateTrialInfo = (info: TrialInfo | null) => {
       if (!active) return;
-      saveTrialInfo(info);
       setTrialInfo(info);
     };
 
