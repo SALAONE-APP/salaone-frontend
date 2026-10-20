@@ -90,6 +90,9 @@ export async function registerServiceTabPayment(tabId: string, data: {
   installments?: number | null;
   hasInterest?: boolean | null;
   interestAmount?: number;
+  discountAmount?: number;
+  surchargeAmount?: number;
+  adjustmentNote?: string | null;
 }) {
   const response = await api.post<PaymentRecord>(`/service-tabs/${tabId}/payments`, data);
   return response.data;
@@ -97,6 +100,9 @@ export async function registerServiceTabPayment(tabId: string, data: {
 
 export async function registerServiceTabSplitPayment(tabId: string, data: {
   parts: Array<{ method: Exclude<PaymentMethod, "local" | "subscription">; amount: number; installments?: number | null; hasInterest?: boolean | null; interestAmount?: number }>;
+  discountAmount?: number;
+  surchargeAmount?: number;
+  adjustmentNote?: string | null;
 }) {
   const response = await api.post<PaymentRecord>(`/service-tabs/${tabId}/payments/split`, data);
   return response.data;

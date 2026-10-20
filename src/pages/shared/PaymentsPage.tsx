@@ -434,11 +434,18 @@ export function PaymentsPage() {
     // O saldo da comanda representa somente os itens. Juros compõem o valor
     // pago pelo cliente, mas não podem impedir a quitação da parcela.
     const serviceAmount = finalAmount - interestAmount;
-    if (isServiceTabPayment && serviceAmount - payment.amount > 0.005) {
-      toast.error("O valor não pode ser maior que o saldo pendente da comanda.");
+    const adjustmentDiscount = parseCurrencyInput(discountInput);
+    const adjustmentSurcharge = parseCurrencyInput(surchargeInput);
+    const serviceSettlementAmount = serviceAmount + adjustmentDiscount - adjustmentSurcharge;
+    if (isServiceTabPayment && serviceSettlementAmount - payment.amount > 0.005) {
+      toast.error("O ajuste não pode quitar mais do que o saldo pendente da comanda.");
       return;
     }
-    const hasAdjustment = !isServiceTabPayment && (parseCurrencyInput(discountInput) > 0 || parseCurrencyInput(surchargeInput) > 0);
+    if (isServiceTabPayment && serviceSettlementAmount <= 0) {
+      toast.error("O valor liquidado da comanda deve ser maior que zero.");
+      return;
+    }
+    const hasAdjustment = adjustmentDiscount > 0 || adjustmentSurcharge > 0;
     setLocalPaymentDialog(null);
     setUpdatingId(payment.id);
     try {
@@ -450,8 +457,11 @@ export function PaymentsPage() {
           installments: selectedLocalMethod === "credito" ? creditInstallments : null,
           hasInterest: selectedLocalMethod === "credito" ? creditHasInterest : null,
           interestAmount,
+          discountAmount: adjustmentDiscount,
+          surchargeAmount: adjustmentSurcharge,
+          adjustmentNote: hasAdjustment ? adjustmentNote.trim() : null,
         });
-        toast.success(serviceAmount + 0.005 >= payment.amount ? "Comanda quitada." : "Pagamento parcial registrado.");
+        toast.success(serviceSettlementAmount + 0.005 >= payment.amount ? "Comanda quitada." : "Pagamento parcial registrado.");
       } else {
         await updatePayment(payment, {
           status: "paid",
@@ -554,7 +564,12 @@ export function PaymentsPage() {
         interestAmount: parseCurrencyInput(part.interestAmount ?? ""),
       }));
       if (isServiceTabPayment) {
-        await registerServiceTabSplitPayment(payment.serviceTab!.id, { parts });
+        await registerServiceTabSplitPayment(payment.serviceTab!.id, {
+          parts,
+          discountAmount: parseCurrencyInput(discountInput),
+          surchargeAmount: parseCurrencyInput(surchargeInput),
+          adjustmentNote: hasAdjustment ? adjustmentNote.trim() : null,
+        });
         toast.success("Pagamento dividido da comanda confirmado.");
       } else {
         await splitPayment(payment.id, parts, finalAmount, discountAmount, hasAdjustment ? adjustmentNote.trim() : null, new Date().toISOString());
@@ -986,8 +1001,7 @@ export function PaymentsPage() {
               <span className="text-muted-foreground">{isServiceTabPayment ? "Saldo pendente" : "Valor original"}</span>
               <span className="font-medium">{formatCurrency(localPaymentDialog?.amount ?? 0)}</span>
             </div>
-            <div className={`grid grid-cols-1 gap-3 ${isServiceTabPayment ? "sm:grid-cols-1" : "sm:grid-cols-3"}`}>
-              {!isServiceTabPayment && <>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="min-w-0 space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Desconto</label>
                 <Input className="min-w-0 w-full" inputMode="numeric" value={discountInput} onChange={(event) => changeDiscount(event.target.value)} />
@@ -996,15 +1010,13 @@ export function PaymentsPage() {
                 <label className="text-xs font-medium text-muted-foreground">Acréscimo</label>
                 <Input className="min-w-0 w-full" inputMode="numeric" value={surchargeInput} onChange={(event) => changeSurcharge(event.target.value)} />
               </div>
-              </>}
               <div className="min-w-0 space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">{isServiceTabPayment ? "Valor desta parcela" : "Valor final"}</label>
-                <Input className="min-w-0 w-full" inputMode="numeric" value={adjustedAmount} onChange={(event) => changeFinalAmount(event.target.value)} readOnly={!isServiceTabPayment} />
+                <label className="text-xs font-medium text-muted-foreground">Valor final</label>
+                <Input className="min-w-0 w-full" inputMode="numeric" value={adjustedAmount} onChange={(event) => changeFinalAmount(event.target.value)} />
               </div>
             </div>
           </div>
-          {!isServiceTabPayment && (
-            <div className="space-y-1.5">
+          <div className="space-y-1.5">
               <label htmlFor="payment-adjustment-note" className="text-xs font-medium text-muted-foreground">
                 Observacao do ajuste
               </label>
@@ -1020,8 +1032,7 @@ export function PaymentsPage() {
                 Opcional. Use para registrar o motivo do desconto ou acrescimo.
                 <span className="float-right">{adjustmentNote.length}/{MAX_ADJUSTMENT_NOTE_LENGTH}</span>
               </p>
-            </div>
-          )}
+          </div>
           {splitParts.length === 1 ? <div className="grid grid-cols-2 gap-3 py-2">
             {IN_PERSON_PAYMENT_METHODS.map(({ value, label }) => (
               <button
