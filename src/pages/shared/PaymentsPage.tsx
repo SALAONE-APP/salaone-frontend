@@ -279,7 +279,6 @@ export function PaymentsPage() {
   const [discountInput, setDiscountInput] = useState("");
   const [surchargeInput, setSurchargeInput] = useState("");
   const [adjustmentNote, setAdjustmentNote] = useState("");
-  const [isPartialPayment, setIsPartialPayment] = useState(false);
   const [methodPaymentDialog, setMethodPaymentDialog] = useState<PaymentWithType | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>("dinheiro");
   const [creditInstallments, setCreditInstallments] = useState(1);
@@ -469,8 +468,6 @@ export function PaymentsPage() {
           method: selectedLocalMethod,
           amount: finalAmount,
           discountAmount: adjustmentDiscount,
-          surchargeAmount: adjustmentSurcharge,
-          partialPayment: isPartialPayment,
           adjustmentNote: hasAdjustment ? adjustmentNote.trim() : null,
           installments: selectedLocalMethod === "credito" ? creditInstallments : null,
           isInstallment: selectedLocalMethod === "credito" && creditInstallments > 1,
@@ -478,7 +475,7 @@ export function PaymentsPage() {
           interestAmount,
           paidAt: new Date().toISOString(),
         });
-        toast.success(isPartialPayment ? "Pagamento parcial registrado." : "Pagamento confirmado.");
+        toast.success("Pagamento confirmado.");
       }
       await loadPayments();
     } catch (err) {
@@ -496,7 +493,6 @@ export function PaymentsPage() {
     setDiscountInput(formatCurrency(0));
     setSurchargeInput(formatCurrency(0));
     setAdjustmentNote("");
-    setIsPartialPayment(false);
     setCreditInstallments(payment.method === "credito" ? payment.installments ?? 1 : 1);
     setCreditHasInterest(payment.method === "credito" ? payment.hasInterest ?? false : false);
     setInterestInput(formatCurrency(payment.interestAmount ?? 0));
@@ -511,7 +507,7 @@ export function PaymentsPage() {
   function changeFinalAmount(value: string, syncDiscount = true) {
     const nextTotal = parseCurrencyInput(value);
     setAdjustedAmount(formatCurrency(nextTotal));
-    if (syncDiscount && localPaymentDialog && localPaymentDialog.paymentType !== "service_tab" && !isPartialPayment) setDiscountInput(formatCurrency(Math.max(0, localPaymentDialog.amount - nextTotal)));
+    if (syncDiscount && localPaymentDialog && localPaymentDialog.paymentType !== "service_tab") setDiscountInput(formatCurrency(Math.max(0, localPaymentDialog.amount - nextTotal)));
     setSplitParts((parts) => {
       if (parts.length === 1) return [{ ...parts[0], amount: nextTotal.toFixed(2) }];
       const previousTotal = parts.slice(0, -1).reduce((sum, part) => sum + (Number(part.amount.replace(",", ".")) || 0), 0);
@@ -1020,26 +1016,6 @@ export function PaymentsPage() {
               </div>
             </div>
           </div>
-          {!isServiceTabPayment && (
-            <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-secondary/30 px-3 py-2 text-sm">
-              <input
-                type="checkbox"
-                checked={isPartialPayment}
-                onChange={(event) => {
-                  const enabled = event.target.checked;
-                  setIsPartialPayment(enabled);
-                  // A reduction typed before choosing partial payment was
-                  // previously auto-filled as a discount. It must not settle
-                  // the remaining balance when the user switches to partial.
-                  if (enabled) {
-                    setDiscountInput(formatCurrency(0));
-                    setSurchargeInput(formatCurrency(0));
-                  }
-                }}
-              />
-              Registrar pagamento parcial
-            </label>
-          )}
           <div className="space-y-1.5">
               <label htmlFor="payment-adjustment-note" className="text-xs font-medium text-muted-foreground">
                 Observacao do ajuste
