@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import salaOneLogo from "../assets/image/logo-icone-salaone.jpeg";
 import api from "../service/api";
+import { logout } from "../service/authService";
 import { createPagarmeCardToken } from "../service/pagarmeService";
 import { onlyDigits } from "@/utils/leadForm";
 
@@ -641,7 +642,12 @@ export function LandingPage() {
     }
   }, [state]);
 
-  const goLogin = () => navigate("/login");
+  // An explicit request to log in from the public landing must allow a
+  // different account; do not let a restricted trial session re-open itself.
+  const goLogin = () => {
+    logout();
+    navigate("/login");
+  };
 
   const onRegistered = (plan: Plan, result: RegisterResult) => {
     setSelectedPlan(null);

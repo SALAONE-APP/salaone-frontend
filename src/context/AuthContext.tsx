@@ -10,6 +10,7 @@ import {
   type StoredSalon,
   type AccessibleSalon,
   listAccessibleSalons,
+  type AuthResponse,
 } from "../service/authService";
 
 export interface User {
@@ -33,7 +34,7 @@ export interface AuthContextData {
   loading: boolean;
   salonAccess: StoredSalon | null;
   accessibleSalons: AccessibleSalon[];
-  login: (email: string, password: string) => Promise<User>;
+  login: (email: string, password: string) => Promise<User & Pick<AuthResponse, "accessStatus">>;
   logout: () => void;
   updateUser: (user: User) => void;
   enterSalonAccess: (salonId: string) => Promise<StoredSalon>;
@@ -128,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void listAccessibleSalons().then(setAccessibleSalons).catch(() => setAccessibleSalons([]));
   }, [user?.id, user?.role]);
 
-  async function login(email: string, password: string): Promise<User> {
+  async function login(email: string, password: string): Promise<User & Pick<AuthResponse, "accessStatus">> {
     const response = await loginRequest({ email, password });
     localStorage.setItem("user", JSON.stringify(response.user));
     localStorage.removeItem(SUPER_ADMIN_ACCESS_STORAGE_KEY);
@@ -143,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       setAccessibleSalons([]);
     }
-    return response.user;
+    return { ...response.user, accessStatus: response.accessStatus };
   }
 
   function logout() {

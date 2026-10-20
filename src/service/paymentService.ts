@@ -56,6 +56,7 @@ export interface PaymentRecord {
     payments?: Array<{
       method: PaymentMethod;
       amount: number;
+      interestAmount?: number;
     }>;
     items: Array<{
       id: string;
@@ -77,6 +78,7 @@ export interface PaymentRecord {
   /** Preenchidos somente para pagamentos presenciais no cartão de crédito. */
   installments?: number | null;
   hasInterest?: boolean | null;
+  interestAmount?: number;
   paidAt?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -88,8 +90,33 @@ export async function registerServiceTabPayment(tabId: string, data: {
   paidAt?: string;
   installments?: number | null;
   hasInterest?: boolean | null;
+  interestAmount?: number;
+  discountAmount?: number;
+  surchargeAmount?: number;
+  adjustmentNote?: string | null;
 }) {
   const response = await api.post<PaymentRecord>(`/service-tabs/${tabId}/payments`, data);
+  return response.data;
+}
+
+export async function registerServiceTabSplitPayment(tabId: string, data: {
+  parts: Array<{ method: Exclude<PaymentMethod, "local" | "subscription">; amount: number; installments?: number | null; hasInterest?: boolean | null; interestAmount?: number }>;
+  discountAmount?: number;
+  surchargeAmount?: number;
+  adjustmentNote?: string | null;
+}) {
+  // O endpoint exige installments e hasInterest para todas as formas, inclusive
+  // dinheiro/PIX/débito. Nunca deixe `undefined` ou `null` chegar ao JSON.
+  const payload = {
+    ...data,
+    parts: data.parts.map((part) => ({
+      ...part,
+      installments: Number.isFinite(Number(part.installments)) ? Number(part.installments) : 1,
+      hasInterest: Boolean(part.hasInterest),
+      interestAmount: Number.isFinite(Number(part.interestAmount)) ? Number(part.interestAmount) : 0,
+    })),
+  };
+  const response = await api.post<PaymentRecord>(`/service-tabs/${tabId}/payments/split`, payload);
   return response.data;
 }
 
@@ -116,6 +143,7 @@ export interface PaymentSummary {
   pending: number;
   refunded: number;
   today: number;
+  interest?: number;
 }
 
 export interface PaymentListResult extends ListPaymentsResponse {
@@ -186,7 +214,7 @@ export async function listAllPayments(params: ListPaymentsParams = {}): Promise<
 
 export async function updatePayment(
   payment: Pick<PaymentRecord, "id" | "appointmentId">,
-  data: { status?: PaymentStatus; method?: PaymentMethod; amount?: number; discountAmount?: number | null; adjustmentNote?: string | null; installments?: number | null; hasInterest?: boolean | null; paidAt?: string; noShow?: boolean },
+  data: { status?: PaymentStatus; method?: PaymentMethod; amount?: number; discountAmount?: number | null; adjustmentNote?: string | null; installments?: number | null; isInstallment?: boolean; hasInterest?: boolean | null; interestAmount?: number; paidAt?: string; noShow?: boolean },
 ) {
   const response = await api.patch<PaymentRecord>(`/payments/${payment.id}`, data);
 
@@ -197,7 +225,9 @@ export interface SplitPaymentPart {
   method: Exclude<PaymentMethod, "local" | "subscription">;
   amount: number;
   installments?: number | null;
+  isInstallment?: boolean;
   hasInterest?: boolean | null;
+  interestAmount?: number;
 }
 
 export async function splitPayment(paymentId: string, parts: SplitPaymentPart[], totalAmount: number, discountAmount: number, adjustmentNote?: string | null, paidAt?: string) {

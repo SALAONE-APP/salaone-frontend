@@ -7,6 +7,8 @@ import { LandingPage } from "./pages/LandingPage";
 import { ForgotPassword } from "./pages/ForgotPassword";
 import { ResetPassword } from "./pages/ResetPassword";
 import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
+import { AccessSuspendedPage } from "./pages/AccessSuspendedPage";
+import { TrialExpiredPage } from "./pages/TrialExpiredPage";
 import { AppRoutes } from "./routes/AppRoutes";
 import { PublicRoute } from "./routes/PublicRoute";
 import { Toaster } from "./components/ui/sonner";
@@ -20,6 +22,8 @@ function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/access-suspended" element={<AccessSuspendedPage />} />
+            <Route path="/trial-expired" element={<TrialExpiredPage />} />
             <Route
               path="/login"
               element={
