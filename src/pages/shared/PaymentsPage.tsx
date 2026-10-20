@@ -519,6 +519,21 @@ export function PaymentsPage() {
   const splitAmountDue = finalAmount + splitInterestTotal;
   const splitDifference = splitAmountDue - splitTotal;
   const isServiceTabPayment = localPaymentDialog?.paymentType === "service_tab";
+
+  function splitEvenly(parts: SplitPart[]) {
+    // Reparte somente os serviços. Os juros continuam exclusivamente na forma
+    // de crédito que os gerou, para que o valor recebido permaneça correto.
+    const totalCents = Math.round(finalAmount * 100);
+    const baseCents = Math.floor(totalCents / parts.length);
+    const remainingCents = totalCents % parts.length;
+
+    return parts.map((part, index) => {
+      const serviceShare = (baseCents + (index < remainingCents ? 1 : 0)) / 100;
+      const interest = parseCurrencyInput(part.interestAmount ?? "");
+      return { ...part, amount: (serviceShare + interest).toFixed(2) };
+    });
+  }
+
   function changeFinalAmount(value: string, syncDiscount = true) {
     const nextTotal = parseCurrencyInput(value);
     setAdjustedAmount(formatCurrency(nextTotal));
@@ -1125,7 +1140,7 @@ export function PaymentsPage() {
                   </Button>
                 </div>
               ))}
-              <Button type="button" variant="outline" size="sm" onClick={() => setSplitParts((parts) => [...parts, { method: "pix", amount: "" }])}>
+              <Button type="button" variant="outline" size="sm" onClick={() => setSplitParts((parts) => splitEvenly([...parts, { method: "pix", amount: "" }]))}>
                 <Plus size={15} className="mr-1" /> Adicionar forma
               </Button>
               <div className="rounded-md bg-secondary/50 p-3 text-sm">
@@ -1149,8 +1164,14 @@ export function PaymentsPage() {
             </Button>
             {splitParts.length === 1 && (
               <Button className="w-full sm:w-auto" variant="outline" onClick={() => {
-                const half = finalAmount / 2;
-                setSplitParts([{ method: selectedLocalMethod as SplitMethod, amount: half.toFixed(2) }, { method: "pix", amount: (finalAmount - half).toFixed(2) }]);
+                const firstPart: SplitPart = {
+                  method: selectedLocalMethod as SplitMethod,
+                  amount: "",
+                  installments: selectedLocalMethod === "credito" ? creditInstallments : undefined,
+                  hasInterest: selectedLocalMethod === "credito" ? creditHasInterest : undefined,
+                  interestAmount: selectedLocalMethod === "credito" && creditHasInterest ? interestInput : undefined,
+                };
+                setSplitParts(splitEvenly([firstPart, { method: "pix", amount: "" }]));
               }}>Dividir pagamento</Button>
             )}
             <Button className="w-full sm:w-auto" onClick={splitParts.length > 1 ? confirmSplitPayment : confirmLocalPayment}>
