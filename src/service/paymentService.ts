@@ -56,6 +56,7 @@ export interface PaymentRecord {
     payments?: Array<{
       method: PaymentMethod;
       amount: number;
+      interestAmount?: number;
     }>;
     items: Array<{
       id: string;
@@ -104,7 +105,18 @@ export async function registerServiceTabSplitPayment(tabId: string, data: {
   surchargeAmount?: number;
   adjustmentNote?: string | null;
 }) {
-  const response = await api.post<PaymentRecord>(`/service-tabs/${tabId}/payments/split`, data);
+  // O endpoint exige installments e hasInterest para todas as formas, inclusive
+  // dinheiro/PIX/débito. Nunca deixe `undefined` ou `null` chegar ao JSON.
+  const payload = {
+    ...data,
+    parts: data.parts.map((part) => ({
+      ...part,
+      installments: Number.isFinite(Number(part.installments)) ? Number(part.installments) : 1,
+      hasInterest: Boolean(part.hasInterest),
+      interestAmount: Number.isFinite(Number(part.interestAmount)) ? Number(part.interestAmount) : 0,
+    })),
+  };
+  const response = await api.post<PaymentRecord>(`/service-tabs/${tabId}/payments/split`, payload);
   return response.data;
 }
 

@@ -125,6 +125,17 @@ function paymentTotalAmount(payment: PaymentWithType) {
   return payment.amount;
 }
 
+function paymentInterestTotal(payment: PaymentWithType) {
+  // A comanda pode ter sido quitada com duas ou mais formas. Nesse caso,
+  // os juros pertencem à forma de crédito, não necessariamente ao primeiro
+  // registro que é usado para montar a linha da tabela.
+  const tabPayments = payment.serviceTab?.payments ?? [];
+  if (payment.paymentType === "service_tab" && tabPayments.length > 0) {
+    return tabPayments.reduce((total, item) => total + Number(item.interestAmount ?? 0), 0);
+  }
+  return Number(payment.interestAmount ?? 0);
+}
+
 const typeLabels: Record<PaymentType, string> = {
   appointment: "Agendamento",
   subscription: "Assinatura",
@@ -502,7 +513,11 @@ export function PaymentsPage() {
   const splitTotal = splitParts.reduce((sum, part) => sum + (Number(part.amount.replace(",", ".")) || 0), 0);
   const finalAmount = parseCurrencyInput(adjustedAmount);
   const discountAmount = Math.max(0, (localPaymentDialog?.amount ?? 0) - finalAmount);
-  const splitDifference = finalAmount - splitTotal;
+  // In split payments, each part already includes its own interest. The
+  // amount to collect must therefore include all credit-interest entries.
+  const splitInterestTotal = splitParts.reduce((sum, part) => sum + parseCurrencyInput(part.interestAmount ?? ""), 0);
+  const splitAmountDue = finalAmount + splitInterestTotal;
+  const splitDifference = splitAmountDue - splitTotal;
   const isServiceTabPayment = localPaymentDialog?.paymentType === "service_tab";
   function changeFinalAmount(value: string, syncDiscount = true) {
     const nextTotal = parseCurrencyInput(value);
@@ -544,7 +559,7 @@ export function PaymentsPage() {
     const hasInvalidInterest = splitParts.some((part) => {
       const interest = parseCurrencyInput(part.interestAmount ?? "");
       const amount = Number(part.amount.replace(",", ".")) || 0;
-      return interest > amount || (interest > 0 && (part.method !== "credito" || (part.installments ?? 1) <= 1 || !part.hasInterest));
+      return interest > amount || (interest > 0 && (part.method !== "credito" || !part.hasInterest));
     });
     if (hasInvalidInterest) {
       toast.error("Informe juros válidos somente na parcela de crédito com juros.");
@@ -558,9 +573,11 @@ export function PaymentsPage() {
       const parts = splitParts.map((part) => ({
         method: part.method,
         amount: Number(part.amount.replace(",", ".")),
-        installments: part.method === "credito" ? part.installments ?? 1 : null,
+        // A API valida estes campos em todas as partes do pagamento dividido.
+        // Para dinheiro, PIX e débito, 1 parcela e sem juros é o equivalente correto.
+        installments: part.method === "credito" ? part.installments ?? 1 : 1,
         isInstallment: part.method === "credito" && ((part.installments ?? 1) > 1 || part.hasInterest),
-        hasInterest: part.method === "credito" ? part.hasInterest ?? false : null,
+        hasInterest: part.method === "credito" ? part.hasInterest ?? false : false,
         interestAmount: parseCurrencyInput(part.interestAmount ?? ""),
       }));
       if (isServiceTabPayment) {
@@ -572,7 +589,7 @@ export function PaymentsPage() {
         });
         toast.success("Pagamento dividido da comanda confirmado.");
       } else {
-        await splitPayment(payment.id, parts, finalAmount, discountAmount, hasAdjustment ? adjustmentNote.trim() : null, new Date().toISOString());
+        await splitPayment(payment.id, parts, splitAmountDue, discountAmount, hasAdjustment ? adjustmentNote.trim() : null, new Date().toISOString());
         toast.success("Pagamento dividido confirmado.");
       }
       await loadPayments();
@@ -873,8 +890,8 @@ export function PaymentsPage() {
                         {formatCurrency(paymentTotalAmount(payment))}
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {Number(payment.interestAmount ?? 0) > 0
-                          ? formatCurrency(Number(payment.interestAmount))
+                        {paymentInterestTotal(payment) > 0
+                          ? formatCurrency(paymentInterestTotal(payment))
                           : "—"}
                       </td>
                       <td className="px-4 py-3">
@@ -1068,8 +1085,31 @@ export function PaymentsPage() {
                   </div>
                   {part.method === "credito" && <div className="col-span-2 grid grid-cols-2 gap-2 rounded-md bg-secondary/50 p-2 text-xs sm:col-span-3">
                     <label>Parcelas<select value={part.installments ?? 1} onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, installments: Number(event.target.value) } : item))} className="mt-1 h-8 w-full rounded border border-input bg-background px-2"><option value={1}>À vista</option>{Array.from({ length: 11 }, (_, value) => value + 2).map((value) => <option key={value} value={value}>{value}x</option>)}</select></label>
-                    <label>Juros<select value={part.hasInterest ? "com" : "sem"} onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, hasInterest: event.target.value === "com" } : item))} className="mt-1 h-8 w-full rounded border border-input bg-background px-2"><option value="sem">Sem juros</option><option value="com">Com juros</option></select></label>
-                    {part.hasInterest && <label className="col-span-2 text-xs sm:col-span-3">Juros do pagamento (R$)<Input className="mt-1 h-8" inputMode="decimal" value={part.interestAmount ?? ""} onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, interestAmount: formatCurrency(parseCurrencyInput(event.target.value)) } : item))} /><span className="mt-1 block text-[11px] text-muted-foreground">Fica com o salão e não entra na comissão.</span></label>}
+                    <label>Juros<select value={part.hasInterest ? "com" : "sem"} onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => {
+                      if (itemIndex !== index) return item;
+                      const previousInterest = parseCurrencyInput(item.interestAmount ?? "");
+                      const nextHasInterest = event.target.value === "com";
+                      return {
+                        ...item,
+                        hasInterest: nextHasInterest,
+                        interestAmount: nextHasInterest ? item.interestAmount ?? "" : "",
+                        // O campo "Valor" é o que o cliente efetivamente paga.
+                        // Ao desativar os juros, removemos deles esse valor automaticamente.
+                        amount: nextHasInterest ? item.amount : (Math.max(0, parseCurrencyInput(item.amount) - previousInterest)).toFixed(2),
+                      };
+                    }))} className="mt-1 h-8 w-full rounded border border-input bg-background px-2"><option value="sem">Sem juros</option><option value="com">Com juros</option></select></label>
+                    {part.hasInterest && <label className="col-span-2 text-xs sm:col-span-3">Juros do pagamento (R$)<Input className="mt-1 h-8" inputMode="decimal" value={part.interestAmount ?? ""} onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => {
+                      if (itemIndex !== index) return item;
+                      const previousInterest = parseCurrencyInput(item.interestAmount ?? "");
+                      const nextInterest = parseCurrencyInput(event.target.value);
+                      return {
+                        ...item,
+                        interestAmount: formatCurrency(nextInterest),
+                        // Soma somente a diferença dos juros para não duplicar o valor
+                        // quando o usuário corrige o campo.
+                        amount: (Math.max(0, parseCurrencyInput(item.amount) - previousInterest + nextInterest)).toFixed(2),
+                      };
+                    }))} /><span className="mt-1 block text-[11px] text-muted-foreground">Somado automaticamente ao valor do cartão. Fica com o salão e não entra na comissão.</span></label>}
                   </div>}
                   <div className="min-w-0 space-y-1">
                     <label className="text-xs text-muted-foreground">Valor</label>
@@ -1089,7 +1129,8 @@ export function PaymentsPage() {
                 <Plus size={15} className="mr-1" /> Adicionar forma
               </Button>
               <div className="rounded-md bg-secondary/50 p-3 text-sm">
-                <div className="flex justify-between"><span>Total informado</span><strong>{formatCurrency(splitTotal)}</strong></div>
+                <div className="flex justify-between"><span>Total a receber</span><strong>{formatCurrency(splitAmountDue)}</strong></div>
+                <div className="mt-1 flex justify-between"><span>Total informado</span><strong>{formatCurrency(splitTotal)}</strong></div>
                 <div className={`mt-1 flex justify-between ${Math.abs(splitDifference) <= 0.005 ? "text-emerald-600" : "text-amber-600"}`}>
                   <span>{splitDifference >= 0 ? "Falta" : "Excedente"}</span><strong>{formatCurrency(Math.abs(splitDifference))}</strong>
                 </div>
