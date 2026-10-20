@@ -202,7 +202,7 @@ export async function listAllPayments(params: ListPaymentsParams = {}): Promise<
 
 export async function updatePayment(
   payment: Pick<PaymentRecord, "id" | "appointmentId">,
-  data: { status?: PaymentStatus; method?: PaymentMethod; amount?: number; discountAmount?: number | null; adjustmentNote?: string | null; installments?: number | null; isInstallment?: boolean; hasInterest?: boolean | null; interestAmount?: number; paidAt?: string; noShow?: boolean },
+  data: { status?: PaymentStatus; method?: PaymentMethod; amount?: number; discountAmount?: number | null; surchargeAmount?: number; partialPayment?: boolean; adjustmentNote?: string | null; installments?: number | null; isInstallment?: boolean; hasInterest?: boolean | null; interestAmount?: number; paidAt?: string; noShow?: boolean },
 ) {
   const response = await api.patch<PaymentRecord>(`/payments/${payment.id}`, data);
 
