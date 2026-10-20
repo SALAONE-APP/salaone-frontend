@@ -470,7 +470,7 @@ export function PaymentsPage() {
           discountAmount: adjustmentDiscount,
           adjustmentNote: hasAdjustment ? adjustmentNote.trim() : null,
           installments: selectedLocalMethod === "credito" ? creditInstallments : null,
-          isInstallment: selectedLocalMethod === "credito" && creditInstallments > 1,
+          isInstallment: selectedLocalMethod === "credito" && (creditInstallments > 1 || creditHasInterest),
           hasInterest: selectedLocalMethod === "credito" ? creditHasInterest : null,
           interestAmount,
           paidAt: new Date().toISOString(),
@@ -559,7 +559,7 @@ export function PaymentsPage() {
         method: part.method,
         amount: Number(part.amount.replace(",", ".")),
         installments: part.method === "credito" ? part.installments ?? 1 : null,
-        isInstallment: part.method === "credito" && (part.installments ?? 1) > 1,
+        isInstallment: part.method === "credito" && ((part.installments ?? 1) > 1 || part.hasInterest),
         hasInterest: part.method === "credito" ? part.hasInterest ?? false : null,
         interestAmount: parseCurrencyInput(part.interestAmount ?? ""),
       }));
@@ -1012,7 +1012,7 @@ export function PaymentsPage() {
               </div>
               <div className="min-w-0 space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Valor final</label>
-                <Input className="min-w-0 w-full" inputMode="numeric" value={adjustedAmount} onChange={(event) => changeFinalAmount(event.target.value)} />
+                <Input className="min-w-0 w-full" inputMode="numeric" value={adjustedAmount} onChange={(event) => changeFinalAmount(event.target.value)} readOnly={isServiceTabPayment} />
               </div>
             </div>
           </div>
@@ -1067,9 +1067,9 @@ export function PaymentsPage() {
                     </select>
                   </div>
                   {part.method === "credito" && <div className="col-span-2 grid grid-cols-2 gap-2 rounded-md bg-secondary/50 p-2 text-xs sm:col-span-3">
-                    <label>Parcelas<select value={part.installments ?? 1} onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, installments: Number(event.target.value), hasInterest: Number(event.target.value) > 1 ? item.hasInterest : false, interestAmount: Number(event.target.value) > 1 ? item.interestAmount : "" } : item))} className="mt-1 h-8 w-full rounded border border-input bg-background px-2"><option value={1}>À vista</option>{Array.from({ length: 11 }, (_, value) => value + 2).map((value) => <option key={value} value={value}>{value}x</option>)}</select></label>
+                    <label>Parcelas<select value={part.installments ?? 1} onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, installments: Number(event.target.value) } : item))} className="mt-1 h-8 w-full rounded border border-input bg-background px-2"><option value={1}>À vista</option>{Array.from({ length: 11 }, (_, value) => value + 2).map((value) => <option key={value} value={value}>{value}x</option>)}</select></label>
                     <label>Juros<select value={part.hasInterest ? "com" : "sem"} onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, hasInterest: event.target.value === "com" } : item))} className="mt-1 h-8 w-full rounded border border-input bg-background px-2"><option value="sem">Sem juros</option><option value="com">Com juros</option></select></label>
-                    {part.hasInterest && (part.installments ?? 1) > 1 && <label className="col-span-2 text-xs sm:col-span-3">Juros do parcelamento (R$)<Input className="mt-1 h-8" inputMode="decimal" value={part.interestAmount ?? ""} onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, interestAmount: formatCurrency(parseCurrencyInput(event.target.value)) } : item))} /><span className="mt-1 block text-[11px] text-muted-foreground">Fica com o salão e não entra na comissão.</span></label>}
+                    {part.hasInterest && <label className="col-span-2 text-xs sm:col-span-3">Juros do pagamento (R$)<Input className="mt-1 h-8" inputMode="decimal" value={part.interestAmount ?? ""} onChange={(event) => setSplitParts((parts) => parts.map((item, itemIndex) => itemIndex === index ? { ...item, interestAmount: formatCurrency(parseCurrencyInput(event.target.value)) } : item))} /><span className="mt-1 block text-[11px] text-muted-foreground">Fica com o salão e não entra na comissão.</span></label>}
                   </div>}
                   <div className="min-w-0 space-y-1">
                     <label className="text-xs text-muted-foreground">Valor</label>
@@ -1099,7 +1099,7 @@ export function PaymentsPage() {
           {splitParts.length === 1 && selectedLocalMethod === "credito" && <div className="grid grid-cols-2 gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
             <label className="space-y-1 text-sm font-medium">Parcelas<select value={creditInstallments} onChange={(event) => setCreditInstallments(Number(event.target.value))} className="h-10 w-full rounded-md border border-input bg-background px-3"><option value={1}>À vista</option>{Array.from({ length: 11 }, (_, value) => value + 2).map((value) => <option key={value} value={value}>{value}x</option>)}</select></label>
             <label className="space-y-1 text-sm font-medium">Juros<select value={creditHasInterest ? "com" : "sem"} onChange={(event) => setCreditHasInterest(event.target.value === "com")} className="h-10 w-full rounded-md border border-input bg-background px-3"><option value="sem">Sem juros</option><option value="com">Com juros</option></select></label>
-            {creditHasInterest && creditInstallments > 1 && <label className="col-span-2 space-y-1 text-sm font-medium">Juros do parcelamento (R$)<Input inputMode="numeric" value={interestInput} onChange={(event) => { const value = parseCurrencyInput(event.target.value); setInterestInput(formatCurrency(value)); if (localPaymentDialog) changeFinalAmount((localPaymentDialog.amount + parseCurrencyInput(surchargeInput) - parseCurrencyInput(discountInput) + value).toFixed(2), false); }} /><span className="block text-xs font-normal text-muted-foreground">Valor que fica com o salao. Nao entra no calculo de comissao.</span></label>}
+            {creditHasInterest && <label className="col-span-2 space-y-1 text-sm font-medium">Juros do pagamento (R$)<Input inputMode="numeric" value={interestInput} onChange={(event) => { const value = parseCurrencyInput(event.target.value); setInterestInput(formatCurrency(value)); if (localPaymentDialog) changeFinalAmount((localPaymentDialog.amount + parseCurrencyInput(surchargeInput) - parseCurrencyInput(discountInput) + value).toFixed(2), false); }} /><span className="block text-xs font-normal text-muted-foreground">Valor que fica com o salao. Nao entra no calculo de comissao.</span></label>}
           </div>}
           </div>
           <DialogFooter className="border-t border-border pt-4 flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
