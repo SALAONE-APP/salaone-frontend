@@ -99,19 +99,27 @@ export async function login(data: LoginPayload): Promise<AuthResponse> {
     email: data.email,
     password: data.password,
   });
+  return hydrateLoginResponse(response.data);
+}
 
+export async function googleLogin(accessToken: string): Promise<AuthResponse> {
+  const response = await api.post<BackendAuthResponse>("/auth/google", { accessToken });
+  return hydrateLoginResponse(response.data);
+}
+
+async function hydrateLoginResponse(response: BackendAuthResponse): Promise<AuthResponse> {
   // Um superadmin pode também ter vínculo com algum salão (por exemplo,
   // como cliente). O vínculo não representa seu papel global de plataforma.
-  const isSuperAdmin = response.data.user.role === "super_admin";
-  const membership = isSuperAdmin ? undefined : response.data.memberships[0];
+  const isSuperAdmin = response.user.role === "super_admin";
+  const membership = isSuperAdmin ? undefined : response.memberships[0];
   const user = {
-    ...response.data.user,
-    role: isSuperAdmin ? "super_admin" : normalizeRole(membership?.role ?? response.data.user.role),
+    ...response.user,
+    role: isSuperAdmin ? "super_admin" : normalizeRole(membership?.role ?? response.user.role),
     permissions: isSuperAdmin ? null : normalizePermissions(membership?.permissions),
     salonUserId: membership?.id ?? null,
   };
 
-  localStorage.setItem("token", response.data.token);
+  localStorage.setItem("token", response.token);
   localStorage.removeItem("refreshToken");
   localStorage.setItem("user", JSON.stringify(user));
 
@@ -125,11 +133,11 @@ export async function login(data: LoginPayload): Promise<AuthResponse> {
   }
 
   return {
-    token: response.data.token,
+    token: response.token,
     user,
-    memberships: response.data.memberships,
+    memberships: response.memberships,
     salon,
-    accessStatus: response.data.accessStatus,
+    accessStatus: response.accessStatus,
   };
 }
 

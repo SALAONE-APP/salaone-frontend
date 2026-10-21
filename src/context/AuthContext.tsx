@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import {
   SUPER_ADMIN_ACCESS_STORAGE_KEY,
   fetchMe,
+  googleLogin as googleLoginRequest,
   login as loginRequest,
   logout as logoutRequest,
   switchSalon as switchSalonRequest,
@@ -35,6 +36,7 @@ export interface AuthContextData {
   salonAccess: StoredSalon | null;
   accessibleSalons: AccessibleSalon[];
   login: (email: string, password: string) => Promise<User & Pick<AuthResponse, "accessStatus">>;
+  loginWithGoogle: (accessToken: string) => Promise<User & Pick<AuthResponse, "accessStatus">>;
   logout: () => void;
   updateUser: (user: User) => void;
   enterSalonAccess: (salonId: string) => Promise<StoredSalon>;
@@ -147,6 +149,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ...response.user, accessStatus: response.accessStatus };
   }
 
+  async function loginWithGoogle(accessToken: string): Promise<User & Pick<AuthResponse, "accessStatus">> {
+    const response = await googleLoginRequest(accessToken);
+    localStorage.removeItem(SUPER_ADMIN_ACCESS_STORAGE_KEY);
+    setSalonAccess(null);
+    setUser(response.user);
+    if (response.user.role !== "super_admin") {
+      try {
+        setAccessibleSalons(await listAccessibleSalons());
+      } catch {
+        setAccessibleSalons([]);
+      }
+    } else {
+      setAccessibleSalons([]);
+    }
+    return { ...response.user, accessStatus: response.accessStatus };
+  }
+
   function logout() {
     logoutRequest();
     setSalonAccess(null);
@@ -202,6 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         salonAccess,
         accessibleSalons,
         login,
+        loginWithGoogle,
         logout,
         updateUser,
         enterSalonAccess,
