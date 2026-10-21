@@ -1274,17 +1274,9 @@ export function BookingsPage() {
                     const activeAppointment =
                       appointment.status === "scheduled" ||
                       appointment.status === "confirmed";
-                    const beforeChangeDeadline =
-                      new Date(appointment.startAt).getTime() - Date.now() >=
-                      60 * 60 * 1000;
                     const canAdminReschedule =
                       (user?.role === "admin" || user?.isAdmin === true) &&
-                      activeAppointment &&
-                      beforeChangeDeadline;
-                    const adminChangeDeadlinePassed =
-                      (user?.role === "admin" || user?.isAdmin === true) &&
-                      activeAppointment &&
-                      !beforeChangeDeadline;
+                      activeAppointment;
 
                     return (
                       <Fragment key={appointment.id}>
@@ -1484,12 +1476,6 @@ export function BookingsPage() {
                                     >
                                       <CalendarClock size={14} />
                                       Alterar data ou horario
-                                    </DropdownMenuItem>
-                                  )}
-                                  {adminChangeDeadlinePassed && (
-                                    <DropdownMenuItem disabled>
-                                      <CalendarClock size={14} />
-                                      Alteracao indisponivel (menos de 1 hora)
                                     </DropdownMenuItem>
                                   )}
                                   <DropdownMenuItem
