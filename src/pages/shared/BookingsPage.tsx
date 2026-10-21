@@ -1252,7 +1252,10 @@ export function BookingsPage() {
                 ) : (
                   filteredAppointments.map((appointment) => {
                     const groupMembers = appointment.bookingGroupId
-                      ? filteredAppointments.filter((item) => item.bookingGroupId === appointment.bookingGroupId)
+                      ? filteredAppointments.filter((item) =>
+                          item.bookingGroupId === appointment.bookingGroupId &&
+                          item.clientId === appointment.clientId,
+                        )
                       : [];
                     const isGrouped = groupMembers.length > 1;
                     const isGroupLead = !isGrouped || groupMembers[0].id === appointment.id;
