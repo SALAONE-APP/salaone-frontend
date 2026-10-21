@@ -355,6 +355,23 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   const isAdmin = user?.role === 'admin' || user?.isAdmin === true || isSuperAdminAccess;
   const canManageSecurityDocuments = isAdmin;
 
+  useEffect(() => {
+    const googleCalendarResult = searchParams.get('googleCalendar');
+    if (!googleCalendarResult) return;
+
+    setActiveTab('security');
+    if (googleCalendarResult === 'connected') {
+      toast.success('Google Agenda conectado com sucesso. A sincronizacao inicial foi iniciada.');
+    } else {
+      toast.error(searchParams.get('googleCalendarMessage') || 'Nao foi possivel conectar o Google Agenda.');
+    }
+
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete('googleCalendar');
+    nextSearchParams.delete('googleCalendarMessage');
+    setSearchParams(nextSearchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   function handleTabChange(tab: string) {
     setActiveTab(tab);
     if (tab === 'meuPlano') {
