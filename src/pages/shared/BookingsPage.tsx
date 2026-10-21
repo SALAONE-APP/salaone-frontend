@@ -3,6 +3,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  Fragment,
   type FormEvent,
 } from "react";
 import {
@@ -10,6 +11,8 @@ import {
   Calendar,
   CalendarClock,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Clock,
   Filter,
   Loader2,
@@ -65,6 +68,7 @@ import { useTableSelection } from "@/hooks/useTableSelection";
 import {
   cancelAppointment,
   createAppointment,
+  createAppointmentGroup,
   getAppointmentById,
   getAvailableSlots,
   listAppointments,
@@ -102,6 +106,14 @@ interface BookingFormState {
   productQuantities: Record<string, number>;
   notes: string;
   allowOutsideBusinessHours: boolean;
+}
+
+interface BookingGroupStep {
+  professionalId: string;
+  date: string;
+  time: string;
+  serviceIds: string[];
+  servicesExpanded?: boolean;
 }
 
 const emptyForm: BookingFormState = {
@@ -236,6 +248,8 @@ export function BookingsPage() {
   const [selectedClientName, setSelectedClientName] = useState("");
   const [bookForSelf, setBookForSelf] = useState(false);
   const [form, setForm] = useState<BookingFormState>(emptyForm);
+  const [expandedBookingGroups, setExpandedBookingGroups] = useState<string[]>([]);
+  const [groupSteps, setGroupSteps] = useState<BookingGroupStep[]>([]);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -399,6 +413,15 @@ export function BookingsPage() {
     [form.serviceIds, services],
   );
 
+  const groupStepServices = useMemo(
+    () => groupSteps.flatMap((step) =>
+      step.serviceIds
+        .map((serviceId) => services.find((service) => service.id === serviceId))
+        .filter((service): service is Service => Boolean(service)),
+    ),
+    [groupSteps, services],
+  );
+
   const availableServicesForProfessional = useMemo(() => {
     if (!form.professionalId) return [];
     const professional = professionals.find((item) => item.id === form.professionalId);
@@ -419,11 +442,11 @@ export function BookingsPage() {
 
   const servicesTotal = useMemo(
     () =>
-      selectedServices.reduce(
+      [...selectedServices, ...groupStepServices].reduce(
         (sum, service) => sum + Number(service.basePrice ?? 0),
         0,
       ),
-    [selectedServices],
+    [groupStepServices, selectedServices],
   );
 
   const productsTotal = useMemo(
@@ -576,6 +599,7 @@ export function BookingsPage() {
       allowOutsideBusinessHours,
     });
     setSelectedClientName("");
+    setGroupSteps([]);
     setBookForSelf(false);
     setDialogOpen(true);
   }
@@ -617,6 +641,16 @@ export function BookingsPage() {
     if (!/^\d{2}:\d{2}$/.test(form.time))
       return "Informe o horario no formato HH:MM.";
 
+    for (const [index, step] of groupSteps.entries()) {
+      if (!step.professionalId || !step.date || !step.time || step.serviceIds.length === 0) {
+        return `Preencha profissional, data, horario e servicos da etapa ${index + 2}.`;
+      }
+      if (step.serviceIds.length !== 1) return `A etapa ${index + 2} deve conter apenas um servico.`;
+    }
+    if (groupSteps.length && form.serviceIds.length !== 1) {
+      return "Em um atendimento agrupado, defina uma etapa para cada servico.";
+    }
+
     return null;
   }
 
@@ -632,29 +666,41 @@ export function BookingsPage() {
     setSaving(true);
 
     try {
-      await createAppointment({
-        clientId: form.clientId,
-        professionalId: form.professionalId,
-        date: form.date,
-        time: form.time,
-        notes: form.notes.trim() || null,
-        allowOutsideBusinessHours: form.allowOutsideBusinessHours,
-        services: selectedServices.map((service) => ({
-          id: service.id,
-          name: service.name,
-          basePrice: service.basePrice,
-          durationMinutes: service.durationMinutes,
-          quantity: 1,
-        })),
-        products: selectedProducts.map((product) => ({
-          id: product.id,
-          name: product.name,
-          price: product.price,
-          quantity: product.quantity,
-        })),
-      });
-
-      toast.success("Agendamento criado.");
+      if (groupSteps.length) {
+        await createAppointmentGroup({
+          clientId: form.clientId,
+          notes: form.notes.trim() || null,
+          allowOutsideBusinessHours: form.allowOutsideBusinessHours,
+          appointments: [
+            { professionalId: form.professionalId, date: form.date, time: form.time, serviceIds: form.serviceIds },
+            ...groupSteps,
+          ],
+        });
+        toast.success("Agendamento com varios profissionais criado.");
+      } else {
+        await createAppointment({
+          clientId: form.clientId,
+          professionalId: form.professionalId,
+          date: form.date,
+          time: form.time,
+          notes: form.notes.trim() || null,
+          allowOutsideBusinessHours: form.allowOutsideBusinessHours,
+          services: selectedServices.map((service) => ({
+            id: service.id,
+            name: service.name,
+            basePrice: service.basePrice,
+            durationMinutes: service.durationMinutes,
+            quantity: 1,
+          })),
+          products: selectedProducts.map((product) => ({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            quantity: product.quantity,
+          })),
+        });
+        toast.success("Agendamento criado.");
+      }
       setDialogOpen(false);
       await loadAppointments();
     } catch (err) {
@@ -1177,6 +1223,13 @@ export function BookingsPage() {
                   </tr>
                 ) : (
                   filteredAppointments.map((appointment) => {
+                    const groupMembers = appointment.bookingGroupId
+                      ? filteredAppointments.filter((item) => item.bookingGroupId === appointment.bookingGroupId)
+                      : [];
+                    const isGrouped = groupMembers.length > 1;
+                    const isGroupLead = !isGrouped || groupMembers[0].id === appointment.id;
+                    const isGroupExpanded = Boolean(appointment.bookingGroupId && expandedBookingGroups.includes(appointment.bookingGroupId));
+                    if (isGrouped && !isGroupLead && !isGroupExpanded) return null;
                     const start = formatDateTime(appointment.startAt);
                     const end = formatDateTime(appointment.endAt);
                     const serviceText =
@@ -1206,9 +1259,29 @@ export function BookingsPage() {
                       !beforeChangeDeadline;
 
                     return (
+                      <Fragment key={appointment.id}>
+                      {isGrouped && isGroupLead && (
+                        <tr key={`group-${appointment.bookingGroupId}`} className="border-b border-primary/20 bg-primary/5">
+                          <td colSpan={8} className="px-4 py-2.5">
+                            <button
+                              type="button"
+                              className="flex w-full items-center gap-2 text-left text-sm"
+                              onClick={() => setExpandedBookingGroups((current) => isGroupExpanded
+                                ? current.filter((id) => id !== appointment.bookingGroupId)
+                                : [...current, appointment.bookingGroupId!])}
+                            >
+                              {isGroupExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                              <span className="font-semibold text-foreground">Atendimento agrupado</span>
+                              <span className="text-muted-foreground">{groupMembers.length} serviços / profissionais</span>
+                              <span className="ml-auto font-semibold text-foreground">{formatCurrency(groupMembers.reduce((sum, item) => sum + item.totalAmount, 0))}</span>
+                            </button>
+                          </td>
+                        </tr>
+                      )}
+                      {(!isGrouped || isGroupExpanded) && (
                       <tr
                         key={appointment.id}
-                        className="border-b border-border transition-colors last:border-b-0 hover:bg-secondary/30"
+                        className={`border-b border-border transition-colors last:border-b-0 hover:bg-secondary/30 ${isGrouped ? "bg-secondary/10" : ""}`}
                       >
                         <td className="p-4">
                           <Checkbox
@@ -1419,6 +1492,8 @@ export function BookingsPage() {
                           </DropdownMenu>
                         </td>
                       </tr>
+                      )}
+                      </Fragment>
                     );
                   })
                 )}
@@ -1880,6 +1955,73 @@ export function BookingsPage() {
                 </div>
               </div>
 
+              <div className="space-y-3 rounded-lg border border-primary/25 bg-primary/5 p-4 md:col-span-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <Label>Outros profissionais no mesmo atendimento</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Cada linha representa um unico servico, com seu proprio horario de inicio e bloqueio de agenda.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setForm((current) => ({ ...current, productQuantities: {} }));
+                      setGroupSteps((current) => [...current, {
+                        professionalId: "", date: form.date, time: "", serviceIds: [], servicesExpanded: true,
+                      }]);
+                    }}
+                  >
+                    <Plus className="mr-1 h-4 w-4" /> Adicionar etapa
+                  </Button>
+                </div>
+                {groupSteps.map((step, index) => {
+                  const stepProfessional = professionals.find((professional) => professional.id === step.professionalId);
+                  const stepServices = services.filter((service) => stepProfessional?.serviceIds?.includes(service.id));
+                  const selectedStepService = services.find((service) => service.id === step.serviceIds[0]);
+                  const updateStep = (patch: Partial<BookingGroupStep>) => setGroupSteps((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
+                  return (
+                    <div key={index} className="space-y-3 rounded-md border border-border bg-background p-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Etapa {index + 2}</span>
+                        <Button type="button" size="sm" variant="ghost" className="text-destructive" onClick={() => setGroupSteps((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Remover</Button>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-3">
+                        <Select value={step.professionalId} onValueChange={(professionalId) => updateStep({ professionalId, serviceIds: [] })}>
+                          <SelectTrigger><SelectValue placeholder="Profissional" /></SelectTrigger>
+                          <SelectContent>{professionals.map((professional) => <SelectItem key={professional.id} value={professional.id}>{professional.displayName}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <Input type="date" value={step.date} onChange={(event) => updateStep({ date: event.target.value })} />
+                        <Input type="time" value={step.time} onChange={(event) => updateStep({ time: event.target.value })} />
+                      </div>
+                      {selectedStepService && !step.servicesExpanded ? (
+                        <div className="flex items-center justify-between gap-3 rounded-md bg-secondary/50 px-3 py-2 text-sm">
+                          <span>
+                            <span className="font-medium">{selectedStepService.name}</span>
+                            <span className="text-muted-foreground"> · {getServiceDuration(selectedStepService)} min · {formatCurrency(selectedStepService.basePrice)}</span>
+                          </span>
+                          <Button type="button" size="sm" variant="ghost" onClick={() => updateStep({ servicesExpanded: true })}>Alterar serviço</Button>
+                        </div>
+                      ) : (
+                        <div className="grid gap-2 md:grid-cols-2">
+                          {stepServices.length ? stepServices.map((service) => (
+                            <label key={service.id} className="flex items-center gap-2 text-sm">
+                              <Checkbox checked={step.serviceIds.includes(service.id)} onCheckedChange={(checked) => updateStep({ serviceIds: checked === true ? [service.id] : [], servicesExpanded: checked !== true })} />
+                              <span className="font-medium">{service.name}</span>
+                              <span className="text-muted-foreground">
+                                ({getServiceDuration(service)} min · {formatCurrency(service.basePrice)})
+                              </span>
+                            </label>
+                          )) : <p className="text-xs text-muted-foreground md:col-span-2">Selecione o profissional para ver seus servicos.</p>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
               <div className="space-y-3 md:col-span-2">
                 <div className="flex items-center justify-between">
                   <Label>Produtos</Label>
@@ -1887,7 +2029,8 @@ export function BookingsPage() {
                     Opcional
                   </span>
                 </div>
-                <div className="grid max-h-64 gap-2 overflow-y-auto rounded-md border border-border p-3 md:grid-cols-2">
+                {groupSteps.length > 0 && <p className="text-xs text-muted-foreground">Produtos ficam desabilitados em agendamentos com varios profissionais; registre-os na comanda depois do atendimento.</p>}
+                <div className={`grid max-h-64 gap-2 overflow-y-auto rounded-md border border-border p-3 md:grid-cols-2 ${groupSteps.length > 0 ? "pointer-events-none opacity-50" : ""}`}>
                   {products.length === 0 ? (
                     <p className="text-sm text-muted-foreground md:col-span-2">
                       Nenhum produto ativo encontrado.
