@@ -228,6 +228,13 @@ function getServiceDuration(service: Service) {
   return Number(service.durationMinutes ?? 30);
 }
 
+function addMinutesToTime(time: string, minutes: number) {
+  const [hours, mins] = time.split(":").map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(mins)) return "";
+  const total = hours * 60 + mins + minutes;
+  return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
 export function BookingsPage() {
   const { user } = useAuth();
   const { can } = usePermissions();
@@ -629,6 +636,27 @@ export function BookingsPage() {
         ...current.productQuantities,
         [product.id]: next,
       },
+    }));
+  }
+
+  function fitGroupStepsInSequence() {
+    if (!form.time) {
+      toast.error("Informe primeiro o horário da primeira etapa.");
+      return;
+    }
+
+    const nextEndByProfessional = new Map<string, string>();
+    nextEndByProfessional.set(form.professionalId, addMinutesToTime(form.time, totalDuration));
+    setGroupSteps((current) => current.map((step) => {
+      const service = services.find((item) => item.id === step.serviceIds[0]);
+      const previousEnd = nextEndByProfessional.get(step.professionalId);
+      // Serviços de outro profissional podem começar em paralelo; somente a
+      // segunda etapa do mesmo profissional é encadeada.
+      const time = previousEnd ?? form.time;
+      if (step.professionalId && service) {
+        nextEndByProfessional.set(step.professionalId, addMinutesToTime(time, getServiceDuration(service)));
+      }
+      return { ...step, date: step.date || form.date, time };
     }));
   }
 
@@ -1263,8 +1291,7 @@ export function BookingsPage() {
                       {isGrouped && isGroupLead && (
                         <tr key={`group-${appointment.bookingGroupId}`} className="border-b border-primary/20 bg-primary/5">
                           <td colSpan={8} className="px-4 py-2.5">
-                            <button
-                              type="button"
+                            <div
                               className="flex w-full items-center gap-2 text-left text-sm"
                               onClick={() => setExpandedBookingGroups((current) => isGroupExpanded
                                 ? current.filter((id) => id !== appointment.bookingGroupId)
@@ -1274,7 +1301,23 @@ export function BookingsPage() {
                               <span className="font-semibold text-foreground">Atendimento agrupado</span>
                               <span className="text-muted-foreground">{groupMembers.length} serviços / profissionais</span>
                               <span className="ml-auto font-semibold text-foreground">{formatCurrency(groupMembers.reduce((sum, item) => sum + item.totalAmount, 0))}</span>
-                            </button>
+                              {can("managePayments") && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="ml-2"
+                                  disabled={startingAttendanceId === appointment.id}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void startAttendanceWithTab(appointment);
+                                  }}
+                                >
+                                  <ReceiptText className="mr-1 h-4 w-4" />
+                                  {startingAttendanceId === appointment.id ? "Abrindo..." : "Iniciar comanda"}
+                                </Button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       )}
@@ -1963,19 +2006,30 @@ export function BookingsPage() {
                       Cada linha representa um unico servico, com seu proprio horario de inicio e bloqueio de agenda.
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setForm((current) => ({ ...current, productQuantities: {} }));
-                      setGroupSteps((current) => [...current, {
-                        professionalId: "", date: form.date, time: "", serviceIds: [], servicesExpanded: true,
-                      }]);
-                    }}
-                  >
-                    <Plus className="mr-1 h-4 w-4" /> Adicionar etapa
-                  </Button>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={!groupSteps.length || !form.time}
+                      onClick={fitGroupStepsInSequence}
+                    >
+                      <Clock className="mr-1 h-4 w-4" /> Encaixar em sequência
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setForm((current) => ({ ...current, productQuantities: {} }));
+                        setGroupSteps((current) => [...current, {
+                          professionalId: "", date: form.date, time: "", serviceIds: [], servicesExpanded: true,
+                        }]);
+                      }}
+                    >
+                      <Plus className="mr-1 h-4 w-4" /> Adicionar etapa
+                    </Button>
+                  </div>
                 </div>
                 {groupSteps.map((step, index) => {
                   const stepProfessional = professionals.find((professional) => professional.id === step.professionalId);
@@ -2120,6 +2174,11 @@ export function BookingsPage() {
                   <span>Total do agendamento</span>
                   <span>{formatCurrency(servicesTotal + productsTotal)}</span>
                 </div>
+                {groupSteps.length > 0 && form.time && (
+                  <p className="mt-2 border-t pt-2 text-xs text-muted-foreground">
+                    Atendimento combinado: início às {form.time}; cada etapa mantém seu próprio horário e profissional.
+                  </p>
+                )}
               </div>
 
               {form.allowOutsideBusinessHours ? (
