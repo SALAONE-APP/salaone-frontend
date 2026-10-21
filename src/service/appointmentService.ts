@@ -73,6 +73,7 @@ export interface Appointment {
   commissionPercent?: number | null;
   createdAt?: string;
   updatedAt?: string;
+  bookingGroupId?: string | null;
   // Só vêm preenchidos na resposta do PATCH que finaliza o atendimento,
   // quando a automação de pós-atendimento do CRM cria um card de verdade
   // nesse momento (ver relationshipAutomationService.ts no backend).
@@ -124,6 +125,18 @@ export interface CreateAppointmentPayload {
   }>;
 }
 
+export interface CreateAppointmentGroupPayload {
+  clientId: string;
+  notes?: string | null;
+  allowOutsideBusinessHours?: boolean;
+  appointments: Array<{
+    professionalId: string;
+    date: string;
+    time: string;
+    serviceIds: string[];
+  }>;
+}
+
 export async function listAppointments(params: ListAppointmentsParams = {}) {
   const response = await api.get<ListAppointmentsResponse>("/appointments", {
     params,
@@ -140,6 +153,11 @@ export async function getAppointmentById(appointmentId: string) {
 export async function createAppointment(data: CreateAppointmentPayload) {
   const response = await api.post<Appointment>("/appointments", data);
 
+  return response.data;
+}
+
+export async function createAppointmentGroup(data: CreateAppointmentGroupPayload) {
+  const response = await api.post<{ bookingGroupId: string; appointments: Appointment[] }>("/appointments/group", data);
   return response.data;
 }
 
