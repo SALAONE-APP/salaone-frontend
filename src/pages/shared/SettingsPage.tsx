@@ -70,7 +70,7 @@ import {
   updateSettings,
 } from '../../service/settingsService';
 import { changePassword, updateProfilePhoto } from '../../service/userService';
-import { disconnectGoogleCalendar, getGoogleCalendarConnection, startGoogleCalendarConnection, syncGoogleCalendarCurrentMonth, type GoogleCalendarConnection } from '../../service/googleCalendarService';
+import { disconnectGoogleCalendar, getGoogleCalendarConnection, startGoogleCalendarConnection, type GoogleCalendarConnection } from '../../service/googleCalendarService';
 import {
   BUSINESS_WEEKDAYS,
   DEFAULT_BUSINESS_HOURS,
@@ -219,18 +219,6 @@ function GoogleCalendarConnectionCard() {
     }
   }
 
-  async function syncCurrentMonth() {
-    try {
-      setSaving(true);
-      await syncGoogleCalendarCurrentMonth();
-      toast.success('Agendamentos do mês atual enviados ao Google Agenda.');
-    } catch {
-      toast.error('Nao foi possivel sincronizar os agendamentos. Verifique o backend.');
-    } finally {
-      setSaving(false);
-    }
-  }
-
   return (
     <div className="bg-card rounded-xl border border-border p-6 space-y-4">
       <div className="flex items-start gap-3">
@@ -245,7 +233,7 @@ function GoogleCalendarConnectionCard() {
       {loading ? <Spinner /> : connection?.connected ? (
         <div className="flex flex-col gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div><p className="text-sm font-medium text-foreground">Agenda conectada</p><p className="text-sm text-muted-foreground">{connection.googleEmail}</p></div>
-          <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={syncCurrentMonth} disabled={saving}>Sincronizar mês atual</Button><Button type="button" variant="outline" onClick={disconnect} disabled={saving} className="gap-2 text-destructive hover:text-destructive"><Unplug size={16} />Desconectar</Button></div>
+          <Button type="button" variant="outline" onClick={disconnect} disabled={saving} className="gap-2 text-destructive hover:text-destructive"><Unplug size={16} />Desconectar</Button>
         </div>
       ) : (
         <Button type="button" onClick={connect} disabled={saving} className="gap-2"><CalendarDays size={16} />{saving ? 'Conectando...' : 'Conectar Google Agenda'}</Button>

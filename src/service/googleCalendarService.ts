@@ -20,7 +20,3 @@ export async function startGoogleCalendarConnection() {
 export async function disconnectGoogleCalendar() {
   await api.delete("/auth/google-calendar");
 }
-
-export async function syncGoogleCalendarCurrentMonth() {
-  await api.post("/auth/google-calendar/sync-current-month");
-}
