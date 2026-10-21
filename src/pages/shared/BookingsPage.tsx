@@ -541,10 +541,7 @@ export function BookingsPage() {
 
   const filteredAppointments = useMemo(() => {
     const term = normalizeText(search.trim());
-
-    if (!term) return appointments;
-
-    return appointments.filter((appointment) => {
+    const matches = term ? appointments.filter((appointment) => {
       const serviceNames = appointment.services
         .map((service) => service.serviceName)
         .join(" ");
@@ -564,6 +561,25 @@ export function BookingsPage() {
       );
 
       return haystack.includes(term);
+    }) : appointments;
+
+    // A combined booking is a single visit in the table. Keep all its items
+    // adjacent even when another client's individual booking sits between two
+    // of its times; otherwise that row visually looks like part of the group.
+    const groupStart = new Map<string, number>();
+    for (const appointment of matches) {
+      if (!appointment.bookingGroupId) continue;
+      const key = `${appointment.bookingGroupId}:${appointment.clientId}`;
+      const start = new Date(appointment.startAt).getTime();
+      groupStart.set(key, Math.min(groupStart.get(key) ?? start, start));
+    }
+    const visitStart = (appointment: Appointment) => appointment.bookingGroupId
+      ? groupStart.get(`${appointment.bookingGroupId}:${appointment.clientId}`) ?? new Date(appointment.startAt).getTime()
+      : new Date(appointment.startAt).getTime();
+    return [...matches].sort((a, b) => {
+      const difference = visitStart(a) - visitStart(b);
+      if (difference !== 0) return difference;
+      return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
     });
   }, [appointments, search]);
 
