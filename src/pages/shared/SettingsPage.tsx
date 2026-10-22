@@ -233,7 +233,12 @@ function GoogleCalendarConnectionCard() {
       {loading ? <Spinner /> : connection?.connected ? (
         <div className="flex flex-col gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div><p className="text-sm font-medium text-foreground">Agenda conectada</p><p className="text-sm text-muted-foreground">{connection.googleEmail}</p></div>
-          <Button type="button" variant="outline" onClick={disconnect} disabled={saving} className="gap-2 text-destructive hover:text-destructive"><Unplug size={16} />Desconectar</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild type="button" variant="outline" className="gap-2">
+              <a href="https://calendar.google.com/calendar/u/0/r" target="_blank" rel="noreferrer"><ExternalLink size={16} />Abrir Google Agenda</a>
+            </Button>
+            <Button type="button" variant="outline" onClick={disconnect} disabled={saving} className="gap-2 text-destructive hover:text-destructive"><Unplug size={16} />Desconectar</Button>
+          </div>
         </div>
       ) : (
         <Button type="button" onClick={connect} disabled={saving} className="gap-2"><CalendarDays size={16} />{saving ? 'Conectando...' : 'Conectar Google Agenda'}</Button>
