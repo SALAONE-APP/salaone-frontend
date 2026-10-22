@@ -447,8 +447,11 @@ export function PaymentsPage() {
     const serviceAmount = finalAmount - interestAmount;
     const adjustmentDiscount = parseCurrencyInput(discountInput);
     const adjustmentSurcharge = parseCurrencyInput(surchargeInput);
-    const serviceSettlementAmount = serviceAmount + adjustmentDiscount - adjustmentSurcharge;
-    if (isServiceTabPayment && serviceSettlementAmount - payment.amount > 0.005) {
+    // O acréscimo aumenta o total da comanda; já o desconto permite quitar uma
+    // parcela maior do que o valor efetivamente recebido.
+    const serviceSettlementAmount = serviceAmount + adjustmentDiscount;
+    const adjustedServiceTabTotal = payment.amount + adjustmentSurcharge;
+    if (isServiceTabPayment && serviceSettlementAmount - adjustedServiceTabTotal > 0.005) {
       toast.error("O ajuste não pode quitar mais do que o saldo pendente da comanda.");
       return;
     }
@@ -472,7 +475,7 @@ export function PaymentsPage() {
           surchargeAmount: adjustmentSurcharge,
           adjustmentNote: hasAdjustment ? adjustmentNote.trim() : null,
         });
-        toast.success(serviceSettlementAmount + 0.005 >= payment.amount ? "Comanda quitada." : "Pagamento parcial registrado.");
+        toast.success(serviceSettlementAmount + 0.005 >= adjustedServiceTabTotal ? "Comanda quitada." : "Pagamento parcial registrado.");
       } else {
         await updatePayment(payment, {
           status: "paid",
