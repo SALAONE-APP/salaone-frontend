@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
+import { useGoogleLogin } from "@react-oauth/google";
 
 import loginProfessional from "../assets/image/salaone-login-professional.png";
 import salaOneLogo from "../assets/image/logo-icone-salaone.jpeg";
 import { useAuth } from "../hooks/useAuth";
 import { getDefaultRouteForRole } from "../config/profileConfig";
 import { Button } from "../components/ui/button";
+import { listPublicSalons, type PublicSalon } from "../service/registerService";
 import {
   Dialog,
   DialogContent,
@@ -38,15 +40,55 @@ function getErrorMessage(error: unknown) {
   );
 }
 
+function GoogleLoginButton({ disabled, onAccessToken, onError }: {
+  disabled: boolean;
+  onAccessToken: (accessToken: string) => void;
+  onError: () => void;
+}) {
+  const startGoogleLogin = useGoogleLogin({
+    flow: "implicit",
+    onSuccess: ({ access_token }) => onAccessToken(access_token),
+    onError,
+  });
+
+  return (
+    <button
+      type="button"
+      onClick={() => startGoogleLogin()}
+      disabled={disabled}
+      className="flex h-12 w-full items-center justify-center gap-3 rounded-lg border border-[#E5DDE5] bg-white font-semibold text-[#1A1A1A] transition hover:bg-[#F8F1F7] disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09Z" />
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z" />
+        <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z" />
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15A10.57 10.57 0 0 0 12 1 11 0 0 0 2.18 7.06L5.84 9.9C6.71 7.31 9.14 5.38 12 5.38Z" />
+      </svg>
+      Entrar com Google
+    </button>
+  );
+}
+
 export function Login() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [accessBlocked, setAccessBlocked] = useState<"SALON_BLOCKED" | "TRIAL_EXPIRED" | null>(null);
+  const [googleToken, setGoogleToken] = useState("");
+  const [showGoogleRegistration, setShowGoogleRegistration] = useState(false);
+  const [salons, setSalons] = useState<PublicSalon[]>([]);
+  const [selectedSalon, setSelectedSalon] = useState("");
+  const [phone, setPhone] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+
+  useEffect(() => {
+    if (showGoogleRegistration) void listPublicSalons().then(setSalons).catch(() => setErrorMessage("Nao foi possivel carregar os saloes."));
+  }, [showGoogleRegistration]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -75,6 +117,45 @@ export function Login() {
       setLoading(false);
     }
   }
+
+  async function handleGoogleLogin(accessToken: string) {
+    try {
+      setGoogleLoading(true);
+      setErrorMessage("");
+      setAccessBlocked(null);
+      const response = await loginWithGoogle(accessToken);
+      if (response.requiresProfileCompletion) {
+        setGoogleToken(accessToken);
+        setShowGoogleRegistration(true);
+        return;
+      }
+      if (response.accessStatus === "TRIAL_EXPIRED") {
+        navigate("/trial-expired", { replace: true });
+        return;
+      }
+      navigate(getDefaultRouteForRole(response.user.role), { replace: true });
+    } catch (error) {
+      const apiError = error as ApiErrorResponse;
+      const code = apiError.response?.data?.code;
+      if (code === "SALON_BLOCKED" || code === "TRIAL_EXPIRED") setAccessBlocked(code);
+      setErrorMessage(getErrorMessage(error));
+    } finally {
+      setGoogleLoading(false);
+    }
+  }
+
+  async function completeGoogleRegistration() {
+    if (!selectedSalon || !phone.trim() || !birthDate) { setErrorMessage("Selecione o salao e informe telefone e data de nascimento."); return; }
+    try {
+      setGoogleLoading(true);
+      const response = await loginWithGoogle(googleToken, { slug: selectedSalon, profileData: { phone, birthDate } });
+      if (response.requiresProfileCompletion) throw new Error("Nao foi possivel concluir o cadastro.");
+      setShowGoogleRegistration(false);
+      navigate(getDefaultRouteForRole(response.user.role), { replace: true });
+    } catch (error) { setErrorMessage(getErrorMessage(error)); } finally { setGoogleLoading(false); }
+  }
+
+  const googleEnabled = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
   return (
     <div className="grid min-h-screen bg-[#F8F1F7] lg:grid-cols-[1.05fr_0.95fr]">
@@ -162,12 +243,27 @@ export function Login() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || googleLoading}
             className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading && <Loader2 className="h-5 w-5 animate-spin" />}
             {loading ? "Entrando..." : "Entrar"}
           </button>
+
+          {googleEnabled && (
+            <>
+              <div className="my-6 flex items-center gap-4">
+                <div className="h-px flex-1 bg-[#E5DDE5]" />
+                <span className="text-sm text-[#6E6E6E]">ou</span>
+                <div className="h-px flex-1 bg-[#E5DDE5]" />
+              </div>
+              <GoogleLoginButton
+                disabled={loading || googleLoading}
+                onAccessToken={handleGoogleLogin}
+                onError={() => setErrorMessage("NÃ£o foi possÃ­vel autenticar com o Google. Tente novamente.")}
+              />
+            </>
+          )}
 
           <p className="mt-7 text-center text-sm text-muted-foreground">
             Ainda não possui uma conta?{" "}
@@ -195,6 +291,17 @@ export function Login() {
               Entendi
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showGoogleRegistration} onOpenChange={(open) => !googleLoading && setShowGoogleRegistration(open)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Complete seu cadastro</DialogTitle><DialogDescription>Selecione o salao onde deseja ser atendido para concluir seu acesso com Google.</DialogDescription></DialogHeader>
+          <div className="space-y-4">
+            <select value={selectedSalon} onChange={(event) => setSelectedSalon(event.target.value)} className="h-11 w-full rounded-lg border border-border bg-background px-3"><option value="">Selecione o salao</option>{salons.map((salon) => <option key={salon.id} value={salon.slug}>{salon.name}</option>)}</select>
+            <input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Telefone" className="h-11 w-full rounded-lg border border-border bg-background px-3" />
+            <input type="date" value={birthDate} onChange={(event) => setBirthDate(event.target.value)} className="h-11 w-full rounded-lg border border-border bg-background px-3" />
+          </div>
+          <DialogFooter><Button onClick={completeGoogleRegistration} disabled={googleLoading}>{googleLoading ? "Salvando..." : "Continuar"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

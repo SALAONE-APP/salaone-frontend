@@ -21,6 +21,8 @@ import {
   FileText,
   ExternalLink,
   ClipboardList,
+  CalendarDays,
+  Unplug,
 } from 'lucide-react';
 import { PlatformSubscriptionTab } from '@/components/PlatformSubscriptionTab';
 import { BannerImageEditor } from '@/components/BannerImageEditor';
@@ -68,6 +70,7 @@ import {
   updateSettings,
 } from '../../service/settingsService';
 import { changePassword, updateProfilePhoto } from '../../service/userService';
+import { disconnectGoogleCalendar, getGoogleCalendarConnection, startGoogleCalendarConnection, type GoogleCalendarConnection } from '../../service/googleCalendarService';
 import {
   BUSINESS_WEEKDAYS,
   DEFAULT_BUSINESS_HOURS,
@@ -173,6 +176,75 @@ function formatPhone(value: string) {
     return d.replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{4})(\d)/, '$1-$2');
   }
   return d.replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2');
+}
+
+function GoogleCalendarConnectionCard() {
+  const [connection, setConnection] = useState<GoogleCalendarConnection | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  async function loadConnection() {
+    try {
+      setLoading(true);
+      setConnection(await getGoogleCalendarConnection());
+    } catch {
+      toast.error('Nao foi possivel carregar a conexao do Google Agenda.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void loadConnection(); }, []);
+
+  async function connect() {
+    try {
+      setSaving(true);
+      window.location.assign(await startGoogleCalendarConnection());
+    } catch {
+      toast.error('Nao foi possivel iniciar a conexao com o Google Agenda.');
+      setSaving(false);
+    }
+  }
+
+  async function disconnect() {
+    try {
+      setSaving(true);
+      await disconnectGoogleCalendar();
+      setConnection({ connected: false });
+      toast.success('Google Agenda desconectado.');
+    } catch {
+      toast.error('Nao foi possivel desconectar o Google Agenda.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="bg-card rounded-xl border border-border p-6 space-y-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <CalendarDays size={20} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-lg font-medium text-foreground">Google Agenda</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Conecte uma conta Google para autorizar a sincronizacao da agenda. Isso nao altera seu acesso nem os dados da SalaOne.</p>
+        </div>
+      </div>
+      {loading ? <Spinner /> : connection?.connected ? (
+        <div className="flex flex-col gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div><p className="text-sm font-medium text-foreground">Agenda conectada</p><p className="text-sm text-muted-foreground">{connection.googleEmail}</p></div>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild type="button" variant="outline" className="gap-2">
+              <a href="https://calendar.google.com/calendar/u/0/r" target="_blank" rel="noreferrer"><ExternalLink size={16} />Abrir Google Agenda</a>
+            </Button>
+            <Button type="button" variant="outline" onClick={disconnect} disabled={saving} className="gap-2 text-destructive hover:text-destructive"><Unplug size={16} />Desconectar</Button>
+          </div>
+        </div>
+      ) : (
+        <Button type="button" onClick={connect} disabled={saving} className="gap-2"><CalendarDays size={16} />{saving ? 'Conectando...' : 'Conectar Google Agenda'}</Button>
+      )}
+    </div>
+  );
 }
 
 export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps) {
@@ -287,6 +359,23 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
   const isSuperAdminAccess = user?.role === 'super_admin' && Boolean(salonAccess);
   const isAdmin = user?.role === 'admin' || user?.isAdmin === true || isSuperAdminAccess;
   const canManageSecurityDocuments = isAdmin;
+
+  useEffect(() => {
+    const googleCalendarResult = searchParams.get('googleCalendar');
+    if (!googleCalendarResult) return;
+
+    setActiveTab('security');
+    if (googleCalendarResult === 'connected') {
+      toast.success('Google Agenda conectado com sucesso. A sincronizacao inicial foi iniciada.');
+    } else {
+      toast.error(searchParams.get('googleCalendarMessage') || 'Nao foi possivel conectar o Google Agenda.');
+    }
+
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete('googleCalendar');
+    nextSearchParams.delete('googleCalendarMessage');
+    setSearchParams(nextSearchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   function handleTabChange(tab: string) {
     setActiveTab(tab);
@@ -1992,6 +2081,8 @@ export function SettingsPage({ canShareRegistrationLink = false }: SettingsProps
 
         {/* Security */}
         <TabsContent value="security" className="space-y-6">
+
+          {isAdmin && <GoogleCalendarConnectionCard />}
 
           {/* Recebedor Pagar.me */}
           <div className="bg-card rounded-xl border border-border p-6 space-y-6">
