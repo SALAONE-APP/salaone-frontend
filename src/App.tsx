@@ -7,6 +7,7 @@ import { LandingPage } from "./pages/LandingPage";
 import { ForgotPassword } from "./pages/ForgotPassword";
 import { ResetPassword } from "./pages/ResetPassword";
 import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
+import { TermsOfServicePage } from "./pages/TermsOfServicePage";
 import { AccessSuspendedPage } from "./pages/AccessSuspendedPage";
 import { TrialExpiredPage } from "./pages/TrialExpiredPage";
 import { AppRoutes } from "./routes/AppRoutes";
@@ -22,6 +23,7 @@ function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/terms" element={<TermsOfServicePage />} />
             <Route path="/access-suspended" element={<AccessSuspendedPage />} />
             <Route path="/trial-expired" element={<TrialExpiredPage />} />
             <Route
