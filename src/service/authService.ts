@@ -53,6 +53,11 @@ export interface AuthResponse {
   salon?: StoredSalon | null;
 }
 
+export interface GooglePreRegistration {
+  slug: string;
+  profileData: { phone: string; birthDate: string };
+}
+
 export interface AccessibleSalon extends StoredSalon {
   role: string;
 }
@@ -102,9 +107,10 @@ export async function login(data: LoginPayload): Promise<AuthResponse> {
   return hydrateLoginResponse(response.data);
 }
 
-export async function googleLogin(accessToken: string): Promise<AuthResponse> {
-  const response = await api.post<BackendAuthResponse>("/auth/google", { accessToken });
-  return hydrateLoginResponse(response.data);
+export async function googleLogin(accessToken: string, preRegistration?: GooglePreRegistration): Promise<AuthResponse> {
+  const response = await api.post<BackendAuthResponse | AuthResponse>("/auth/google", { accessToken, ...preRegistration });
+  if (response.data.requiresProfileCompletion) return response.data as AuthResponse;
+  return hydrateLoginResponse(response.data as BackendAuthResponse);
 }
 
 async function hydrateLoginResponse(response: BackendAuthResponse): Promise<AuthResponse> {

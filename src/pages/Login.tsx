@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
@@ -9,6 +9,7 @@ import salaOneLogo from "../assets/image/logo-icone-salaone.jpeg";
 import { useAuth } from "../hooks/useAuth";
 import { getDefaultRouteForRole } from "../config/profileConfig";
 import { Button } from "../components/ui/button";
+import { listPublicSalons, type PublicSalon } from "../service/registerService";
 import {
   Dialog,
   DialogContent,
@@ -78,6 +79,16 @@ export function Login() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [accessBlocked, setAccessBlocked] = useState<"SALON_BLOCKED" | "TRIAL_EXPIRED" | null>(null);
+  const [googleToken, setGoogleToken] = useState("");
+  const [showGoogleRegistration, setShowGoogleRegistration] = useState(false);
+  const [salons, setSalons] = useState<PublicSalon[]>([]);
+  const [selectedSalon, setSelectedSalon] = useState("");
+  const [phone, setPhone] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+
+  useEffect(() => {
+    if (showGoogleRegistration) void listPublicSalons().then(setSalons).catch(() => setErrorMessage("Nao foi possivel carregar os saloes."));
+  }, [showGoogleRegistration]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -112,12 +123,17 @@ export function Login() {
       setGoogleLoading(true);
       setErrorMessage("");
       setAccessBlocked(null);
-      const loggedUser = await loginWithGoogle(accessToken);
-      if (loggedUser.accessStatus === "TRIAL_EXPIRED") {
+      const response = await loginWithGoogle(accessToken);
+      if (response.requiresProfileCompletion) {
+        setGoogleToken(accessToken);
+        setShowGoogleRegistration(true);
+        return;
+      }
+      if (response.accessStatus === "TRIAL_EXPIRED") {
         navigate("/trial-expired", { replace: true });
         return;
       }
-      navigate(getDefaultRouteForRole(loggedUser.role), { replace: true });
+      navigate(getDefaultRouteForRole(response.user.role), { replace: true });
     } catch (error) {
       const apiError = error as ApiErrorResponse;
       const code = apiError.response?.data?.code;
@@ -126,6 +142,17 @@ export function Login() {
     } finally {
       setGoogleLoading(false);
     }
+  }
+
+  async function completeGoogleRegistration() {
+    if (!selectedSalon || !phone.trim() || !birthDate) { setErrorMessage("Selecione o salao e informe telefone e data de nascimento."); return; }
+    try {
+      setGoogleLoading(true);
+      const response = await loginWithGoogle(googleToken, { slug: selectedSalon, profileData: { phone, birthDate } });
+      if (response.requiresProfileCompletion) throw new Error("Nao foi possivel concluir o cadastro.");
+      setShowGoogleRegistration(false);
+      navigate(getDefaultRouteForRole(response.user.role), { replace: true });
+    } catch (error) { setErrorMessage(getErrorMessage(error)); } finally { setGoogleLoading(false); }
   }
 
   const googleEnabled = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
@@ -264,6 +291,17 @@ export function Login() {
               Entendi
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showGoogleRegistration} onOpenChange={(open) => !googleLoading && setShowGoogleRegistration(open)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Complete seu cadastro</DialogTitle><DialogDescription>Selecione o salao onde deseja ser atendido para concluir seu acesso com Google.</DialogDescription></DialogHeader>
+          <div className="space-y-4">
+            <select value={selectedSalon} onChange={(event) => setSelectedSalon(event.target.value)} className="h-11 w-full rounded-lg border border-border bg-background px-3"><option value="">Selecione o salao</option>{salons.map((salon) => <option key={salon.id} value={salon.slug}>{salon.name}</option>)}</select>
+            <input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Telefone" className="h-11 w-full rounded-lg border border-border bg-background px-3" />
+            <input type="date" value={birthDate} onChange={(event) => setBirthDate(event.target.value)} className="h-11 w-full rounded-lg border border-border bg-background px-3" />
+          </div>
+          <DialogFooter><Button onClick={completeGoogleRegistration} disabled={googleLoading}>{googleLoading ? "Salvando..." : "Continuar"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
