@@ -109,7 +109,9 @@ export async function login(data: LoginPayload): Promise<AuthResponse> {
 
 export async function googleLogin(accessToken: string, preRegistration?: GooglePreRegistration): Promise<AuthResponse> {
   const response = await api.post<BackendAuthResponse | AuthResponse>("/auth/google", { accessToken, ...preRegistration });
-  if (response.data.requiresProfileCompletion) return response.data as AuthResponse;
+  if ("requiresProfileCompletion" in response.data && response.data.requiresProfileCompletion) {
+    return response.data;
+  }
   return hydrateLoginResponse(response.data as BackendAuthResponse);
 }
 
