@@ -174,13 +174,18 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
       toast.error("Selecione o script utilizado.");
       return;
     }
+    // Lead importado do Instagram pode chegar sem telefone; o que ja tinha nao pode ser apagado.
+    if (!phone.trim() && lead.phone) {
+      toast.error("Informe o telefone do lead.");
+      return;
+    }
 
     setSaving(true);
     try {
       const updated = await updateSalesLead(lead.id, {
         contactName: contactName.trim(),
         salonName: salonName.trim() || null,
-        phone: phone.trim(),
+        phone: phone.trim() || undefined,
         instagramHandle: instagramHandle.trim() || null,
         email: email.trim() || null,
         channel,
