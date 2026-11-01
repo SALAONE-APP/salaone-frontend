@@ -580,3 +580,87 @@ export function buildSalesLeadCsvTemplate(product: SalesProduct) {
   const content = [SALES_LEAD_CSV_TEMPLATE_HEADER.join(";"), example.join(";")].join("\r\n") + "\r\n";
   return new Blob(["﻿" + content], { type: "text/csv;charset=utf-8" });
 }
+
+// ---- Busca de leads no Google Maps (Apify) - so super_admin ----
+
+export type SalesLeadSearchStatus = "running" | "succeeded" | "failed" | "importing" | "imported";
+
+export type SalesLeadSearchBudget =
+  | { configured: false; product: SalesProduct }
+  | {
+      configured: true;
+      product: SalesProduct;
+      cycleEndAt: string | null;
+      limitUsd: number;
+      usedUsd: number;
+      reservedUsd: number;
+      availableUsd: number;
+      percent: number;
+      level: "ok" | "warning" | "blocked";
+      maxPlacesAffordable: number;
+    };
+
+export interface SalesLeadSearch {
+  id: string;
+  product: SalesProduct;
+  pipelineId: string;
+  pipelineName: string | null;
+  responsibleId: string;
+  responsibleName: string | null;
+  scriptId: string | null;
+  createdByName: string | null;
+  searchTerm: string;
+  location: string;
+  maxPlaces: number;
+  status: SalesLeadSearchStatus;
+  estimatedCostUsd: number;
+  costUsd: number | null;
+  errorMessage: string | null;
+  createdCount: number | null;
+  createdAt: string;
+  finishedAt: string | null;
+  importedAt: string | null;
+}
+
+// Mesmos valores do backend (utils/apifyGoogleMaps.ts), so para a estimativa na tela.
+export const GOOGLE_MAPS_PRICE_PER_PLACE_USD = 0.006;
+export const GOOGLE_MAPS_RUN_OVERHEAD_USD = 0.02;
+// Teste controlado: cada busca traz no maximo 3 estabelecimentos.
+export const GOOGLE_MAPS_MAX_PLACES_PER_SEARCH = 3;
+
+export function estimateGoogleMapsSearchCost(maxPlaces: number) {
+  return maxPlaces * GOOGLE_MAPS_PRICE_PER_PLACE_USD + GOOGLE_MAPS_RUN_OVERHEAD_USD;
+}
+
+export async function getSalesLeadSearchBudget(product: SalesProduct) {
+  const response = await api.get<{ budget: SalesLeadSearchBudget }>("/sales-crm/lead-searches/budget", { params: { product } });
+  return response.data.budget;
+}
+
+export async function listSalesLeadSearches(product: SalesProduct) {
+  const response = await api.get<{ items: SalesLeadSearch[] }>("/sales-crm/lead-searches", { params: { product } });
+  return response.data.items;
+}
+
+export async function createSalesLeadSearch(input: {
+  product: SalesProduct;
+  pipelineId?: string;
+  responsibleId: string;
+  scriptId: string | null;
+  searchTerm: string;
+  location: string;
+  maxPlaces: number;
+}) {
+  const response = await api.post<{ search: SalesLeadSearch }>("/sales-crm/lead-searches", input);
+  return response.data.search;
+}
+
+export async function previewSalesLeadSearch(id: string) {
+  const response = await api.get<SalesLeadImportResult>(`/sales-crm/lead-searches/${id}/preview`);
+  return response.data;
+}
+
+export async function importSalesLeadSearch(id: string) {
+  const response = await api.post<SalesLeadImportResult>(`/sales-crm/lead-searches/${id}/import`);
+  return response.data;
+}
