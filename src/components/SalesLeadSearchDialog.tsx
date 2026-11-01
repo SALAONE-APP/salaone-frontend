@@ -307,7 +307,7 @@ export function SalesLeadSearchDialog({ product, pipeline, source, open, onClose
             <p className="text-sm text-muted-foreground">
               Resultado de <strong className="text-foreground">{searchTitle(previewing.search)}</strong> · responsável {previewing.search.responsibleName ?? "—"}.{" "}
               {isInstagram
-                ? "Perfis sem telefone (nem link do WhatsApp na bio) ou já cadastrados neste produto são ignorados."
+                ? "Perfis já cadastrados neste produto (pelo @ ou telefone) são ignorados. Perfis sem telefone entram mesmo assim, para você completar o telefone no lead."
                 : "Estabelecimentos sem telefone ou já cadastrados neste produto são ignorados."}
             </p>
             <SalesLeadImportPreview result={previewing.result} lineLabel="#" />
