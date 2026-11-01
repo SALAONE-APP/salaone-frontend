@@ -32,7 +32,6 @@ import {
 import { listSuperAdminUsers, type SuperAdminUser } from "@/service/superAdminService";
 
 const POLL_INTERVAL_MS = 5000;
-const MIN_PLACES = 10;
 
 function formatUsd(value: number) {
   return `US$ ${value.toFixed(2)}`;
@@ -83,7 +82,7 @@ export function SalesLeadSearchBudgetAlert({ budget, compact = false }: { budget
           {budget.level === "blocked" ? (
             <span>Novas buscas ficam bloqueadas até a renovação do ciclo.</span>
           ) : (
-            <span>Cabem até {budget.maxPlacesAffordable} estabelecimentos na próxima busca.</span>
+            <span>Cabem cerca de {Math.floor(budget.availableUsd / estimateGoogleMapsSearchCost(GOOGLE_MAPS_MAX_PLACES_PER_SEARCH))} buscas até o limite do mês.</span>
           )}
         </div>
       </AlertDescription>
@@ -113,7 +112,6 @@ export function SalesLeadSearchDialog({ product, pipeline, open, onClose, onImpo
   const [searches, setSearches] = useState<SalesLeadSearch[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [location, setLocation] = useState("");
-  const [maxPlaces, setMaxPlaces] = useState(50);
   const [responsibleId, setResponsibleId] = useState("");
   const [scriptId, setScriptId] = useState("none");
   const [responsibleOptions, setResponsibleOptions] = useState<SuperAdminUser[]>([]);
@@ -137,7 +135,6 @@ export function SalesLeadSearchDialog({ product, pipeline, open, onClose, onImpo
     if (!open) {
       setSearchTerm("");
       setLocation("");
-      setMaxPlaces(50);
       setResponsibleId("");
       setScriptId("none");
       setPreviewing(null);
@@ -161,7 +158,8 @@ export function SalesLeadSearchDialog({ product, pipeline, open, onClose, onImpo
   }, [open, hasRunning, refresh]);
 
   const blocked = !budget || !budget.configured || budget.level === "blocked";
-  const maxAllowed = budget?.configured ? budget.maxPlacesAffordable : 0;
+  // Quantidade fixa por busca (teste controlado do plano FREE).
+  const maxPlaces = GOOGLE_MAPS_MAX_PLACES_PER_SEARCH;
   const estimatedCost = estimateGoogleMapsSearchCost(maxPlaces);
   const overBudget = budget?.configured ? maxPlaces > budget.maxPlacesAffordable : true;
 
@@ -183,11 +181,6 @@ export function SalesLeadSearchDialog({ product, pipeline, open, onClose, onImpo
       toast.error("Selecione o script de abordagem.");
       return;
     }
-    if (maxPlaces < MIN_PLACES || maxPlaces > GOOGLE_MAPS_MAX_PLACES_PER_SEARCH) {
-      toast.error(`A quantidade deve ficar entre ${MIN_PLACES} e ${GOOGLE_MAPS_MAX_PLACES_PER_SEARCH}.`);
-      return;
-    }
-
     setSubmitting(true);
     try {
       await createSalesLeadSearch({
@@ -296,18 +289,11 @@ export function SalesLeadSearchDialog({ product, pipeline, open, onClose, onImpo
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <Label>Quantidade de estabelecimentos</Label>
-                  <Input
-                    className="mt-1.5"
-                    type="number"
-                    min={MIN_PLACES}
-                    max={Math.max(MIN_PLACES, Math.min(GOOGLE_MAPS_MAX_PLACES_PER_SEARCH, maxAllowed))}
-                    step={10}
-                    value={maxPlaces}
-                    onChange={(e) => setMaxPlaces(Number(e.target.value))}
-                  />
+                  <p className="mt-1.5 flex h-9 items-center rounded-md border border-border bg-muted/40 px-3 text-sm">
+                    {maxPlaces} por busca
+                  </p>
                   <p className={cn("mt-1 text-xs", overBudget ? "text-destructive" : "text-muted-foreground")}>
                     Custo estimado: {formatUsd(estimatedCost)}
-                    {overBudget && budget?.configured && ` · máximo agora: ${budget.maxPlacesAffordable}`}
                   </p>
                 </div>
                 <div>

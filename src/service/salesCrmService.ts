@@ -625,7 +625,8 @@ export interface SalesLeadSearch {
 // Mesmos valores do backend (utils/apifyGoogleMaps.ts), so para a estimativa na tela.
 export const GOOGLE_MAPS_PRICE_PER_PLACE_USD = 0.006;
 export const GOOGLE_MAPS_RUN_OVERHEAD_USD = 0.02;
-export const GOOGLE_MAPS_MAX_PLACES_PER_SEARCH = 200;
+// Teste controlado: cada busca traz no maximo 3 estabelecimentos.
+export const GOOGLE_MAPS_MAX_PLACES_PER_SEARCH = 3;
 
 export function estimateGoogleMapsSearchCost(maxPlaces: number) {
   return maxPlaces * GOOGLE_MAPS_PRICE_PER_PLACE_USD + GOOGLE_MAPS_RUN_OVERHEAD_USD;
