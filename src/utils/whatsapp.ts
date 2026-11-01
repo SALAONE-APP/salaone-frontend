@@ -30,6 +30,12 @@ export function hasWhatsAppPhone(phone: string | null | undefined): boolean {
   return Boolean(formatPhone(phone ?? ""));
 }
 
+// Link para abrir a conversa com o numero, sem mensagem pronta. Null se o numero nao for valido.
+export function buildWhatsAppChatUrl(phone: string | null | undefined): string | null {
+  const formatted = formatPhone(phone ?? "");
+  return formatted ? `https://wa.me/${formatted}` : null;
+}
+
 function formatCurrencyBR(value: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }

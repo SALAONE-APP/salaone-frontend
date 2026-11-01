@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { AlertTriangle, CircleDot, Filter, Instagram, Loader2, MessageCircle, Plus, Search, Settings2, Upload, UserCog } from "lucide-react";
+import { AlertTriangle, CircleDot, Filter, Instagram, Loader2, MessageCircle, Phone, Plus, Search, Settings2, Upload, UserCog } from "lucide-react";
 import { toast } from "sonner";
 
 import { SalesLeadCreateDialog } from "@/components/SalesLeadCreateDialog";
 import { SalesLeadDetailDialog } from "@/components/SalesLeadDetailDialog";
 import { SalesLeadImportDialog } from "@/components/SalesLeadImportDialog";
+import { InstagramLinkButton, WhatsAppLinkButton } from "@/components/SalesLeadContactLinks";
 import { SalesPipelineManagerDialog } from "@/components/SalesPipelineManagerDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -588,10 +589,18 @@ export function SalesCrmKanbanPage() {
                         </div>
 
                         <div className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground">
+                          {lead.phone && (
+                            <div className="flex items-center gap-1.5">
+                              <Phone size={12} className="shrink-0" />
+                              <span className="min-w-0 flex-1 truncate">{lead.phone}</span>
+                              <WhatsAppLinkButton value={lead.phone} size="card" />
+                            </div>
+                          )}
                           {lead.instagramHandle && (
                             <div className="flex items-center gap-1.5">
-                              <Instagram size={12} />
-                              <span className="truncate">{lead.instagramHandle}</span>
+                              <Instagram size={12} className="shrink-0" />
+                              <span className="min-w-0 flex-1 truncate">{lead.instagramHandle}</span>
+                              <InstagramLinkButton value={lead.instagramHandle} size="card" />
                             </div>
                           )}
                           {lead.nextAction && (

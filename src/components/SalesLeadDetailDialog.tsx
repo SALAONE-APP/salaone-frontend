@@ -46,6 +46,7 @@ import {
   salesBusinessNameLabel,
 } from "@/service/salesCrmService";
 import { listSuperAdminUsers, type SuperAdminUser } from "@/service/superAdminService";
+import { InstagramLinkButton, WhatsAppLinkButton } from "@/components/SalesLeadContactLinks";
 
 interface Props {
   leadId: string | null;
@@ -275,11 +276,17 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
                 </div>
                 <div>
                   <Label>Telefone</Label>
-                  <Input className="mt-1.5" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  <div className="mt-1.5 flex gap-2">
+                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+                    <WhatsAppLinkButton value={phone} />
+                  </div>
                 </div>
                 <div>
                   <Label>Instagram</Label>
-                  <Input className="mt-1.5" value={instagramHandle} onChange={(e) => setInstagramHandle(e.target.value)} />
+                  <div className="mt-1.5 flex gap-2">
+                    <Input value={instagramHandle} onChange={(e) => setInstagramHandle(e.target.value)} />
+                    <InstagramLinkButton value={instagramHandle} />
+                  </div>
                 </div>
                 <div>
                   <Label>E-mail</Label>
