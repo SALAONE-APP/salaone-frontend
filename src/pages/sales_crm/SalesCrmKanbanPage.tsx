@@ -37,6 +37,7 @@ import {
   listSalesLeads,
   getSalesLeadSearchBudget,
   type SalesLeadSearchBudget,
+  type SalesLeadSearchSource,
   SALES_PRODUCT_BUSINESS_LABELS,
   SALES_PRODUCT_LABELS,
   salesChannelLabel,
@@ -121,9 +122,16 @@ export function SalesCrmKanbanPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  // Mantem a ultima fonte para o titulo nao trocar durante a animacao de fechar.
+  const [searchSource, setSearchSource] = useState<SalesLeadSearchSource>("google_maps");
+
+  function openSearch(source: SalesLeadSearchSource) {
+    setSearchSource(source);
+    setSearchOpen(true);
+  }
   const [searchBudget, setSearchBudget] = useState<SalesLeadSearchBudget | null>(null);
 
-  // Alerta de consumo do credito do Apify (busca no Google Maps) para o super_admin.
+  // Alerta de consumo do credito do Apify (buscas no Google Maps/Instagram) para o super_admin.
   useEffect(() => {
     if (!isSuperAdmin) return;
     let cancelled = false;
@@ -422,9 +430,15 @@ export function SalesCrmKanbanPage() {
             </Button>
           )}
           {isSuperAdmin && (
-            <Button size="sm" variant="outline" className="gap-2" onClick={() => setSearchOpen(true)} disabled={!activePipeline}>
+            <Button size="sm" variant="outline" className="gap-2" onClick={() => openSearch("google_maps")} disabled={!activePipeline}>
               <MapPin size={14} />
               Buscar no Google Maps
+            </Button>
+          )}
+          {isSuperAdmin && (
+            <Button size="sm" variant="outline" className="gap-2" onClick={() => openSearch("instagram")} disabled={!activePipeline}>
+              <Instagram size={14} />
+              Buscar no Instagram
             </Button>
           )}
           <Button size="sm" variant="outline" className="gap-2" onClick={() => setImportOpen(true)} disabled={!activePipeline}>
@@ -671,6 +685,7 @@ export function SalesCrmKanbanPage() {
         <SalesLeadSearchDialog
           product={product}
           pipeline={activePipeline}
+          source={searchSource}
           open={searchOpen}
           onClose={() => setSearchOpen(false)}
           onImported={() => void load()}

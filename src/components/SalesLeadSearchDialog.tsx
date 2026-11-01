@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Loader2, MapPin, Search, XCircle } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AlertTriangle, CheckCircle2, Instagram, Loader2, MapPin, Search, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { SalesLeadImportPreview } from "@/components/SalesLeadImportPreview";
@@ -11,20 +11,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   GOOGLE_MAPS_MAX_PLACES_PER_SEARCH,
+  GOOGLE_MAPS_MIN_PLACES_PER_SEARCH,
+  INSTAGRAM_MAX_PROFILES_PER_SEARCH,
   SALES_PRODUCT_LABELS,
+  createInstagramLeadSearch,
   createSalesLeadSearch,
   estimateGoogleMapsSearchCost,
+  estimateInstagramSearchCost,
   getSalesLeadSearchBudget,
   importSalesLeadSearch,
   listSalesLeadSearches,
   listSalesScripts,
+  parseInstagramUsernamesInput,
   previewSalesLeadSearch,
   type SalesLeadImportResult,
   type SalesLeadSearch,
   type SalesLeadSearchBudget,
+  type SalesLeadSearchSource,
   type SalesPipeline,
   type SalesProduct,
   type SalesScript,
@@ -32,6 +39,11 @@ import {
 import { listSuperAdminUsers, type SuperAdminUser } from "@/service/superAdminService";
 
 const POLL_INTERVAL_MS = 5000;
+
+const SOURCE_LABELS: Record<SalesLeadSearchSource, string> = {
+  google_maps: "Google Maps",
+  instagram: "Instagram",
+};
 
 function formatUsd(value: number) {
   return `US$ ${value.toFixed(2)}`;
@@ -42,8 +54,9 @@ function errorMessage(error: unknown, fallback: string) {
   return typeof value === "string" ? value : fallback;
 }
 
-// Consumo do credito gratuito do Apify do produto. Tambem e usado no Kanban
-// como alerta quando o consumo passa de 80% ou as buscas estao bloqueadas.
+// Consumo do credito gratuito do Apify do produto (vale para Google Maps e
+// Instagram). Tambem e usado no Kanban como alerta quando o consumo passa de 80%
+// ou as buscas estao bloqueadas.
 export function SalesLeadSearchBudgetAlert({ budget, compact = false }: { budget: SalesLeadSearchBudget | null; compact?: boolean }) {
   if (!budget) return null;
 
@@ -52,7 +65,7 @@ export function SalesLeadSearchBudgetAlert({ budget, compact = false }: { budget
       <Alert>
         <AlertTriangle />
         <AlertTitle>Integração com o Apify não configurada</AlertTitle>
-        <AlertDescription>Cadastre o token da conta do Apify deste produto no servidor para liberar a busca no Google Maps.</AlertDescription>
+        <AlertDescription>Cadastre o token da conta do Apify deste produto no servidor para liberar as buscas de leads.</AlertDescription>
       </Alert>
     );
   }
@@ -62,7 +75,7 @@ export function SalesLeadSearchBudgetAlert({ budget, compact = false }: { budget
   const cycleEnd = budget.cycleEndAt ? new Date(budget.cycleEndAt).toLocaleDateString("pt-BR") : null;
   const title =
     budget.level === "blocked"
-      ? "Buscas no Google Maps bloqueadas: crédito gratuito do Apify esgotado"
+      ? "Buscas de leads bloqueadas: crédito gratuito do Apify esgotado"
       : budget.level === "warning"
         ? "Crédito gratuito do Apify acabando"
         : "Crédito do Apify no mês";
@@ -82,7 +95,7 @@ export function SalesLeadSearchBudgetAlert({ budget, compact = false }: { budget
           {budget.level === "blocked" ? (
             <span>Novas buscas ficam bloqueadas até a renovação do ciclo.</span>
           ) : (
-            <span>Cabem cerca de {Math.floor(budget.availableUsd / estimateGoogleMapsSearchCost(GOOGLE_MAPS_MAX_PLACES_PER_SEARCH))} buscas até o limite do mês.</span>
+            <span>Restam {formatUsd(budget.availableUsd)} para buscas neste mês.</span>
           )}
         </div>
       </AlertDescription>
@@ -98,20 +111,30 @@ const STATUS_BADGES: Record<SalesLeadSearch["status"], { label: string; classNam
   failed: { label: "Falhou", className: "bg-destructive/15 text-destructive" },
 };
 
+function searchTitle(search: SalesLeadSearch) {
+  return search.source === "instagram" ? search.searchTerm : `${search.searchTerm} · ${search.location ?? ""}`;
+}
+
 interface Props {
   product: SalesProduct;
   pipeline: SalesPipeline | null;
+  source: SalesLeadSearchSource;
   open: boolean;
   onClose: () => void;
   onImported: () => void;
   onBudgetChange?: (budget: SalesLeadSearchBudget) => void;
 }
 
-export function SalesLeadSearchDialog({ product, pipeline, open, onClose, onImported, onBudgetChange }: Props) {
+export function SalesLeadSearchDialog({ product, pipeline, source, open, onClose, onImported, onBudgetChange }: Props) {
+  const isInstagram = source === "instagram";
+  const SourceIcon = isInstagram ? Instagram : MapPin;
+
   const [budget, setBudget] = useState<SalesLeadSearchBudget | null>(null);
   const [searches, setSearches] = useState<SalesLeadSearch[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [location, setLocation] = useState("");
+  const [maxPlaces, setMaxPlaces] = useState(GOOGLE_MAPS_MIN_PLACES_PER_SEARCH);
+  const [usernamesText, setUsernamesText] = useState("");
   const [responsibleId, setResponsibleId] = useState("");
   const [scriptId, setScriptId] = useState("none");
   const [responsibleOptions, setResponsibleOptions] = useState<SuperAdminUser[]>([]);
@@ -124,17 +147,19 @@ export function SalesLeadSearchDialog({ product, pipeline, open, onClose, onImpo
     try {
       const [nextBudget, nextSearches] = await Promise.all([getSalesLeadSearchBudget(product), listSalesLeadSearches(product)]);
       setBudget(nextBudget);
-      setSearches(nextSearches);
+      setSearches(nextSearches.filter((search) => search.source === source));
       onBudgetChange?.(nextBudget);
     } catch (error) {
-      toast.error(errorMessage(error, "Não foi possível consultar as buscas do Google Maps."));
+      toast.error(errorMessage(error, `Não foi possível consultar as buscas do ${SOURCE_LABELS[source]}.`));
     }
-  }, [product, onBudgetChange]);
+  }, [product, source, onBudgetChange]);
 
   useEffect(() => {
     if (!open) {
       setSearchTerm("");
       setLocation("");
+      setMaxPlaces(GOOGLE_MAPS_MIN_PLACES_PER_SEARCH);
+      setUsernamesText("");
       setResponsibleId("");
       setScriptId("none");
       setPreviewing(null);
@@ -157,43 +182,70 @@ export function SalesLeadSearchDialog({ product, pipeline, open, onClose, onImpo
     return () => window.clearInterval(timer);
   }, [open, hasRunning, refresh]);
 
+  const parsedUsernames = useMemo(() => parseInstagramUsernamesInput(usernamesText), [usernamesText]);
+  const itemCount = isInstagram ? parsedUsernames.usernames.length : maxPlaces;
+  const estimatedCost = isInstagram ? estimateInstagramSearchCost(itemCount) : estimateGoogleMapsSearchCost(itemCount);
   const blocked = !budget || !budget.configured || budget.level === "blocked";
-  // Quantidade fixa por busca (teste controlado do plano FREE).
-  const maxPlaces = GOOGLE_MAPS_MAX_PLACES_PER_SEARCH;
-  const estimatedCost = estimateGoogleMapsSearchCost(maxPlaces);
-  const overBudget = budget?.configured ? maxPlaces > budget.maxPlacesAffordable : true;
+  const overBudget = budget?.configured ? estimatedCost > budget.availableUsd : true;
+  const quantityInvalid = isInstagram
+    ? itemCount === 0 || itemCount > INSTAGRAM_MAX_PROFILES_PER_SEARCH || parsedUsernames.invalid.length > 0
+    : !Number.isInteger(maxPlaces) || maxPlaces < GOOGLE_MAPS_MIN_PLACES_PER_SEARCH || maxPlaces > GOOGLE_MAPS_MAX_PLACES_PER_SEARCH;
 
-  async function handleStart() {
-    if (!pipeline) return;
-    if (searchTerm.trim().length < 2) {
-      toast.error("Informe o que buscar (ex.: barbearia).");
-      return;
-    }
-    if (location.trim().length < 2) {
-      toast.error("Informe a cidade (ex.: Fortaleza, CE).");
-      return;
-    }
+  function validateCommon() {
     if (!responsibleId) {
       toast.error("Selecione o vendedor responsável pelos leads.");
-      return;
+      return false;
     }
     if (scriptId === "none" && scriptOptions.length > 0) {
       toast.error("Selecione o script de abordagem.");
-      return;
+      return false;
     }
+    return true;
+  }
+
+  async function handleStart() {
+    if (!pipeline) return;
+    const common = { product, pipelineId: pipeline.id, responsibleId, scriptId: scriptId === "none" ? null : scriptId };
+
+    if (isInstagram) {
+      if (parsedUsernames.invalid.length > 0) {
+        toast.error(`Perfis inválidos: ${parsedUsernames.invalid.slice(0, 5).join(", ")}. Use o @ ou o link do perfil.`);
+        return;
+      }
+      if (itemCount === 0) {
+        toast.error("Informe ao menos um perfil do Instagram.");
+        return;
+      }
+      if (itemCount > INSTAGRAM_MAX_PROFILES_PER_SEARCH) {
+        toast.error(`Informe no máximo ${INSTAGRAM_MAX_PROFILES_PER_SEARCH} perfis por busca.`);
+        return;
+      }
+    } else {
+      if (searchTerm.trim().length < 2) {
+        toast.error("Informe o que buscar (ex.: barbearia).");
+        return;
+      }
+      if (location.trim().length < 2) {
+        toast.error("Informe a cidade (ex.: Fortaleza, CE).");
+        return;
+      }
+      if (quantityInvalid) {
+        toast.error(`A quantidade deve ficar entre ${GOOGLE_MAPS_MIN_PLACES_PER_SEARCH} e ${GOOGLE_MAPS_MAX_PLACES_PER_SEARCH}.`);
+        return;
+      }
+    }
+    if (!validateCommon()) return;
+
     setSubmitting(true);
     try {
-      await createSalesLeadSearch({
-        product,
-        pipelineId: pipeline.id,
-        responsibleId,
-        scriptId: scriptId === "none" ? null : scriptId,
-        searchTerm: searchTerm.trim(),
-        location: location.trim(),
-        maxPlaces,
-      });
+      if (isInstagram) {
+        await createInstagramLeadSearch({ ...common, usernames: parsedUsernames.usernames });
+        setUsernamesText("");
+      } else {
+        await createSalesLeadSearch({ ...common, searchTerm: searchTerm.trim(), location: location.trim(), maxPlaces });
+        setSearchTerm("");
+      }
       toast.success("Busca iniciada. Leva alguns minutos; você pode fechar esta janela e voltar depois.");
-      setSearchTerm("");
       await refresh();
     } catch (error) {
       toast.error(errorMessage(error, "Não foi possível iniciar a busca."));
@@ -221,7 +273,7 @@ export function SalesLeadSearchDialog({ product, pipeline, open, onClose, onImpo
       const result = await importSalesLeadSearch(previewing.search.id);
       const skipped = result.duplicates.length + result.invalid.length;
       toast.success(
-        `${result.created} ${result.created === 1 ? "lead importado" : "leads importados"} do Google Maps` +
+        `${result.created} ${result.created === 1 ? "lead importado" : "leads importados"} do ${SOURCE_LABELS[source]}` +
           (skipped > 0 ? ` · ${skipped} ignorados` : "") +
           ".",
       );
@@ -239,21 +291,27 @@ export function SalesLeadSearchDialog({ product, pipeline, open, onClose, onImpo
     <Dialog open={open} onOpenChange={(next) => !next && !submitting && onClose()}>
       <DialogContent className="flex max-h-[90vh] flex-col gap-4 overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Buscar leads no Google Maps · {SALES_PRODUCT_LABELS[product]}</DialogTitle>
+          <DialogTitle>
+            Buscar leads no {SOURCE_LABELS[source]} · {SALES_PRODUCT_LABELS[product]}
+          </DialogTitle>
           <DialogDescription>
-            Busca estabelecimentos no Google Maps (com Instagram e e-mail do site, quando houver) e importa como leads no funil{" "}
-            {pipeline ? `"${pipeline.name}"` : "ativo"}, com o canal "Google Meu Negócio".
+            {isInstagram
+              ? "Busca os dados dos perfis do Instagram informados (nome, link da bio e telefone do WhatsApp, quando houver)"
+              : "Busca estabelecimentos no Google Maps (com Instagram e e-mail do site, quando houver)"}{" "}
+            e importa como leads no funil {pipeline ? `"${pipeline.name}"` : "ativo"}, com o canal "{isInstagram ? "Instagram" : "Google Meu Negócio"}".
           </DialogDescription>
         </DialogHeader>
 
         {previewing ? (
           <>
             <p className="text-sm text-muted-foreground">
-              Resultado de <strong className="text-foreground">"{previewing.search.searchTerm}"</strong> em {previewing.search.location} · responsável{" "}
-              {previewing.search.responsibleName ?? "—"}. Estabelecimentos sem telefone ou já cadastrados neste produto são ignorados.
+              Resultado de <strong className="text-foreground">{searchTitle(previewing.search)}</strong> · responsável {previewing.search.responsibleName ?? "—"}.{" "}
+              {isInstagram
+                ? "Perfis sem telefone (nem link do WhatsApp na bio) ou já cadastrados neste produto são ignorados."
+                : "Estabelecimentos sem telefone ou já cadastrados neste produto são ignorados."}
             </p>
             <SalesLeadImportPreview result={previewing.result} lineLabel="#" />
-            {previewing.result.valid === 0 && <p className="text-sm text-destructive">Nenhum estabelecimento novo para importar.</p>}
+            {previewing.result.valid === 0 && <p className="text-sm text-destructive">Nenhum lead novo para importar.</p>}
             <DialogFooter>
               <Button variant="outline" onClick={() => setPreviewing(null)} disabled={submitting}>
                 Voltar
@@ -275,27 +333,52 @@ export function SalesLeadSearchDialog({ product, pipeline, open, onClose, onImpo
             )}
 
             <fieldset disabled={blocked || submitting} className="flex flex-col gap-3 disabled:opacity-60">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {isInstagram ? (
                 <div>
-                  <Label>O que buscar</Label>
-                  <Input className="mt-1.5" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Ex.: barbearia" maxLength={100} />
+                  <Label>Perfis do Instagram</Label>
+                  <Textarea
+                    className="mt-1.5 min-h-28 font-mono text-sm"
+                    value={usernamesText}
+                    onChange={(e) => setUsernamesText(e.target.value)}
+                    placeholder={"@barbearia_exemplo\n@salao.exemplo\nhttps://www.instagram.com/loja_exemplo"}
+                  />
+                  <p className={cn("mt-1 text-xs", quantityInvalid && itemCount > 0 ? "text-destructive" : "text-muted-foreground")}>
+                    Um por linha (@ ou link do perfil), até {INSTAGRAM_MAX_PROFILES_PER_SEARCH}. {itemCount} {itemCount === 1 ? "perfil" : "perfis"}
+                    {parsedUsernames.invalid.length > 0 && ` · inválidos: ${parsedUsernames.invalid.slice(0, 3).join(", ")}`}
+                    {itemCount > 0 && ` · custo estimado: ${formatUsd(estimatedCost)}`}
+                  </p>
                 </div>
-                <div>
-                  <Label>Cidade</Label>
-                  <Input className="mt-1.5" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ex.: Fortaleza, CE" maxLength={150} />
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label>O que buscar</Label>
+                    <Input className="mt-1.5" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Ex.: barbearia" maxLength={100} />
+                  </div>
+                  <div>
+                    <Label>Cidade</Label>
+                    <Input className="mt-1.5" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ex.: Fortaleza, CE" maxLength={150} />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <Label>Quantidade de estabelecimentos</Label>
-                  <p className="mt-1.5 flex h-9 items-center rounded-md border border-border bg-muted/40 px-3 text-sm">
-                    {maxPlaces} por busca
-                  </p>
-                  <p className={cn("mt-1 text-xs", overBudget ? "text-destructive" : "text-muted-foreground")}>
-                    Custo estimado: {formatUsd(estimatedCost)}
-                  </p>
-                </div>
+                {!isInstagram && (
+                  <div>
+                    <Label>Quantidade de estabelecimentos</Label>
+                    <Input
+                      className="mt-1.5"
+                      type="number"
+                      min={GOOGLE_MAPS_MIN_PLACES_PER_SEARCH}
+                      max={GOOGLE_MAPS_MAX_PLACES_PER_SEARCH}
+                      step={10}
+                      value={maxPlaces}
+                      onChange={(e) => setMaxPlaces(Number(e.target.value))}
+                    />
+                    <p className={cn("mt-1 text-xs", quantityInvalid || overBudget ? "text-destructive" : "text-muted-foreground")}>
+                      De {GOOGLE_MAPS_MIN_PLACES_PER_SEARCH} a {GOOGLE_MAPS_MAX_PLACES_PER_SEARCH} · custo estimado: {formatUsd(estimatedCost)}
+                    </p>
+                  </div>
+                )}
                 <div>
                   <Label>Vendedor responsável</Label>
                   <Select value={responsibleId} onValueChange={setResponsibleId}>
@@ -311,23 +394,22 @@ export function SalesLeadSearchDialog({ product, pipeline, open, onClose, onImpo
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-
-              <div>
-                <Label>Script de abordagem</Label>
-                <Select value={scriptId === "none" && scriptOptions.length > 0 ? "" : scriptId} onValueChange={setScriptId}>
-                  <SelectTrigger className="mt-1.5">
-                    <SelectValue placeholder="Selecione um script" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {scriptOptions.length === 0 && <SelectItem value="none">Nenhum</SelectItem>}
-                    {scriptOptions.map((script) => (
-                      <SelectItem key={script.id} value={script.id}>
-                        {script.name} ({script.version})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div>
+                  <Label>Script de abordagem</Label>
+                  <Select value={scriptId === "none" && scriptOptions.length > 0 ? "" : scriptId} onValueChange={setScriptId}>
+                    <SelectTrigger className="mt-1.5">
+                      <SelectValue placeholder="Selecione um script" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {scriptOptions.length === 0 && <SelectItem value="none">Nenhum</SelectItem>}
+                      {scriptOptions.map((script) => (
+                        <SelectItem key={script.id} value={script.id}>
+                          {script.name} ({script.version})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </fieldset>
 
@@ -335,7 +417,7 @@ export function SalesLeadSearchDialog({ product, pipeline, open, onClose, onImpo
               <Button variant="outline" onClick={onClose} disabled={submitting}>
                 Fechar
               </Button>
-              <Button className="gap-2" onClick={() => void handleStart()} disabled={blocked || submitting || overBudget || !pipeline}>
+              <Button className="gap-2" onClick={() => void handleStart()} disabled={blocked || submitting || overBudget || quantityInvalid || !pipeline}>
                 {submitting ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
                 Buscar
               </Button>
@@ -351,14 +433,12 @@ export function SalesLeadSearchDialog({ product, pipeline, open, onClose, onImpo
                       <li key={search.id} className="flex flex-col gap-2 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
                           <p className="flex items-center gap-1.5 font-medium text-foreground">
-                            <MapPin size={14} className="shrink-0 text-muted-foreground" />
-                            <span className="truncate">
-                              {search.searchTerm} · {search.location}
-                            </span>
+                            <SourceIcon size={14} className="shrink-0 text-muted-foreground" />
+                            <span className="truncate">{searchTitle(search)}</span>
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(search.createdAt).toLocaleString("pt-BR")} · até {search.maxPlaces} locais · {search.responsibleName ?? "—"} ·{" "}
-                            {formatUsd(search.costUsd ?? search.estimatedCostUsd)}
+                            {new Date(search.createdAt).toLocaleString("pt-BR")} · {isInstagram ? `${search.maxPlaces} perfis` : `até ${search.maxPlaces} locais`} ·{" "}
+                            {search.responsibleName ?? "—"} · {formatUsd(search.costUsd ?? search.estimatedCostUsd)}
                             {search.costUsd === null && " (estimado)"}
                           </p>
                           {search.status === "failed" && search.errorMessage && <p className="text-xs text-destructive">{search.errorMessage}</p>}

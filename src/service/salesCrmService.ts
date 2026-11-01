@@ -584,6 +584,7 @@ export function buildSalesLeadCsvTemplate(product: SalesProduct) {
 // ---- Busca de leads no Google Maps (Apify) - so super_admin ----
 
 export type SalesLeadSearchStatus = "running" | "succeeded" | "failed" | "importing" | "imported";
+export type SalesLeadSearchSource = "google_maps" | "instagram";
 
 export type SalesLeadSearchBudget =
   | { configured: false; product: SalesProduct }
@@ -609,8 +610,10 @@ export interface SalesLeadSearch {
   responsibleName: string | null;
   scriptId: string | null;
   createdByName: string | null;
+  source: SalesLeadSearchSource;
   searchTerm: string;
-  location: string;
+  location: string | null;
+  usernames: string[];
   maxPlaces: number;
   status: SalesLeadSearchStatus;
   estimatedCostUsd: number;
@@ -625,11 +628,43 @@ export interface SalesLeadSearch {
 // Mesmos valores do backend (utils/apifyGoogleMaps.ts), so para a estimativa na tela.
 export const GOOGLE_MAPS_PRICE_PER_PLACE_USD = 0.006;
 export const GOOGLE_MAPS_RUN_OVERHEAD_USD = 0.02;
-// Teste controlado: cada busca traz no maximo 3 estabelecimentos.
-export const GOOGLE_MAPS_MAX_PLACES_PER_SEARCH = 3;
+export const GOOGLE_MAPS_MIN_PLACES_PER_SEARCH = 10;
+export const GOOGLE_MAPS_MAX_PLACES_PER_SEARCH = 100;
 
 export function estimateGoogleMapsSearchCost(maxPlaces: number) {
   return maxPlaces * GOOGLE_MAPS_PRICE_PER_PLACE_USD + GOOGLE_MAPS_RUN_OVERHEAD_USD;
+}
+
+// Mesmos valores do backend (utils/apifyInstagram.ts).
+export const INSTAGRAM_PRICE_PER_PROFILE_USD = 0.0026;
+export const INSTAGRAM_RUN_OVERHEAD_USD = 0.02;
+export const INSTAGRAM_MAX_PROFILES_PER_SEARCH = 100;
+
+export function estimateInstagramSearchCost(profiles: number) {
+  return profiles * INSTAGRAM_PRICE_PER_PROFILE_USD + INSTAGRAM_RUN_OVERHEAD_USD;
+}
+
+// "@usuario", "usuario" ou link do perfil -> usuario em minusculas (null se invalido).
+export function normalizeInstagramUsernameInput(value: string) {
+  let raw = value.trim();
+  const fromUrl = raw.match(/instagram\.com\/([^/?#\s]+)/i);
+  if (fromUrl) raw = fromUrl[1];
+  raw = raw.replace(/^@/, "");
+  if (!/^[A-Za-z0-9._]{1,30}$/.test(raw) || ["p", "reel", "reels", "explore", "stories", "tv", "accounts"].includes(raw.toLowerCase())) return null;
+  return raw.toLowerCase();
+}
+
+// Texto colado (um por linha, virgula ou espaco) -> usuarios unicos e entradas invalidas.
+export function parseInstagramUsernamesInput(text: string) {
+  const usernames: string[] = [];
+  const invalid: string[] = [];
+  for (const item of text.split(/[\s,;]+/)) {
+    if (!item.trim()) continue;
+    const username = normalizeInstagramUsernameInput(item);
+    if (!username) invalid.push(item.trim());
+    else if (!usernames.includes(username)) usernames.push(username);
+  }
+  return { usernames, invalid };
 }
 
 export async function getSalesLeadSearchBudget(product: SalesProduct) {
@@ -652,6 +687,17 @@ export async function createSalesLeadSearch(input: {
   maxPlaces: number;
 }) {
   const response = await api.post<{ search: SalesLeadSearch }>("/sales-crm/lead-searches", input);
+  return response.data.search;
+}
+
+export async function createInstagramLeadSearch(input: {
+  product: SalesProduct;
+  pipelineId?: string;
+  responsibleId: string;
+  scriptId: string | null;
+  usernames: string[];
+}) {
+  const response = await api.post<{ search: SalesLeadSearch }>("/sales-crm/lead-searches/instagram", input);
   return response.data.search;
 }
 
