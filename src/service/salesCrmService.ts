@@ -584,7 +584,8 @@ export function buildSalesLeadCsvTemplate(product: SalesProduct) {
 // ---- Busca de leads no Google Maps (Apify) - so super_admin ----
 
 export type SalesLeadSearchStatus = "running" | "succeeded" | "failed" | "importing" | "imported";
-export type SalesLeadSearchSource = "google_maps" | "instagram";
+// "instagram": lista de perfis informada; "instagram_search": busca por nicho.
+export type SalesLeadSearchSource = "google_maps" | "instagram" | "instagram_search";
 
 export type SalesLeadSearchBudget =
   | { configured: false; product: SalesProduct }
@@ -642,6 +643,37 @@ export const INSTAGRAM_MAX_PROFILES_PER_SEARCH = 100;
 
 export function estimateInstagramSearchCost(profiles: number) {
   return profiles * INSTAGRAM_PRICE_PER_PROFILE_USD + INSTAGRAM_RUN_OVERHEAD_USD;
+}
+
+// Busca por nicho (mesmos valores de utils/instagramNiches.ts no backend).
+export const INSTAGRAM_SEARCH_PRICE_PER_RESULT_USD = 0.0027;
+export const INSTAGRAM_SEARCH_RUN_OVERHEAD_USD = 0.02;
+export const INSTAGRAM_SEARCH_MIN_PROFILES = 10;
+export const INSTAGRAM_SEARCH_MAX_PROFILES = 100;
+
+// Estimativa simples (o backend divide a quantidade entre os termos do nicho).
+export function estimateInstagramNicheSearchCost(profiles: number) {
+  return profiles * INSTAGRAM_SEARCH_PRICE_PER_RESULT_USD + INSTAGRAM_SEARCH_RUN_OVERHEAD_USD;
+}
+
+export type InstagramNicheOption = { key: string; label: string };
+
+export async function listInstagramNiches(product: SalesProduct) {
+  const response = await api.get<{ items: InstagramNicheOption[] }>("/sales-crm/lead-searches/instagram/niches", { params: { product } });
+  return response.data.items;
+}
+
+export async function createInstagramNicheSearch(input: {
+  product: SalesProduct;
+  pipelineId?: string;
+  responsibleId: string;
+  scriptId: string | null;
+  niche: string;
+  location: string;
+  maxProfiles: number;
+}) {
+  const response = await api.post<{ search: SalesLeadSearch }>("/sales-crm/lead-searches/instagram/niche", input);
+  return response.data.search;
 }
 
 // "@usuario", "usuario" ou link do perfil -> usuario em minusculas (null se invalido).

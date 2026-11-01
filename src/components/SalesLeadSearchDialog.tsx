@@ -17,17 +17,23 @@ import {
   GOOGLE_MAPS_MAX_PLACES_PER_SEARCH,
   GOOGLE_MAPS_MIN_PLACES_PER_SEARCH,
   INSTAGRAM_MAX_PROFILES_PER_SEARCH,
+  INSTAGRAM_SEARCH_MAX_PROFILES,
+  INSTAGRAM_SEARCH_MIN_PROFILES,
   SALES_PRODUCT_LABELS,
   createInstagramLeadSearch,
+  createInstagramNicheSearch,
   createSalesLeadSearch,
   estimateGoogleMapsSearchCost,
+  estimateInstagramNicheSearchCost,
   estimateInstagramSearchCost,
   getSalesLeadSearchBudget,
   importSalesLeadSearch,
   listSalesLeadSearches,
+  listInstagramNiches,
   listSalesScripts,
   parseInstagramUsernamesInput,
   previewSalesLeadSearch,
+  type InstagramNicheOption,
   type SalesLeadImportResult,
   type SalesLeadSearch,
   type SalesLeadSearchBudget,
@@ -43,7 +49,11 @@ const POLL_INTERVAL_MS = 5000;
 const SOURCE_LABELS: Record<SalesLeadSearchSource, string> = {
   google_maps: "Google Maps",
   instagram: "Instagram",
+  instagram_search: "Instagram",
 };
+
+// No Instagram: busca por nicho (padrao) ou por uma lista de perfis.
+type InstagramMode = "niche" | "list";
 
 function formatUsd(value: number) {
   return `US$ ${value.toFixed(2)}`;
@@ -112,7 +122,15 @@ const STATUS_BADGES: Record<SalesLeadSearch["status"], { label: string; classNam
 };
 
 function searchTitle(search: SalesLeadSearch) {
-  return search.source === "instagram" ? search.searchTerm : `${search.searchTerm} · ${search.location ?? ""}`;
+  if (search.source === "instagram") return search.searchTerm;
+  if (search.source === "instagram_search") return `${search.searchTerm} · ${search.location || "todas as cidades"}`;
+  return `${search.searchTerm} · ${search.location ?? ""}`;
+}
+
+function searchCountLabel(search: SalesLeadSearch) {
+  if (search.source === "instagram") return `${search.maxPlaces} perfis`;
+  if (search.source === "instagram_search") return `até ${search.maxPlaces} perfis`;
+  return `até ${search.maxPlaces} locais`;
 }
 
 interface Props {
@@ -135,6 +153,10 @@ export function SalesLeadSearchDialog({ product, pipeline, source, open, onClose
   const [location, setLocation] = useState("");
   const [maxPlaces, setMaxPlaces] = useState(GOOGLE_MAPS_MIN_PLACES_PER_SEARCH);
   const [usernamesText, setUsernamesText] = useState("");
+  const [instagramMode, setInstagramMode] = useState<InstagramMode>("niche");
+  const [niche, setNiche] = useState("");
+  const [nicheOptions, setNicheOptions] = useState<InstagramNicheOption[]>([]);
+  const [maxProfiles, setMaxProfiles] = useState(INSTAGRAM_SEARCH_MIN_PROFILES);
   const [responsibleId, setResponsibleId] = useState("");
   const [scriptId, setScriptId] = useState("none");
   const [responsibleOptions, setResponsibleOptions] = useState<SuperAdminUser[]>([]);
@@ -147,7 +169,8 @@ export function SalesLeadSearchDialog({ product, pipeline, source, open, onClose
     try {
       const [nextBudget, nextSearches] = await Promise.all([getSalesLeadSearchBudget(product), listSalesLeadSearches(product)]);
       setBudget(nextBudget);
-      setSearches(nextSearches.filter((search) => search.source === source));
+      // As duas formas de busca do Instagram aparecem juntas.
+      setSearches(nextSearches.filter((search) => (source === "google_maps" ? search.source === "google_maps" : search.source !== "google_maps")));
       onBudgetChange?.(nextBudget);
     } catch (error) {
       toast.error(errorMessage(error, `Não foi possível consultar as buscas do ${SOURCE_LABELS[source]}.`));
@@ -160,19 +183,27 @@ export function SalesLeadSearchDialog({ product, pipeline, source, open, onClose
       setLocation("");
       setMaxPlaces(GOOGLE_MAPS_MIN_PLACES_PER_SEARCH);
       setUsernamesText("");
+      setInstagramMode("niche");
+      setNiche("");
+      setMaxProfiles(INSTAGRAM_SEARCH_MIN_PROFILES);
       setResponsibleId("");
       setScriptId("none");
       setPreviewing(null);
       return;
     }
     void refresh();
+    if (source !== "google_maps") {
+      listInstagramNiches(product)
+        .then(setNicheOptions)
+        .catch(() => setNicheOptions([]));
+    }
     listSalesScripts({ product, active: true })
       .then(setScriptOptions)
       .catch(() => null);
     Promise.all([listSuperAdminUsers({ role: "sales_rep", limit: 100 }), listSuperAdminUsers({ role: "super_admin", limit: 100 })])
       .then(([reps, admins]) => setResponsibleOptions([...reps.items, ...admins.items]))
       .catch(() => null);
-  }, [open, product, refresh]);
+  }, [open, product, source, refresh]);
 
   // Enquanto houver busca rodando, consulta o andamento periodicamente.
   const hasRunning = searches.some((search) => search.status === "running" || search.status === "importing");
@@ -182,12 +213,19 @@ export function SalesLeadSearchDialog({ product, pipeline, source, open, onClose
     return () => window.clearInterval(timer);
   }, [open, hasRunning, refresh]);
 
+  const isNicheSearch = isInstagram && instagramMode === "niche";
   const parsedUsernames = useMemo(() => parseInstagramUsernamesInput(usernamesText), [usernamesText]);
-  const itemCount = isInstagram ? parsedUsernames.usernames.length : maxPlaces;
-  const estimatedCost = isInstagram ? estimateInstagramSearchCost(itemCount) : estimateGoogleMapsSearchCost(itemCount);
+  const itemCount = isNicheSearch ? maxProfiles : isInstagram ? parsedUsernames.usernames.length : maxPlaces;
+  const estimatedCost = isNicheSearch
+    ? estimateInstagramNicheSearchCost(itemCount)
+    : isInstagram
+      ? estimateInstagramSearchCost(itemCount)
+      : estimateGoogleMapsSearchCost(itemCount);
   const blocked = !budget || !budget.configured || budget.level === "blocked";
   const overBudget = budget?.configured ? estimatedCost > budget.availableUsd : true;
-  const quantityInvalid = isInstagram
+  const quantityInvalid = isNicheSearch
+    ? !Number.isInteger(maxProfiles) || maxProfiles < INSTAGRAM_SEARCH_MIN_PROFILES || maxProfiles > INSTAGRAM_SEARCH_MAX_PROFILES
+    : isInstagram
     ? itemCount === 0 || itemCount > INSTAGRAM_MAX_PROFILES_PER_SEARCH || parsedUsernames.invalid.length > 0
     : !Number.isInteger(maxPlaces) || maxPlaces < GOOGLE_MAPS_MIN_PLACES_PER_SEARCH || maxPlaces > GOOGLE_MAPS_MAX_PLACES_PER_SEARCH;
 
@@ -207,7 +245,16 @@ export function SalesLeadSearchDialog({ product, pipeline, source, open, onClose
     if (!pipeline) return;
     const common = { product, pipelineId: pipeline.id, responsibleId, scriptId: scriptId === "none" ? null : scriptId };
 
-    if (isInstagram) {
+    if (isNicheSearch) {
+      if (!niche) {
+        toast.error("Selecione o nicho que deseja buscar.");
+        return;
+      }
+      if (quantityInvalid) {
+        toast.error(`A quantidade deve ficar entre ${INSTAGRAM_SEARCH_MIN_PROFILES} e ${INSTAGRAM_SEARCH_MAX_PROFILES}.`);
+        return;
+      }
+    } else if (isInstagram) {
       if (parsedUsernames.invalid.length > 0) {
         toast.error(`Perfis inválidos: ${parsedUsernames.invalid.slice(0, 5).join(", ")}. Use o @ ou o link do perfil.`);
         return;
@@ -238,7 +285,9 @@ export function SalesLeadSearchDialog({ product, pipeline, source, open, onClose
 
     setSubmitting(true);
     try {
-      if (isInstagram) {
+      if (isNicheSearch) {
+        await createInstagramNicheSearch({ ...common, niche, location: location.trim(), maxProfiles });
+      } else if (isInstagram) {
         await createInstagramLeadSearch({ ...common, usernames: parsedUsernames.usernames });
         setUsernamesText("");
       } else {
@@ -296,7 +345,7 @@ export function SalesLeadSearchDialog({ product, pipeline, source, open, onClose
           </DialogTitle>
           <DialogDescription>
             {isInstagram
-              ? "Busca os dados dos perfis do Instagram informados (nome, link da bio e telefone do WhatsApp, quando houver)"
+              ? "Busca perfis do Instagram por nicho e cidade, ou pela lista de perfis informada (nome, link da bio e telefone do WhatsApp, quando houver),"
               : "Busca estabelecimentos no Google Maps (com Instagram e e-mail do site, quando houver)"}{" "}
             e importa como leads no funil {pipeline ? `"${pipeline.name}"` : "ativo"}, com o canal "{isInstagram ? "Instagram" : "Google Meu Negócio"}".
           </DialogDescription>
@@ -333,7 +382,57 @@ export function SalesLeadSearchDialog({ product, pipeline, source, open, onClose
             )}
 
             <fieldset disabled={blocked || submitting} className="flex flex-col gap-3 disabled:opacity-60">
-              {isInstagram ? (
+              {isInstagram && (
+                <div className="flex gap-2">
+                  <Button type="button" size="sm" variant={instagramMode === "niche" ? "default" : "outline"} onClick={() => setInstagramMode("niche")}>
+                    Por nicho
+                  </Button>
+                  <Button type="button" size="sm" variant={instagramMode === "list" ? "default" : "outline"} onClick={() => setInstagramMode("list")}>
+                    Por lista de perfis
+                  </Button>
+                </div>
+              )}
+
+              {isNicheSearch ? (
+                <>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <Label>Nicho</Label>
+                      <Select value={niche} onValueChange={setNiche}>
+                        <SelectTrigger className="mt-1.5">
+                          <SelectValue placeholder="Selecione o nicho que deseja pegar os leads" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {nicheOptions.map((option) => (
+                            <SelectItem key={option.key} value={option.key}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Cidade</Label>
+                      <Input className="mt-1.5" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ex.: Fortaleza (opcional)" maxLength={150} />
+                    </div>
+                  </div>
+                  <div className="sm:w-1/2 sm:pr-1.5">
+                    <Label>Quantidade de perfis</Label>
+                    <Input
+                      className="mt-1.5"
+                      type="number"
+                      min={INSTAGRAM_SEARCH_MIN_PROFILES}
+                      max={INSTAGRAM_SEARCH_MAX_PROFILES}
+                      step={10}
+                      value={maxProfiles}
+                      onChange={(e) => setMaxProfiles(Number(e.target.value))}
+                    />
+                    <p className={cn("mt-1 text-xs", quantityInvalid || overBudget ? "text-destructive" : "text-muted-foreground")}>
+                      De {INSTAGRAM_SEARCH_MIN_PROFILES} a {INSTAGRAM_SEARCH_MAX_PROFILES} · custo estimado: {formatUsd(estimatedCost)}
+                    </p>
+                  </div>
+                </>
+              ) : isInstagram ? (
                 <div>
                   <Label>Perfis do Instagram</Label>
                   <Textarea
@@ -437,7 +536,7 @@ export function SalesLeadSearchDialog({ product, pipeline, source, open, onClose
                             <span className="truncate">{searchTitle(search)}</span>
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(search.createdAt).toLocaleString("pt-BR")} · {isInstagram ? `${search.maxPlaces} perfis` : `até ${search.maxPlaces} locais`} ·{" "}
+                            {new Date(search.createdAt).toLocaleString("pt-BR")} · {searchCountLabel(search)} ·{" "}
                             {search.responsibleName ?? "—"} · {formatUsd(search.costUsd ?? search.estimatedCostUsd)}
                             {search.costUsd === null && " (estimado)"}
                           </p>
