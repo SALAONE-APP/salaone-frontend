@@ -1,18 +1,27 @@
 import api from "./api";
 
-export const SALES_PRODUCTS = ["salaone", "barberone"] as const;
+export const SALES_PRODUCTS = ["salaone", "barberone", "shopone"] as const;
 export type SalesProduct = (typeof SALES_PRODUCTS)[number];
 
 export const SALES_PRODUCT_LABELS: Record<SalesProduct, string> = {
   salaone: "SalaOne",
   barberone: "BarberOne",
+  shopone: "ShopOne",
 };
 
 // Como o cliente-alvo de cada produto e chamado nos textos do CRM.
-export const SALES_PRODUCT_BUSINESS_LABELS: Record<SalesProduct, { singular: string; plural: string }> = {
-  salaone: { singular: "salão", plural: "salões" },
-  barberone: { singular: "barbearia", plural: "barbearias" },
+// preposition monta "do salão" / "da barbearia" / "da loja".
+export const SALES_PRODUCT_BUSINESS_LABELS: Record<SalesProduct, { singular: string; plural: string; preposition: "do" | "da" }> = {
+  salaone: { singular: "salão", plural: "salões", preposition: "do" },
+  barberone: { singular: "barbearia", plural: "barbearias", preposition: "da" },
+  shopone: { singular: "loja", plural: "lojas", preposition: "da" },
 };
+
+// "Nome do salão", "Nome da barbearia", "Nome da loja".
+export function salesBusinessNameLabel(product: string) {
+  const business = SALES_PRODUCT_BUSINESS_LABELS[isSalesProduct(product) ? product : "salaone"];
+  return `Nome ${business.preposition} ${business.singular}`;
+}
 
 export function isSalesProduct(value: string): value is SalesProduct {
   return (SALES_PRODUCTS as readonly string[]).includes(value);

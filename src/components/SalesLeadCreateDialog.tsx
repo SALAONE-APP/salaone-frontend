@@ -19,6 +19,7 @@ import {
   type SalesLead,
   type SalesScript,
   type SalesProduct,
+  salesBusinessNameLabel,
 } from "@/service/salesCrmService";
 import { listSuperAdminUsers, type SuperAdminUser } from "@/service/superAdminService";
 
@@ -156,7 +157,7 @@ export function SalesLeadCreateDialog({ product, pipelineId, open, onClose, onCr
         </div>
 
         <div>
-          <Label>Nome {product === "barberone" ? "da barbearia" : "do salão"}</Label>
+          <Label>{salesBusinessNameLabel(product)}</Label>
           <Input className="mt-1.5" value={salonName} onChange={(e) => setSalonName(e.target.value)} placeholder="Opcional" />
         </div>
 

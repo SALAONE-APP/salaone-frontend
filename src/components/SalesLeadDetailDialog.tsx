@@ -43,6 +43,7 @@ import {
   type SalesPipeline,
   type SalesLeadActivity,
   type SalesScript,
+  salesBusinessNameLabel,
 } from "@/service/salesCrmService";
 import { listSuperAdminUsers, type SuperAdminUser } from "@/service/superAdminService";
 
@@ -269,7 +270,7 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
                   <Input className="mt-1.5" value={contactName} onChange={(e) => setContactName(e.target.value)} />
                 </div>
                 <div>
-                  <Label>Nome {lead?.product === "barberone" ? "da barbearia" : "do salão"}</Label>
+                  <Label>{salesBusinessNameLabel(lead?.product ?? "salaone")}</Label>
                   <Input className="mt-1.5" value={salonName} onChange={(e) => setSalonName(e.target.value)} />
                 </div>
                 <div>

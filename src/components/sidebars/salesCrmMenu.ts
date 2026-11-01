@@ -1,4 +1,4 @@
-import { BarChart3, Building2, FileText, KanbanSquare, Scissors } from "lucide-react";
+import { BarChart3, Building2, FileText, KanbanSquare, Scissors, ShoppingBag } from "lucide-react";
 
 import type { SidebarItem } from "../shared/ProfileSidebar";
 
@@ -19,4 +19,5 @@ function productGroup(label: string, product: string, icon: SidebarItem["icon"])
 export const salesCrmProductItems: SidebarItem[] = [
   productGroup("SalaOne", "salaone", Building2),
   productGroup("BarberOne", "barberone", Scissors),
+  productGroup("ShopOne", "shopone", ShoppingBag),
 ];
