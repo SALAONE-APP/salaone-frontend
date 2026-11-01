@@ -10,6 +10,6 @@ export const docsMenuItem: SidebarItem = {
   children: [
     { icon: Building2, label: "SalaOne", href: "/documentacoes/salaone" },
     { icon: Scissors, label: "BarberOne", href: "/documentacoes/barberone" },
-    { icon: ShoppingBag, label: "ShopOne", href: "/documentacoes/shopone" },
+    { icon: ShoppingBag, label: "S1 ORBE", href: "/documentacoes/shopone" },
   ],
 };

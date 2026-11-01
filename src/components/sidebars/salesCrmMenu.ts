@@ -19,5 +19,5 @@ function productGroup(label: string, product: string, icon: SidebarItem["icon"])
 export const salesCrmProductItems: SidebarItem[] = [
   productGroup("SalaOne", "salaone", Building2),
   productGroup("BarberOne", "barberone", Scissors),
-  productGroup("ShopOne", "shopone", ShoppingBag),
+  productGroup("S1 ORBE", "shopone", ShoppingBag),
 ];

@@ -6,7 +6,7 @@ export type SalesProduct = (typeof SALES_PRODUCTS)[number];
 export const SALES_PRODUCT_LABELS: Record<SalesProduct, string> = {
   salaone: "SalaOne",
   barberone: "BarberOne",
-  shopone: "ShopOne",
+  shopone: "S1 ORBE",
 };
 
 // Como o cliente-alvo de cada produto e chamado nos textos do CRM.
