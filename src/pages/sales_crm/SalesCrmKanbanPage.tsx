@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { AlertTriangle, CircleDot, Filter, Instagram, Loader2, MessageCircle, Plus, Search, Settings2, UserCog } from "lucide-react";
+import { AlertTriangle, CircleDot, Filter, Instagram, Loader2, MessageCircle, Plus, Search, Settings2, Upload, UserCog } from "lucide-react";
 import { toast } from "sonner";
 
 import { SalesLeadCreateDialog } from "@/components/SalesLeadCreateDialog";
 import { SalesLeadDetailDialog } from "@/components/SalesLeadDetailDialog";
+import { SalesLeadImportDialog } from "@/components/SalesLeadImportDialog";
 import { SalesPipelineManagerDialog } from "@/components/SalesPipelineManagerDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -114,6 +115,7 @@ export function SalesCrmKanbanPage() {
   const [dragOverCardId, setDragOverCardId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const [pendingLostReasonDrag, setPendingLostReasonDrag] = useState<PendingLostReasonDrag | null>(null);
   const [pendingLostReason, setPendingLostReason] = useState("");
@@ -393,13 +395,17 @@ export function SalesCrmKanbanPage() {
             Acompanhe a prospecção de novos clientes do {SALES_PRODUCT_LABELS[product]} ({business.plural}), do primeiro contato ao fechamento.
           </p>
         </div>
-        <div className="flex items-center gap-2 self-start">
+        <div className="flex flex-wrap items-center gap-2 self-start">
           {isSuperAdmin && (
             <Button size="sm" variant="outline" className="gap-2" onClick={() => setManagerOpen(true)}>
               <Settings2 size={14} />
               Gerenciar funis
             </Button>
           )}
+          <Button size="sm" variant="outline" className="gap-2" onClick={() => setImportOpen(true)} disabled={!activePipeline}>
+            <Upload size={14} />
+            Importar CSV
+          </Button>
           <Button size="sm" className="gap-2" onClick={() => setCreateOpen(true)} disabled={!activePipeline}>
             <Plus size={14} />
             Novo Lead
@@ -618,6 +624,13 @@ export function SalesCrmKanbanPage() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={() => void load()}
+      />
+      <SalesLeadImportDialog
+        product={product}
+        pipeline={activePipeline}
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => void load()}
       />
 
       <SalesPipelineManagerDialog

@@ -1,18 +1,27 @@
 import api from "./api";
 
-export const SALES_PRODUCTS = ["salaone", "barberone"] as const;
+export const SALES_PRODUCTS = ["salaone", "barberone", "shopone"] as const;
 export type SalesProduct = (typeof SALES_PRODUCTS)[number];
 
 export const SALES_PRODUCT_LABELS: Record<SalesProduct, string> = {
   salaone: "SalaOne",
   barberone: "BarberOne",
+  shopone: "S1 ORBE",
 };
 
 // Como o cliente-alvo de cada produto e chamado nos textos do CRM.
-export const SALES_PRODUCT_BUSINESS_LABELS: Record<SalesProduct, { singular: string; plural: string }> = {
-  salaone: { singular: "salão", plural: "salões" },
-  barberone: { singular: "barbearia", plural: "barbearias" },
+// preposition monta "do salão" / "da barbearia" / "da loja".
+export const SALES_PRODUCT_BUSINESS_LABELS: Record<SalesProduct, { singular: string; plural: string; preposition: "do" | "da" }> = {
+  salaone: { singular: "salão", plural: "salões", preposition: "do" },
+  barberone: { singular: "barbearia", plural: "barbearias", preposition: "da" },
+  shopone: { singular: "loja", plural: "lojas", preposition: "da" },
 };
+
+// "Nome do salão", "Nome da barbearia", "Nome da loja".
+export function salesBusinessNameLabel(product: string) {
+  const business = SALES_PRODUCT_BUSINESS_LABELS[isSalesProduct(product) ? product : "salaone"];
+  return `Nome ${business.preposition} ${business.singular}`;
+}
 
 export function isSalesProduct(value: string): value is SalesProduct {
   return (SALES_PRODUCTS as readonly string[]).includes(value);
@@ -502,3 +511,72 @@ export const SALES_PIPELINE_TEMPLATES: Array<{ id: string; name: string; descrip
     ],
   },
 ];
+
+// ---- Importacao de leads via CSV ----
+// O parsing e a validacao ficam no backend; a pre-visualizacao e uma chamada com dryRun.
+
+export interface ImportSalesLeadsParams {
+  product: SalesProduct;
+  pipelineId?: string;
+  responsibleId: string;
+  scriptId: string | null;
+  defaultChannel: SalesChannel;
+}
+
+export interface SalesLeadImportResult {
+  dryRun: boolean;
+  total: number;
+  valid: number;
+  created: number;
+  pipelineId: string;
+  preview: Array<{ line: number; contactName: string; phone: string }>;
+  duplicates: Array<{ line: number; contactName: string; phone: string; reason: string }>;
+  invalid: Array<{ line: number; contactName: string | null; phone: string | null; errors: string[] }>;
+}
+
+export async function importSalesLeadsCsv(params: ImportSalesLeadsParams, file: File, dryRun: boolean) {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("product", params.product);
+  if (params.pipelineId) form.append("pipelineId", params.pipelineId);
+  form.append("responsibleId", params.responsibleId);
+  if (params.scriptId) form.append("scriptId", params.scriptId);
+  form.append("defaultChannel", params.defaultChannel);
+  form.append("dryRun", String(dryRun));
+  const response = await api.post<SalesLeadImportResult>("/sales-crm/leads/import", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data;
+}
+
+export const SALES_LEAD_CSV_TEMPLATE_HEADER = [
+  "nome_contato",
+  "telefone",
+  "nome_estabelecimento",
+  "instagram",
+  "email",
+  "canal",
+  "canal_outro",
+  "observacoes",
+  "proxima_acao",
+  "proxima_acao_em",
+] as const;
+
+// Modelo com ; e BOM UTF-8: e o que o Excel em PT-BR abre com acentos e colunas certas.
+export function buildSalesLeadCsvTemplate(product: SalesProduct) {
+  const business = SALES_PRODUCT_BUSINESS_LABELS[product];
+  const example = [
+    "Maria Silva",
+    "(11) 99999-9999",
+    `Exemplo ${business.singular}`,
+    "@exemplo",
+    "maria@exemplo.com",
+    "Indicação",
+    "",
+    "Conheceu no evento",
+    "Enviar apresentação",
+    "15/12/2026 14:00",
+  ];
+  const content = [SALES_LEAD_CSV_TEMPLATE_HEADER.join(";"), example.join(";")].join("\r\n") + "\r\n";
+  return new Blob(["﻿" + content], { type: "text/csv;charset=utf-8" });
+}

@@ -1,4 +1,4 @@
-import { BookOpen, Building2, Scissors } from "lucide-react";
+import { BookOpen, Building2, Scissors, ShoppingBag } from "lucide-react";
 
 import type { SidebarItem } from "../shared/ProfileSidebar";
 
@@ -10,5 +10,6 @@ export const docsMenuItem: SidebarItem = {
   children: [
     { icon: Building2, label: "SalaOne", href: "/documentacoes/salaone" },
     { icon: Scissors, label: "BarberOne", href: "/documentacoes/barberone" },
+    { icon: ShoppingBag, label: "S1 ORBE", href: "/documentacoes/shopone" },
   ],
 };
