@@ -580,3 +580,165 @@ export function buildSalesLeadCsvTemplate(product: SalesProduct) {
   const content = [SALES_LEAD_CSV_TEMPLATE_HEADER.join(";"), example.join(";")].join("\r\n") + "\r\n";
   return new Blob(["﻿" + content], { type: "text/csv;charset=utf-8" });
 }
+
+// ---- Busca de leads no Google Maps (Apify) - so super_admin ----
+
+export type SalesLeadSearchStatus = "running" | "succeeded" | "failed" | "importing" | "imported";
+// "instagram": lista de perfis informada; "instagram_search": busca por nicho.
+export type SalesLeadSearchSource = "google_maps" | "instagram" | "instagram_search";
+
+export type SalesLeadSearchBudget =
+  | { configured: false; product: SalesProduct }
+  | {
+      configured: true;
+      product: SalesProduct;
+      cycleEndAt: string | null;
+      limitUsd: number;
+      usedUsd: number;
+      reservedUsd: number;
+      availableUsd: number;
+      percent: number;
+      level: "ok" | "warning" | "blocked";
+      maxPlacesAffordable: number;
+    };
+
+export interface SalesLeadSearch {
+  id: string;
+  product: SalesProduct;
+  pipelineId: string;
+  pipelineName: string | null;
+  responsibleId: string;
+  responsibleName: string | null;
+  scriptId: string | null;
+  createdByName: string | null;
+  source: SalesLeadSearchSource;
+  searchTerm: string;
+  location: string | null;
+  usernames: string[];
+  maxPlaces: number;
+  status: SalesLeadSearchStatus;
+  estimatedCostUsd: number;
+  costUsd: number | null;
+  errorMessage: string | null;
+  createdCount: number | null;
+  createdAt: string;
+  finishedAt: string | null;
+  importedAt: string | null;
+}
+
+// Mesmos valores do backend (utils/apifyGoogleMaps.ts), so para a estimativa na tela.
+export const GOOGLE_MAPS_PRICE_PER_PLACE_USD = 0.006;
+export const GOOGLE_MAPS_RUN_OVERHEAD_USD = 0.02;
+export const GOOGLE_MAPS_MIN_PLACES_PER_SEARCH = 10;
+export const GOOGLE_MAPS_MAX_PLACES_PER_SEARCH = 100;
+
+export function estimateGoogleMapsSearchCost(maxPlaces: number) {
+  return maxPlaces * GOOGLE_MAPS_PRICE_PER_PLACE_USD + GOOGLE_MAPS_RUN_OVERHEAD_USD;
+}
+
+// Mesmos valores do backend (utils/apifyInstagram.ts).
+export const INSTAGRAM_PRICE_PER_PROFILE_USD = 0.0026;
+export const INSTAGRAM_RUN_OVERHEAD_USD = 0.02;
+export const INSTAGRAM_MAX_PROFILES_PER_SEARCH = 100;
+
+export function estimateInstagramSearchCost(profiles: number) {
+  return profiles * INSTAGRAM_PRICE_PER_PROFILE_USD + INSTAGRAM_RUN_OVERHEAD_USD;
+}
+
+// Busca por nicho (mesmos valores de utils/instagramNiches.ts no backend).
+export const INSTAGRAM_SEARCH_PRICE_PER_RESULT_USD = 0.0027;
+export const INSTAGRAM_SEARCH_RUN_OVERHEAD_USD = 0.02;
+export const INSTAGRAM_SEARCH_MIN_PROFILES = 10;
+export const INSTAGRAM_SEARCH_MAX_PROFILES = 100;
+
+// Estimativa simples (o backend divide a quantidade entre os termos do nicho).
+export function estimateInstagramNicheSearchCost(profiles: number) {
+  return profiles * INSTAGRAM_SEARCH_PRICE_PER_RESULT_USD + INSTAGRAM_SEARCH_RUN_OVERHEAD_USD;
+}
+
+export type InstagramNicheOption = { key: string; label: string };
+
+export async function listInstagramNiches(product: SalesProduct) {
+  const response = await api.get<{ items: InstagramNicheOption[] }>("/sales-crm/lead-searches/instagram/niches", { params: { product } });
+  return response.data.items;
+}
+
+export async function createInstagramNicheSearch(input: {
+  product: SalesProduct;
+  pipelineId?: string;
+  responsibleId: string;
+  scriptId: string | null;
+  niche: string;
+  location: string;
+  maxProfiles: number;
+}) {
+  const response = await api.post<{ search: SalesLeadSearch }>("/sales-crm/lead-searches/instagram/niche", input);
+  return response.data.search;
+}
+
+// "@usuario", "usuario" ou link do perfil -> usuario em minusculas (null se invalido).
+export function normalizeInstagramUsernameInput(value: string) {
+  let raw = value.trim();
+  const fromUrl = raw.match(/instagram\.com\/([^/?#\s]+)/i);
+  if (fromUrl) raw = fromUrl[1];
+  raw = raw.replace(/^@/, "");
+  if (!/^[A-Za-z0-9._]{1,30}$/.test(raw) || ["p", "reel", "reels", "explore", "stories", "tv", "accounts"].includes(raw.toLowerCase())) return null;
+  return raw.toLowerCase();
+}
+
+// Texto colado (um por linha, virgula ou espaco) -> usuarios unicos e entradas invalidas.
+export function parseInstagramUsernamesInput(text: string) {
+  const usernames: string[] = [];
+  const invalid: string[] = [];
+  for (const item of text.split(/[\s,;]+/)) {
+    if (!item.trim()) continue;
+    const username = normalizeInstagramUsernameInput(item);
+    if (!username) invalid.push(item.trim());
+    else if (!usernames.includes(username)) usernames.push(username);
+  }
+  return { usernames, invalid };
+}
+
+export async function getSalesLeadSearchBudget(product: SalesProduct) {
+  const response = await api.get<{ budget: SalesLeadSearchBudget }>("/sales-crm/lead-searches/budget", { params: { product } });
+  return response.data.budget;
+}
+
+export async function listSalesLeadSearches(product: SalesProduct) {
+  const response = await api.get<{ items: SalesLeadSearch[] }>("/sales-crm/lead-searches", { params: { product } });
+  return response.data.items;
+}
+
+export async function createSalesLeadSearch(input: {
+  product: SalesProduct;
+  pipelineId?: string;
+  responsibleId: string;
+  scriptId: string | null;
+  searchTerm: string;
+  location: string;
+  maxPlaces: number;
+}) {
+  const response = await api.post<{ search: SalesLeadSearch }>("/sales-crm/lead-searches", input);
+  return response.data.search;
+}
+
+export async function createInstagramLeadSearch(input: {
+  product: SalesProduct;
+  pipelineId?: string;
+  responsibleId: string;
+  scriptId: string | null;
+  usernames: string[];
+}) {
+  const response = await api.post<{ search: SalesLeadSearch }>("/sales-crm/lead-searches/instagram", input);
+  return response.data.search;
+}
+
+export async function previewSalesLeadSearch(id: string) {
+  const response = await api.get<SalesLeadImportResult>(`/sales-crm/lead-searches/${id}/preview`);
+  return response.data;
+}
+
+export async function importSalesLeadSearch(id: string) {
+  const response = await api.post<SalesLeadImportResult>(`/sales-crm/lead-searches/${id}/import`);
+  return response.data;
+}

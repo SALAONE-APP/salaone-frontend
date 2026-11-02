@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { AlertTriangle, CircleDot, Filter, Instagram, Loader2, MessageCircle, Phone, Plus, Search, Settings2, Upload, UserCog } from "lucide-react";
+import { AlertTriangle, CircleDot, Filter, Instagram, Loader2, MapPin, MessageCircle, Phone, Plus, Search, Settings2, Upload, UserCog } from "lucide-react";
 import { toast } from "sonner";
 
 import { SalesLeadCreateDialog } from "@/components/SalesLeadCreateDialog";
 import { SalesLeadDetailDialog } from "@/components/SalesLeadDetailDialog";
 import { SalesLeadImportDialog } from "@/components/SalesLeadImportDialog";
 import { InstagramLinkButton, WhatsAppLinkButton } from "@/components/SalesLeadContactLinks";
+import { SalesLeadSearchBudgetAlert, SalesLeadSearchDialog } from "@/components/SalesLeadSearchDialog";
 import { SalesPipelineManagerDialog } from "@/components/SalesPipelineManagerDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,9 @@ import {
   SALES_CONTACT_STATUSES,
   SALES_LOST_REASONS,
   listSalesLeads,
+  getSalesLeadSearchBudget,
+  type SalesLeadSearchBudget,
+  type SalesLeadSearchSource,
   SALES_PRODUCT_BUSINESS_LABELS,
   SALES_PRODUCT_LABELS,
   salesChannelLabel,
@@ -117,6 +121,28 @@ export function SalesCrmKanbanPage() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  // Mantem a ultima fonte para o titulo nao trocar durante a animacao de fechar.
+  const [searchSource, setSearchSource] = useState<SalesLeadSearchSource>("google_maps");
+
+  function openSearch(source: SalesLeadSearchSource) {
+    setSearchSource(source);
+    setSearchOpen(true);
+  }
+  const [searchBudget, setSearchBudget] = useState<SalesLeadSearchBudget | null>(null);
+
+  // Alerta de consumo do credito do Apify (buscas no Google Maps/Instagram) para o super_admin.
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    let cancelled = false;
+    setSearchBudget(null);
+    getSalesLeadSearchBudget(product)
+      .then((budget) => !cancelled && setSearchBudget(budget))
+      .catch(() => null);
+    return () => {
+      cancelled = true;
+    };
+  }, [isSuperAdmin, product]);
 
   const [pendingLostReasonDrag, setPendingLostReasonDrag] = useState<PendingLostReasonDrag | null>(null);
   const [pendingLostReason, setPendingLostReason] = useState("");
@@ -403,6 +429,18 @@ export function SalesCrmKanbanPage() {
               Gerenciar funis
             </Button>
           )}
+          {isSuperAdmin && (
+            <Button size="sm" variant="outline" className="gap-2" onClick={() => openSearch("google_maps")} disabled={!activePipeline}>
+              <MapPin size={14} />
+              Buscar no Google Maps
+            </Button>
+          )}
+          {isSuperAdmin && (
+            <Button size="sm" variant="outline" className="gap-2" onClick={() => openSearch("instagram")} disabled={!activePipeline}>
+              <Instagram size={14} />
+              Buscar no Instagram
+            </Button>
+          )}
           <Button size="sm" variant="outline" className="gap-2" onClick={() => setImportOpen(true)} disabled={!activePipeline}>
             <Upload size={14} />
             Importar CSV
@@ -413,6 +451,8 @@ export function SalesCrmKanbanPage() {
           </Button>
         </div>
       </div>
+
+      {isSuperAdmin && <SalesLeadSearchBudgetAlert budget={searchBudget} compact />}
 
       <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative">
@@ -641,6 +681,17 @@ export function SalesCrmKanbanPage() {
         onClose={() => setImportOpen(false)}
         onImported={() => void load()}
       />
+      {isSuperAdmin && (
+        <SalesLeadSearchDialog
+          product={product}
+          pipeline={activePipeline}
+          source={searchSource}
+          open={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          onImported={() => void load()}
+          onBudgetChange={setSearchBudget}
+        />
+      )}
 
       <SalesPipelineManagerDialog
         product={product}

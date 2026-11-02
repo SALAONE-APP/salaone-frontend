@@ -1,15 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, FileUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
+import { SalesLeadImportPreview } from "@/components/SalesLeadImportPreview";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
-import { cn } from "@/lib/utils";
 import {
   SALES_CHANNELS,
   SALES_PRODUCT_LABELS,
@@ -37,26 +36,6 @@ const MAX_FILE_BYTES = 2 * 1024 * 1024;
 
 // "Outro" exigiria descrever o canal em cada linha; quem precisa disso usa a coluna canal_outro.
 const DEFAULT_CHANNEL_OPTIONS = SALES_CHANNELS.filter((channel) => channel !== "outro");
-
-type PreviewRow = {
-  line: number;
-  contactName: string | null;
-  phone: string | null;
-  status: "ok" | "duplicate" | "invalid";
-  reason: string;
-};
-
-const STATUS_LABELS: Record<PreviewRow["status"], string> = {
-  ok: "Será criado",
-  duplicate: "Duplicado",
-  invalid: "Com erro",
-};
-
-const STATUS_CLASSES: Record<PreviewRow["status"], string> = {
-  ok: "border-transparent bg-[hsl(var(--success)/0.15)] text-[hsl(var(--success))]",
-  duplicate: "border-transparent bg-[hsl(var(--warning)/0.15)] text-[hsl(var(--warning))]",
-  invalid: "border-transparent bg-destructive/15 text-destructive",
-};
 
 function importErrorMessage(error: unknown) {
   const response = (error as { response?: { status?: number; data?: { message?: unknown } } })?.response;
@@ -115,15 +94,6 @@ export function SalesLeadImportDialog({ product, pipeline, open, onClose, onImpo
         .catch(() => null);
     }
   }, [open, isSalesRep, userId, product]);
-
-  const rows = useMemo<PreviewRow[]>(() => {
-    if (!preview) return [];
-    return [
-      ...preview.preview.map((item) => ({ ...item, status: "ok" as const, reason: "" })),
-      ...preview.duplicates.map((item) => ({ ...item, status: "duplicate" as const })),
-      ...preview.invalid.map((item) => ({ line: item.line, contactName: item.contactName, phone: item.phone, status: "invalid" as const, reason: item.errors.join("; ") })),
-    ].sort((a, b) => a.line - b.line);
-  }, [preview]);
 
   function handleDownloadTemplate() {
     const url = URL.createObjectURL(buildSalesLeadCsvTemplate(product));
@@ -313,49 +283,7 @@ export function SalesLeadImportDialog({ product, pipeline, open, onClose, onImpo
           </>
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-lg border border-border p-3">
-                <p className="text-2xl font-semibold text-[hsl(var(--success))]">{preview.valid}</p>
-                <p className="text-xs text-muted-foreground">Serão criados</p>
-              </div>
-              <div className="rounded-lg border border-border p-3">
-                <p className="text-2xl font-semibold text-[hsl(var(--warning))]">{preview.duplicates.length}</p>
-                <p className="text-xs text-muted-foreground">Duplicados (ignorados)</p>
-              </div>
-              <div className="rounded-lg border border-border p-3">
-                <p className="text-2xl font-semibold text-destructive">{preview.invalid.length}</p>
-                <p className="text-xs text-muted-foreground">Com erro</p>
-              </div>
-            </div>
-
-            <div className="max-h-80 overflow-auto rounded-lg border border-border">
-              <table className="w-full text-left text-sm">
-                <thead className="sticky top-0 bg-card text-xs text-muted-foreground">
-                  <tr>
-                    <th className="px-3 py-2 font-medium">Linha</th>
-                    <th className="px-3 py-2 font-medium">Nome</th>
-                    <th className="px-3 py-2 font-medium">Telefone</th>
-                    <th className="px-3 py-2 font-medium">Status</th>
-                    <th className="px-3 py-2 font-medium">Motivo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={`${row.status}-${row.line}`} className="border-t border-border align-top">
-                      <td className="px-3 py-2 tabular-nums text-muted-foreground">{row.line}</td>
-                      <td className="px-3 py-2">{row.contactName || "—"}</td>
-                      <td className="whitespace-nowrap px-3 py-2">{row.phone || "—"}</td>
-                      <td className="px-3 py-2">
-                        <Badge variant="outline" className={cn("whitespace-nowrap", STATUS_CLASSES[row.status])}>
-                          {STATUS_LABELS[row.status]}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">{row.reason || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <SalesLeadImportPreview result={preview} />
 
             {preview.valid === 0 && (
               <p className="text-sm text-destructive">Nenhuma linha válida para importar. Corrija o arquivo e tente de novo.</p>
