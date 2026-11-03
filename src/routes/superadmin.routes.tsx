@@ -4,7 +4,7 @@ import { SuperAdminUsersPage } from "../pages/super_admin/SuperAdminUsersPage";
 import { SuperAdminSubscriptionsPage } from "../pages/super_admin/SuperAdminSubscriptionsPage";
 import { SuperAdminPlansPage } from "../pages/super_admin/SuperAdminPlansPage";
 import { SuperAdminReportsPage } from "../pages/super_admin/SuperAdminReportsPage";
-import { SuperAdminAresChatPage } from "../pages/super_admin/SuperAdminAresChatPage";
+import { SuperAdminSalonFilePage } from "../pages/super_admin/SuperAdminSalonFilePage";
 import { SuperAdminFeatureUpdatesPage } from "../pages/super_admin/SuperAdminFeatureUpdatesPage";
 import { SuperAdminLandingLeadsPage } from "../pages/super_admin/SuperAdminLandingLeadsPage";
 import { SuperAdminFinancialPage } from "../pages/super_admin/SuperAdminFinancialPage";
@@ -31,6 +31,12 @@ export const superAdminRoutes: AppRoute[] = [
     Component: SuperAdminSalonsPage,
   },
   {
+    path: "/salons/:id",
+    title: "Ficha do salão",
+    breadcrumbs: ["Super Admin", "Salões", "Ficha"],
+    Component: SuperAdminSalonFilePage,
+  },
+  {
     path: "/users",
     title: "Usuarios",
     breadcrumbs: ["Super Admin", "Usuarios"],
@@ -53,12 +59,6 @@ export const superAdminRoutes: AppRoute[] = [
     title: "Planos Landing",
     breadcrumbs: ["Super Admin", "Planos Landing"],
     Component: SuperAdminPlansPage,
-  },
-  {
-    path: "/areschat",
-    title: "AresChat",
-    breadcrumbs: ["Super Admin", "AresChat"],
-    Component: SuperAdminAresChatPage,
   },
   {
     path: "/landing-leads",

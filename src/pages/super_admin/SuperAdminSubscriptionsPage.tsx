@@ -1,6 +1,7 @@
 import { SubscriptionPriceChangeDialog } from "@/components/SubscriptionPriceChangeDialog";
 import type { PriceTarget } from "@/service/subscriptionPriceChangeService";
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -502,6 +503,7 @@ export function SuperAdminSubscriptionsPage() {
                   <td className="px-5 py-3 font-medium text-foreground">{fmtCurrency(row.price)}</td>
                   <td className="px-5 py-3">
                     <div className="flex flex-wrap gap-2">
+                    <Link to={`/salons/${row.shop.id}`} className="rounded border border-primary/40 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/10">Abrir ficha</Link>
                     {row.shop.platformSubscription?.platform_plans && <button type="button" className="rounded border border-border px-3 py-1 text-xs" onClick={() => setPriceTarget({ planId: row.shop.platformSubscription!.platform_plans!.id, price: Number(row.shop.platformSubscription!.platform_plans!.price), subscriptionId: row.shop.platformSubscription!.id })}>Atualizar preço no Pagar.me</button>}
                     <button type="button" onClick={() => { setPaymentMode("payment"); setPaymentTarget(row.shop); }} className="rounded bg-primary/10 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/20">Registrar pagamento</button>
                     <button type="button" onClick={() => { setPaymentMode("upgrade"); setPaymentTarget(row.shop); }} className="rounded border border-primary/30 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/10">Fazer upgrade</button>
