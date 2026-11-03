@@ -252,7 +252,7 @@ function mapBackendSalon(salon: BackendSalon): SuperAdminSalon {
   };
 }
 
-async function getSalonMetrics(
+export async function getSalonMetrics(
   salonId: string,
   fallback: SuperAdminSalon["metrics"],
 ): Promise<SuperAdminSalon["metrics"]> {

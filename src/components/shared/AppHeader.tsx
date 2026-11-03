@@ -8,11 +8,6 @@ import { cn } from "@/lib/utils";
 import { getProfileConfig } from "../../config/profileConfig";
 import { useAuth } from "../../hooks/useAuth";
 import { useSidebarMobile } from "../../layouts/ProfileLayout";
-import { AresChatButton } from "../AresChatButton";
-import {
-  getSalonPlatformSubscription,
-  hasActivePlatformSubscription,
-} from "@/service/platformSubscriptionService";
 
 interface AppHeaderProps {
   title: string;
@@ -55,7 +50,6 @@ export function AppHeader({
   const [salon, setSalon] = useState<StoredSalon | null>(() =>
     getStoredSalon()
   );
-  const [canUseAresChat, setCanUseAresChat] = useState(false);
   const profileConfig = getProfileConfig(user?.role === "super_admin" && salonAccess ? "admin" : user?.role);
   const userName = user?.name?.trim() || "Usuario";
   const salonName = salon?.name?.trim() || "SalaOne";
@@ -83,31 +77,6 @@ export function AppHeader({
       window.removeEventListener("salon:updated", refreshSalon);
     };
   }, []);
-
-  useEffect(() => {
-    let active = true;
-
-    if (user?.role !== "admin" && !salonAccess) {
-      setCanUseAresChat(false);
-      return () => {
-        active = false;
-      };
-    }
-
-    getSalonPlatformSubscription()
-      .then(({ subscription }) => {
-        if (active) {
-          setCanUseAresChat(hasActivePlatformSubscription(subscription));
-        }
-      })
-      .catch(() => {
-        if (active) setCanUseAresChat(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [user?.role, salonAccess]);
 
   async function handleSalonChange(salonId: string) {
     if (!salonId || salonId === salon?.id) return;
@@ -178,10 +147,6 @@ export function AppHeader({
         >
           <Link to={actionHref}>{actionLabel}</Link>
         </Button>
-
-        {(user?.role === "admin" || salonAccess) && canUseAresChat && (
-          <AresChatButton salonSlug={salon?.slug} />
-        )}
 
         <div className="flex items-center gap-3 border-l border-border pl-3">
           <Avatar className="h-9 w-9">

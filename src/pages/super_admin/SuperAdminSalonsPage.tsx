@@ -1,25 +1,16 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
-import { CreditCard, Loader2, LogIn, QrCode } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { CreditCard, FileText, Loader2, QrCode } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
 import {
   listSuperAdminSalons,
-  getSuperAdminSalonById,
-  listSuperAdminSalonUsers,
-  updateSuperAdminSalonStatus,
-  deleteSuperAdminSalon,
   createSuperAdminSalonUnit,
-  updateSuperAdminSalonUnitLimit,
   getPlatformPlans,
-  resetSuperAdminUserPassword,
   type SalonStatus,
   type SuperAdminSalon,
-  type SuperAdminSalonDetail,
-  type SuperAdminSalonUser,
   type PlatformPlan,
 } from "@/service/superAdminService";
-import { useAuth } from "@/hooks/useAuth";
 
 function fmtDate(value?: string | null) {
   if (!value) return "-";
@@ -86,8 +77,6 @@ const SUBSCRIPTION_OPTIONS = [
 ];
 
 export function SuperAdminSalonsPage() {
-  const navigate = useNavigate();
-  const { enterSalonAccess } = useAuth();
   const [salons, setSalons] = useState<SuperAdminSalon[]>([]);
   const [platformPlans, setPlatformPlans] = useState<PlatformPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,26 +88,10 @@ export function SuperAdminSalonsPage() {
     q: "", status: "", plan: "", subscriptionStatus: "", createdFrom: "", createdTo: "",
   });
 
-  const [selectedSalon, setSelectedSalon] = useState<SuperAdminSalonDetail | null>(null);
-  const [selectedSalonUsers, setSelectedSalonUsers] = useState<SuperAdminSalonUser[]>([]);
-  const [detailsLoading, setDetailsLoading] = useState(false);
-  const [accessingSalonId, setAccessingSalonId] = useState<string | null>(null);
-  const [deleteModal, setDeleteModal] = useState({ open: false, salonId: "", salonName: "", slug: "", typedSlug: "", isSubmitting: false });
-  const [statusReasonModal, setStatusReasonModal] = useState({
-    open: false, salonId: "", salonName: "", nextStatus: "", reason: "",
-  });
-  const [resetPasswordModal, setResetPasswordModal] = useState({
-    open: false,
-    user: null as SuperAdminSalonUser | null,
-    newPassword: "",
-    generatedPassword: "",
-    isSubmitting: false,
-  });
   const [createUnitModal, setCreateUnitModal] = useState({
     open: false, submitting: false, name: "", phone: "", ownerName: "", ownerEmail: "", ownerPassword: "", maxUnits: "1", unlimited: false,
     billingMode: "free" as "free" | "manual_pix" | "card", negotiatedAmount: "", billingInterval: "month" as "month" | "year", dueDate: "", platformPlanId: "",
   });
-  const [unitLimitModal, setUnitLimitModal] = useState({ open: false, salonId: "", salonName: "", maxUnits: "1", unlimited: false, submitting: false });
 
   const loadSalons = useCallback(async () => {
     const result = await listSuperAdminSalons({
@@ -153,99 +126,6 @@ export function SuperAdminSalonsPage() {
     try { await loadSalons(); } catch { toast.error("Erro ao aplicar filtros."); } finally { setLoading(false); }
   };
 
-  const openDetails = async (salonId: string) => {
-    setDetailsLoading(true);
-    try {
-      const [details, usersData] = await Promise.all([
-        getSuperAdminSalonById(salonId),
-        listSuperAdminSalonUsers(salonId),
-      ]);
-      setSelectedSalon(details);
-      setSelectedSalonUsers(Array.isArray(usersData?.items) ? usersData.items : []);
-    } catch { toast.error("Nao foi possivel carregar os detalhes."); } finally { setDetailsLoading(false); }
-  };
-
-  const closeDetails = () => { setSelectedSalon(null); setSelectedSalonUsers([]); };
-
-  const accessSalon = async (salon: Pick<SuperAdminSalon, "id" | "name">) => {
-    setAccessingSalonId(salon.id);
-    try {
-      await enterSalonAccess(salon.id);
-      toast.success(`Acessando o painel de ${salon.name}.`);
-      navigate("/home", { replace: true });
-    } catch (error) {
-      toast.error((error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Não foi possível acessar este salão.");
-    } finally {
-      setAccessingSalonId(null);
-    }
-  };
-
-  const performStatusUpdate = async (salonId: string, nextStatus: string, reason?: string | null) => {
-    try {
-      await updateSuperAdminSalonStatus(salonId, nextStatus as SalonStatus, reason);
-      toast.success("Status atualizado com sucesso.");
-      await loadSalons();
-      if (selectedSalon?.id === salonId) {
-        const details = await getSuperAdminSalonById(salonId);
-        setSelectedSalon(details);
-      }
-    } catch { toast.error("Nao foi possivel atualizar o status."); }
-  };
-
-  const closeDeleteModal = () => setDeleteModal({ open: false, salonId: "", salonName: "", slug: "", typedSlug: "", isSubmitting: false });
-
-  const submitDeleteModal = async () => {
-    setDeleteModal((p) => ({ ...p, isSubmitting: true }));
-    try {
-      const result = await deleteSuperAdminSalon(deleteModal.salonId, deleteModal.typedSlug.trim());
-      toast.success(`Salão ${result.name} excluído (${result.deletedUsers} usuário(s) removido(s)).`);
-      closeDeleteModal();
-      await loadSalons();
-    } catch (err) {
-      setDeleteModal((p) => ({ ...p, isSubmitting: false }));
-      toast.error((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Não foi possível excluir o salão.");
-    }
-  };
-
-  const handleStatusUpdate = async (salonId: string, nextStatus: string) => {
-    if (nextStatus === "blocked" || nextStatus === "inactive") {
-      const shop = salons.find((s) => s.id === salonId);
-      setStatusReasonModal({ open: true, salonId, salonName: shop?.name ?? "Salão", nextStatus, reason: "" });
-      return;
-    }
-    await performStatusUpdate(salonId, nextStatus, null);
-  };
-
-  const closeStatusReasonModal = () =>
-    setStatusReasonModal({ open: false, salonId: "", salonName: "", nextStatus: "", reason: "" });
-
-  const submitStatusReasonModal = async () => {
-    const reason = statusReasonModal.reason.trim() || null;
-    const { salonId, nextStatus } = statusReasonModal;
-    closeStatusReasonModal();
-    await performStatusUpdate(salonId, nextStatus, reason);
-  };
-
-  const openResetPasswordModal = (user: SuperAdminSalonUser) =>
-    setResetPasswordModal({ open: true, user, newPassword: "", generatedPassword: "", isSubmitting: false });
-
-  const closeResetPasswordModal = () =>
-    setResetPasswordModal({ open: false, user: null, newPassword: "", generatedPassword: "", isSubmitting: false });
-
-  const submitResetPasswordModal = async () => {
-    if (!resetPasswordModal.user) return;
-    setResetPasswordModal((p) => ({ ...p, isSubmitting: true }));
-    try {
-      const pw = resetPasswordModal.newPassword.trim() || undefined;
-      const res = await resetSuperAdminUserPassword(resetPasswordModal.user.id, pw);
-      setResetPasswordModal((p) => ({ ...p, generatedPassword: res?.password ?? "", isSubmitting: false }));
-      toast.success("Senha redefinida com sucesso.");
-    } catch {
-      setResetPasswordModal((p) => ({ ...p, isSubmitting: false }));
-      toast.error("Erro ao redefinir senha.");
-    }
-  };
-
   const closeCreateUnitModal = () => setCreateUnitModal({ open: false, submitting: false, name: "", phone: "", ownerName: "", ownerEmail: "", ownerPassword: "", maxUnits: "1", unlimited: false, billingMode: "free", negotiatedAmount: "", billingInterval: "month", dueDate: "", platformPlanId: "" });
   const submitCreateUnit = async () => {
     const form = createUnitModal;
@@ -276,21 +156,6 @@ export function SuperAdminSalonsPage() {
     }
   };
 
-  const submitUnitLimit = async () => {
-    const maxSalonUnits = unitLimitModal.unlimited ? null : Number(unitLimitModal.maxUnits);
-    if (maxSalonUnits !== null && (!Number.isInteger(maxSalonUnits) || maxSalonUnits < 1)) { toast.error("Informe um limite de unidades válido."); return; }
-    setUnitLimitModal((value) => ({ ...value, submitting: true }));
-    try {
-      const result = await updateSuperAdminSalonUnitLimit(unitLimitModal.salonId, maxSalonUnits);
-      toast.success(result.maxSalonUnits === null ? "Unidades ilimitadas liberadas." : `Limite atualizado para ${result.maxSalonUnits} unidade(s).`);
-      setUnitLimitModal({ open: false, salonId: "", salonName: "", maxUnits: "1", unlimited: false, submitting: false });
-      await loadSalons();
-    } catch (error) {
-      toast.error((error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Não foi possível atualizar o limite de unidades.");
-      setUnitLimitModal((value) => ({ ...value, submitting: false }));
-    }
-  };
-
   const subscriptionsByShop: Record<string, { planName: string | null; price: number | null }> = {};
   for (const shop of salons) {
     const platformSub = shop.platformSubscription;
@@ -306,7 +171,7 @@ export function SuperAdminSalonsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h3 className="text-base font-semibold text-foreground">Gestao de Salões</h3><p className="text-sm text-muted-foreground">Filtre, visualize detalhes e atualize o status das salões.</p></div>
+        <div><h3 className="text-base font-semibold text-foreground">Gestao de Salões</h3><p className="text-sm text-muted-foreground">Filtre os salões e abra a ficha para ver detalhes, assinatura e ações.</p></div>
         <button type="button" onClick={() => setCreateUnitModal((current) => ({ ...current, open: true }))} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">Cadastrar unidade</button>
       </div>
 
@@ -382,17 +247,9 @@ export function SuperAdminSalonsPage() {
                     </div>
                   </td>
                   <td className="px-5 py-3">
-                    <div className="flex flex-wrap gap-1">
-                      <button type="button" onClick={() => void openDetails(shop.id)} className="rounded bg-secondary px-2 py-1 text-xs font-medium text-foreground hover:bg-secondary/80">Detalhes</button>
-                      <button type="button" onClick={() => void accessSalon(shop)} disabled={accessingSalonId !== null} className="inline-flex items-center gap-1 rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
-                        {accessingSalonId === shop.id ? <Loader2 size={12} className="animate-spin" /> : <LogIn size={12} />} Acessar
-                      </button>
-                      <button type="button" onClick={() => setUnitLimitModal({ open: true, salonId: shop.id, salonName: shop.name, maxUnits: "1", unlimited: false, submitting: false })} className="rounded border border-primary/30 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10">Unidades</button>
-                      <button type="button" onClick={() => void handleStatusUpdate(shop.id, "active")} className="rounded bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-500/20">Ativar</button>
-                      <button type="button" onClick={() => void handleStatusUpdate(shop.id, "inactive")} className="rounded bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-500/20">Inativar</button>
-                      <button type="button" onClick={() => void handleStatusUpdate(shop.id, "blocked")} className="rounded bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/20">Bloquear</button>
-                      <button type="button" onClick={() => setDeleteModal({ open: true, salonId: shop.id, salonName: shop.name, slug: shop.slug, typedSlug: "", isSubmitting: false })} className="rounded border border-destructive/40 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10">Excluir</button>
-                    </div>
+                    <Link to={`/salons/${shop.id}`} className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10">
+                      <FileText size={13} /> Ficha
+                    </Link>
                   </td>
                 </tr>
               ))}
@@ -437,199 +294,6 @@ export function SuperAdminSalonsPage() {
         </div>
       )}
 
-      {unitLimitModal.open && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => !unitLimitModal.submitting && setUnitLimitModal((value) => ({ ...value, open: false }))}>
-          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl" onClick={(event) => event.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-foreground">Gerenciar unidades</h3><p className="mt-1 text-sm text-muted-foreground">{unitLimitModal.salonName}. Este limite vale para todas as unidades do mesmo responsável.</p>
-            <div className="mt-5 space-y-4"><label className="block text-sm font-medium text-foreground">Quantidade máxima de unidades<input type="number" min="1" disabled={unitLimitModal.unlimited} value={unitLimitModal.maxUnits} onChange={(event) => setUnitLimitModal((value) => ({ ...value, maxUnits: event.target.value }))} className="mt-1 h-10 w-full rounded-lg border border-border bg-background px-3 disabled:opacity-50" /></label><label className="flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={unitLimitModal.unlimited} onChange={(event) => setUnitLimitModal((value) => ({ ...value, unlimited: event.target.checked }))} /> Liberar unidades ilimitadas</label></div>
-            <p className="mt-4 rounded-lg bg-secondary/50 p-3 text-xs text-muted-foreground">Não é possível definir um limite menor que a quantidade de unidades já vinculadas.</p>
-            <div className="mt-5 flex justify-end gap-2"><button type="button" disabled={unitLimitModal.submitting} onClick={() => setUnitLimitModal((value) => ({ ...value, open: false }))} className="rounded border border-border px-4 py-2 text-sm">Cancelar</button><button type="button" disabled={unitLimitModal.submitting} onClick={() => void submitUnitLimit()} className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{unitLimitModal.submitting ? "Salvando..." : "Salvar limite"}</button></div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Detalhes */}
-      {selectedSalon && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={closeDetails}>
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            {detailsLoading ? (
-              <div className="flex justify-center py-10"><Loader2 className="animate-spin text-muted-foreground" size={24} /></div>
-            ) : (
-              <>
-                <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-foreground">{selectedSalon.name}</h3>
-                  <button type="button" onClick={closeDetails} className="rounded border border-border px-3 py-1 text-sm text-muted-foreground hover:bg-secondary">Fechar</button>
-                </div>
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                  <div className="space-y-2 text-sm">
-                    <h4 className="font-semibold text-foreground">Dados principais</h4>
-                    <p><strong className="text-muted-foreground">Slug:</strong> <span className="text-foreground">{selectedSalon.slug}</span></p>
-                    <p><strong className="text-muted-foreground">Tipo de empresa:</strong> <span className="text-foreground">{businessTypeLabel(selectedSalon.businessType)}</span></p>
-                    <p><strong className="text-muted-foreground">Email:</strong> <span className="text-foreground">{selectedSalon.email ?? "-"}</span></p>
-                    <p><strong className="text-muted-foreground">Telefone:</strong> <span className="text-foreground">{selectedSalon.phone ?? "-"}</span></p>
-                    <p><strong className="text-muted-foreground">CNPJ:</strong> <span className="text-foreground">{selectedSalon.cnpj ?? "-"}</span></p>
-                    <p><strong className="text-muted-foreground">Status:</strong> <StatusBadge status={selectedSalon.status} /></p>
-                    <p><strong className="text-muted-foreground">Criada em:</strong> <span className="text-foreground">{fmtDate(selectedSalon.createdAt)}</span></p>
-                  </div>
-                  <div className="space-y-2 text-sm">
-                    <h4 className="font-semibold text-foreground">Assinaturas recentes</h4>
-                    {!selectedSalon.subscriptions?.length ? (
-                      <p className="text-muted-foreground">Sem assinaturas registradas.</p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {selectedSalon.subscriptions.map((sub) => (
-                          <li key={sub.id} className="rounded-lg border border-border bg-secondary/30 p-3">
-                            <p className="font-medium text-foreground">{sub.subscription_plans?.name ?? "Plano desconhecido"}</p>
-                            <p className="text-xs text-muted-foreground">Status: {sub.status}</p>
-                            <p className="text-xs text-muted-foreground">Proxima cobranca: {fmtDate(sub.next_billing_at)}</p>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-                {selectedSalonUsers.length > 0 && (
-                  <div className="mt-5 space-y-2">
-                    <h4 className="text-sm font-semibold text-foreground">Usuarios vinculados ({selectedSalonUsers.length})</h4>
-                    <div className="overflow-hidden rounded-lg border border-border">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                            <th className="px-4 py-2">Nome</th>
-                            <th className="px-4 py-2">Email</th>
-                            <th className="px-4 py-2">Telefone</th>
-                            <th className="px-4 py-2">Perfil</th>
-                            <th className="px-4 py-2">Criacao</th>
-                            <th className="px-4 py-2">Acoes</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedSalonUsers.map((u) => (
-                            <tr key={u.id} className="border-b border-border last:border-0">
-                              <td className="px-4 py-2 font-medium text-foreground">{u.name}</td>
-                              <td className="px-4 py-2 text-muted-foreground">{u.email ?? "-"}</td>
-                              <td className="px-4 py-2 text-muted-foreground">{u.phone ?? "-"}</td>
-                              <td className="px-4 py-2 text-muted-foreground">{u.role}</td>
-                              <td className="px-4 py-2 text-muted-foreground">{fmtDate(u.created_at)}</td>
-                              <td className="px-4 py-2">
-                                <button type="button" onClick={() => openResetPasswordModal(u)}
-                                  className="rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-secondary">
-                                  Resetar senha
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Modal Excluir salao */}
-      {deleteModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={closeDeleteModal}>
-          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-3 text-lg font-semibold text-destructive">Excluir salão permanentemente</h3>
-            <p className="mb-3 text-sm text-muted-foreground">
-              Isso apaga <strong className="text-foreground">{deleteModal.salonName}</strong> e todos os dados vinculados (agendamentos, clientes, serviços, produtos, funcionários e usuários que ficarem sem salão). Não pode ser desfeito.
-            </p>
-            <p className="mb-2 text-sm text-muted-foreground">Digite o slug <code className="rounded bg-secondary px-1 text-foreground">{deleteModal.slug}</code> para confirmar:</p>
-            <input type="text" value={deleteModal.typedSlug} onChange={(e) => setDeleteModal((p) => ({ ...p, typedSlug: e.target.value }))}
-              className="mb-4 h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-destructive/40" />
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={closeDeleteModal} className="rounded border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-secondary">Cancelar</button>
-              <button type="button" onClick={() => void submitDeleteModal()} disabled={deleteModal.isSubmitting || deleteModal.typedSlug.trim() !== deleteModal.slug}
-                className="rounded bg-destructive px-4 py-2 text-sm font-medium text-white hover:bg-destructive/90 disabled:opacity-40">
-                {deleteModal.isSubmitting ? "Excluindo..." : "Excluir definitivamente"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Motivo de status */}
-      {statusReasonModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={closeStatusReasonModal}>
-          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-foreground">
-                {statusReasonModal.nextStatus === "blocked" ? "Bloquear salão" : "Inativar salão"}
-              </h3>
-              <button type="button" onClick={closeStatusReasonModal} className="rounded border border-border px-3 py-1 text-sm text-muted-foreground hover:bg-secondary">Fechar</button>
-            </div>
-            <p className="mb-4 text-sm text-muted-foreground">
-              Informe um motivo (opcional) para {statusReasonModal.nextStatus === "blocked" ? "bloquear" : "inativar"}{" "}
-              <strong className="text-foreground">{statusReasonModal.salonName}</strong>.
-            </p>
-            <textarea value={statusReasonModal.reason}
-              onChange={(e) => setStatusReasonModal((p) => ({ ...p, reason: e.target.value }))}
-              rows={4} placeholder="Ex.: pendencia financeira, solicitacao do responsavel..."
-              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-            />
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={closeStatusReasonModal} className="rounded border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-secondary">Cancelar</button>
-              <button type="button" onClick={() => void submitStatusReasonModal()}
-                className={`rounded px-4 py-2 text-sm font-medium text-white ${statusReasonModal.nextStatus === "blocked" ? "bg-destructive hover:bg-destructive/90" : "bg-amber-600 hover:bg-amber-700"}`}>
-                Confirmar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Resetar senha */}
-      {resetPasswordModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={closeResetPasswordModal}>
-          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-foreground">Redefinir Senha</h3>
-              <button type="button" onClick={closeResetPasswordModal} className="rounded border border-border px-3 py-1 text-sm text-muted-foreground hover:bg-secondary">Fechar</button>
-            </div>
-            {!resetPasswordModal.generatedPassword ? (
-              <>
-                <p className="mb-4 text-sm text-muted-foreground">
-                  Redefinir senha de <strong className="text-foreground">{resetPasswordModal.user?.name ?? resetPasswordModal.user?.email}</strong>.
-                </p>
-                <div className="mb-4 space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Nova senha (deixe vazio para gerar automaticamente)</label>
-                  <input type="text" value={resetPasswordModal.newPassword}
-                    onChange={(e) => setResetPasswordModal((p) => ({ ...p, newPassword: e.target.value }))}
-                    placeholder="Ex.: Abc@1234"
-                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <button type="button" onClick={closeResetPasswordModal} className="rounded border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-secondary">Cancelar</button>
-                  <button type="button" onClick={() => void submitResetPasswordModal()} disabled={resetPasswordModal.isSubmitting}
-                    className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-                    {resetPasswordModal.isSubmitting ? "Redefinindo..." : "Confirmar"}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="mb-3 text-sm text-muted-foreground">Senha redefinida com sucesso!</p>
-                <div className="mb-3 space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Senha temporaria</label>
-                  <input type="text" readOnly value={resetPasswordModal.generatedPassword}
-                    onClick={(e) => (e.target as HTMLInputElement).select()}
-                    className="h-9 w-full cursor-text rounded-lg border border-border bg-secondary px-3 font-mono text-sm text-foreground focus:outline-none"
-                  />
-                </div>
-                <p className="mb-4 text-xs text-muted-foreground">Compartilhe esta senha com o usuario. Ele devera altera-la no primeiro acesso.</p>
-                <div className="flex justify-end">
-                  <button type="button" onClick={closeResetPasswordModal} className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">Concluido</button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
