@@ -224,6 +224,13 @@ export interface SalesScriptAttachment {
   createdAt: string;
 }
 
+// Tema do script: titulo curto + resposta pronta para o lead.
+export interface SalesScriptTopic {
+  id?: string;
+  title: string;
+  response: string;
+}
+
 export interface SalesScript {
   id: string;
   product: SalesProduct;
@@ -236,6 +243,7 @@ export interface SalesScript {
   createdAt: string;
   updatedAt: string;
   attachments: SalesScriptAttachment[];
+  topics: SalesScriptTopic[];
 }
 
 export interface SalesDashboardSummary {
@@ -354,6 +362,7 @@ export interface CreateSalesScriptInput {
   version: string;
   channel?: string | null;
   content: string;
+  topics?: SalesScriptTopic[];
   active?: boolean;
 }
 
@@ -362,6 +371,7 @@ export interface UpdateSalesScriptInput {
   version?: string;
   channel?: string | null;
   content?: string;
+  topics?: SalesScriptTopic[];
   active?: boolean;
 }
 
