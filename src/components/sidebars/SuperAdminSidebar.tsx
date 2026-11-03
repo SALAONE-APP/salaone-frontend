@@ -8,7 +8,6 @@ import {
   Handshake,
   LayoutDashboard,
   Megaphone,
-  MessageSquareMore,
   Users,
 } from "lucide-react";
 
@@ -25,7 +24,6 @@ const sections: SidebarSection[] = [
       { icon: Users, label: "Usuarios", href: "/users" },
       { icon: CreditCard, label: "Assinaturas", href: "/subscriptions" },
       { icon: FileText, label: "Planos Landing", href: "/platform-plans" },
-      { icon: MessageSquareMore, label: "AresChat", href: "/areschat" },
       { icon: ContactRound, label: "Contatos interessados", href: "/landing-leads" },
       { icon: Megaphone, label: "Novas Funcionalidades", href: "/feature-updates" },
       { icon: BarChart3, label: "Relatorios", href: "/reports" },
