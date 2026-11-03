@@ -261,7 +261,7 @@ export function Login() {
             <GoogleLoginButton
               disabled={loading || googleLoading}
               onAccessToken={handleGoogleLogin}
-              onError={() => setErrorMessage("NÃ£o foi possÃ­vel autenticar com o Google. Tente novamente.")}
+              onError={() => setErrorMessage("Não foi possível autenticar com o Google. Tente novamente.")}
             />
           )}
           <button
