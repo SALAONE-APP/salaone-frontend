@@ -19,6 +19,7 @@ import {
   UserCog,
   Users,
   Zap,
+  MessageCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -76,6 +77,15 @@ function buildSections(canUseCrm: boolean): SidebarSection[] {
             { icon: Boxes, label: "Estoque", href: "/stock" },
             { icon: Image, label: "Galeria", href: "/gallery" },
           ],
+        },
+      ],
+    },
+    {
+      items: [
+        {
+          icon: MessageCircle,
+          label: "Comunicacao",
+          children: [{ icon: MessageCircle, label: "WhatsApp", href: "/whatsapp" }],
         },
       ],
     },

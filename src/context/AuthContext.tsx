@@ -13,6 +13,7 @@ import {
   listAccessibleSalons,
   type AuthResponse,
   type GooglePreRegistration,
+  verifyWhatsAppLoginCode,
 } from "../service/authService";
 
 export interface User {
@@ -38,6 +39,7 @@ export interface AuthContextData {
   accessibleSalons: AccessibleSalon[];
   login: (email: string, password: string) => Promise<User & Pick<AuthResponse, "accessStatus">>;
   loginWithGoogle: (accessToken: string, preRegistration?: GooglePreRegistration) => Promise<AuthResponse>;
+  loginWithWhatsAppCode: (requestId: string, code: string) => Promise<User & Pick<AuthResponse, "accessStatus">>;
   logout: () => void;
   updateUser: (user: User) => void;
   enterSalonAccess: (salonId: string) => Promise<StoredSalon>;
@@ -133,7 +135,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user?.id, user?.role]);
 
   async function login(email: string, password: string): Promise<User & Pick<AuthResponse, "accessStatus">> {
-    const response = await loginRequest({ email, password });
+    return startSession(await loginRequest({ email, password }));
+  }
+
+  // Login sem senha: código recebido no WhatsApp
+  async function loginWithWhatsAppCode(requestId: string, code: string): Promise<User & Pick<AuthResponse, "accessStatus">> {
+    return startSession(await verifyWhatsAppLoginCode(requestId, code));
+  }
+
+  async function startSession(response: AuthResponse): Promise<User & Pick<AuthResponse, "accessStatus">> {
     localStorage.setItem("user", JSON.stringify(response.user));
     localStorage.removeItem(SUPER_ADMIN_ACCESS_STORAGE_KEY);
     setSalonAccess(null);
@@ -224,6 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         accessibleSalons,
         login,
         loginWithGoogle,
+        loginWithWhatsAppCode,
         logout,
         updateUser,
         enterSalonAccess,

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Mail, Phone } from "lucide-react";
+import { WhatsAppLoginDialog } from "../components/WhatsAppLoginDialog";
 import { useGoogleLogin } from "@react-oauth/google";
 
 import loginProfessional from "../assets/image/salaone-login-professional.png";
@@ -77,6 +78,7 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showWhatsAppLogin, setShowWhatsAppLogin] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [accessBlocked, setAccessBlocked] = useState<"SALON_BLOCKED" | "TRIAL_EXPIRED" | null>(null);
   const [googleToken, setGoogleToken] = useState("");
@@ -250,20 +252,30 @@ export function Login() {
             {loading ? "Entrando..." : "Entrar"}
           </button>
 
+          <div className="my-6 flex items-center gap-4">
+            <div className="h-px flex-1 bg-[#E5DDE5]" />
+            <span className="text-sm text-[#6E6E6E]">ou</span>
+            <div className="h-px flex-1 bg-[#E5DDE5]" />
+          </div>
           {googleEnabled && (
-            <>
-              <div className="my-6 flex items-center gap-4">
-                <div className="h-px flex-1 bg-[#E5DDE5]" />
-                <span className="text-sm text-[#6E6E6E]">ou</span>
-                <div className="h-px flex-1 bg-[#E5DDE5]" />
-              </div>
-              <GoogleLoginButton
-                disabled={loading || googleLoading}
-                onAccessToken={handleGoogleLogin}
-                onError={() => setErrorMessage("NÃ£o foi possÃ­vel autenticar com o Google. Tente novamente.")}
-              />
-            </>
+            <GoogleLoginButton
+              disabled={loading || googleLoading}
+              onAccessToken={handleGoogleLogin}
+              onError={() => setErrorMessage("NÃ£o foi possÃ­vel autenticar com o Google. Tente novamente.")}
+            />
           )}
+          <button
+            type="button"
+            onClick={() => {
+              setErrorMessage("");
+              setShowWhatsAppLogin(true);
+            }}
+            disabled={loading || googleLoading}
+            className={`${googleEnabled ? "mt-3 " : ""}flex h-12 w-full items-center justify-center gap-3 rounded-lg border border-[#E5DDE5] bg-white text-sm font-semibold text-[#1A1A1A] shadow-sm transition hover:border-emerald-500/40 hover:bg-[#F8F1F7] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-60`}
+          >
+            <Phone className="h-5 w-5 text-emerald-600" />
+            Entrar com o telefone (código no WhatsApp)
+          </button>
 
           <p className="mt-7 text-center text-sm text-muted-foreground">
             Ainda não possui uma conta?{" "}
@@ -273,6 +285,15 @@ export function Login() {
           </p>
         </form>
       </main>
+      {showWhatsAppLogin && (
+        <WhatsAppLoginDialog
+          onClose={() => setShowWhatsAppLogin(false)}
+          onSuccess={(loggedUser) => {
+            setShowWhatsAppLogin(false);
+            navigate(loggedUser.accessStatus === "TRIAL_EXPIRED" ? "/trial-expired" : getDefaultRouteForRole(loggedUser.role), { replace: true });
+          }}
+        />
+      )}
       <Dialog open={accessBlocked !== null} onOpenChange={(open) => !open && setAccessBlocked(null)}>
         <DialogContent className="sm:max-w-md" showCloseButton={false}>
           <DialogHeader>

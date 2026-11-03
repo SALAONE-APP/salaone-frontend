@@ -107,6 +107,23 @@ export async function login(data: LoginPayload): Promise<AuthResponse> {
   return hydrateLoginResponse(response.data);
 }
 
+export interface WhatsAppLoginCodeRequest {
+  requestId: string;
+  expiresInMinutes: number;
+  phone: string; // mascarado pelo servidor
+}
+
+// Pede um código de acesso de 6 dígitos, enviado pelo WhatsApp para o telefone cadastrado.
+export async function requestWhatsAppLoginCode(phone: string) {
+  return (await api.post<WhatsAppLoginCodeRequest>("/auth/whatsapp-login/request", { phone })).data;
+}
+
+// Confere o código e salva a sessão, como no login por e-mail.
+export async function verifyWhatsAppLoginCode(requestId: string, code: string): Promise<AuthResponse> {
+  const response = await api.post<BackendAuthResponse>("/auth/whatsapp-login/verify", { requestId, code });
+  return hydrateLoginResponse(response.data);
+}
+
 export async function googleLogin(accessToken: string, preRegistration?: GooglePreRegistration): Promise<AuthResponse> {
   const response = await api.post<BackendAuthResponse | AuthResponse>("/auth/google", { accessToken, ...preRegistration });
   if ("requiresProfileCompletion" in response.data && response.data.requiresProfileCompletion) {

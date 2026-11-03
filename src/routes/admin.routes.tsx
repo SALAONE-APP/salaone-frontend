@@ -1,5 +1,6 @@
 import { AdminDashboard } from "../pages/admin/AdminDashboard";
 import { AdminSettingsPage } from "../pages/admin/AdminSettingsPage";
+import { WhatsAppPage } from "../pages/admin/WhatsAppPage";
 import { MyUnitsPage } from "../pages/admin/MyUnitsPage";
 import { EmployeePayrollPage } from "../pages/admin/EmployeePayrollPage";
 import { EmployeeAppointmentHistoryPage } from "../pages/admin/EmployeeAppointmentHistoryPage";
@@ -173,6 +174,12 @@ export const adminRoutes: AppRoute[] = [
     title: "Avaliacoes",
     breadcrumbs: ["Relacionamento", "Avaliacoes"],
     Component: () => <CrmFeatureGate><ReviewsPage /></CrmFeatureGate>,
+  },
+  {
+    path: "/whatsapp",
+    title: "WhatsApp",
+    breadcrumbs: ["Comunicacao", "WhatsApp"],
+    Component: WhatsAppPage,
   },
   {
     path: "/settings",
