@@ -74,6 +74,20 @@ function toDateTimeLocalInput(value: string | null) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function quizPayload(value: unknown): { score?: number; temperature?: string; salesSummary?: string; mainPainLabel?: string; answers?: Array<{ question: string; answer: string }> } | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as { qualification?: { score?: unknown; temperature?: unknown; mainPainLabel?: unknown }; salesSummary?: unknown; answers?: unknown };
+  return {
+    score: typeof raw.qualification?.score === "number" ? raw.qualification.score : undefined,
+    temperature: typeof raw.qualification?.temperature === "string" ? raw.qualification.temperature : undefined,
+    mainPainLabel: typeof raw.qualification?.mainPainLabel === "string" ? raw.qualification.mainPainLabel : undefined,
+    salesSummary: typeof raw.salesSummary === "string" ? raw.salesSummary : undefined,
+    answers: Array.isArray(raw.answers)
+      ? raw.answers.filter((answer): answer is { question: string; answer: string } => Boolean(answer) && typeof answer.question === "string" && typeof answer.answer === "string")
+      : undefined,
+  };
+}
+
 export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === "super_admin";
@@ -270,6 +284,33 @@ export function SalesLeadDetailDialog({ leadId, onClose, onChanged }: Props) {
             </div>
           ) : (
             <>
+              {lead.channel === "quiz" && (() => {
+                const quiz = quizPayload(lead.quizPayload);
+                return quiz ? (
+                  <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 text-sm">
+                    <div className="mb-2 flex flex-wrap gap-2">
+                      <Badge>Quiz</Badge>
+                      {quiz.score !== undefined && <Badge variant="outline">Pontuação: {quiz.score}</Badge>}
+                      {quiz.temperature && <Badge variant="outline">Temperatura: {quiz.temperature}</Badge>}
+                    </div>
+                    {quiz.mainPainLabel && <p><span className="font-medium">Principal dificuldade:</span> {quiz.mainPainLabel}</p>}
+                    {quiz.salesSummary && <p className="mt-1 whitespace-pre-wrap"><span className="font-medium">Resumo comercial:</span> {quiz.salesSummary}</p>}
+                    {quiz.answers && quiz.answers.length > 0 && (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer font-medium">Respostas completas do Quiz</summary>
+                        <dl className="mt-2 space-y-2">
+                          {quiz.answers.map((answer, index) => (
+                            <div key={`${answer.question}-${index}`}>
+                              <dt className="font-medium">{answer.question}</dt>
+                              <dd className="text-muted-foreground">{answer.answer}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </details>
+                    )}
+                  </div>
+                ) : null;
+              })()}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <Label>Nome do contato</Label>
