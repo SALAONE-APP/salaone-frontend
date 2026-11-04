@@ -29,7 +29,7 @@ export function isSalesProduct(value: string): value is SalesProduct {
 
 // Listas fechadas espelhando salesCrmSchemas.ts (backend) - validadas via Joi
 // contra string, não enum de banco, para poder evoluir sem migration.
-export const SALES_CHANNELS = ["instagram", "tiktok", "indicacao", "youtube", "google_meu_negocio", "outro"] as const;
+export const SALES_CHANNELS = ["instagram", "tiktok", "indicacao", "youtube", "google_meu_negocio", "quiz", "outro"] as const;
 export type SalesChannel = (typeof SALES_CHANNELS)[number];
 
 export const SALES_LOST_REASONS = [
@@ -71,6 +71,7 @@ export const SALES_CHANNEL_LABELS: Record<SalesChannel, string> = {
   indicacao: "Indicação",
   youtube: "YouTube",
   google_meu_negocio: "Google Meu Negócio",
+  quiz: "Quiz",
   outro: "Outro",
 };
 
@@ -191,6 +192,8 @@ export interface SalesLead {
   nextAction: string | null;
   nextActionAt: string | null;
   notes: string | null;
+  quizSubmissionId?: string | null;
+  quizPayload?: unknown | null;
   sortOrder: number;
   resolvedAt: string | null;
   createdAt: string;
